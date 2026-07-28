@@ -50,10 +50,12 @@ export function ProjectsTable({
   title,
   data,
   showAdd = true,
+  readOnly = false,
 }: {
   title: string;
   data: Project[];
   showAdd?: boolean;
+  readOnly?: boolean;
 }) {
   const { addProject, updateProject, deleteProject, duplicateProject } = useProjects();
   const [search, setSearch] = useState("");
@@ -174,7 +176,7 @@ export function ProjectsTable({
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <ExportButtons rows={exportRows} filename={title} />
-          {showAdd && (
+          {showAdd && !readOnly && (
             <Button
               onClick={() => {
                 setEditing(null);
@@ -272,32 +274,37 @@ export function ProjectsTable({
                         <DropdownMenuItem onClick={() => setViewing(p)}>
                           <Eye className="mr-2 h-4 w-4" /> View Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setEditing(p);
-                            setModalOpen(true);
-                          }}
-                        >
-                          <Pencil className="mr-2 h-4 w-4" /> Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            duplicateProject(p.id);
-                            toast.success("Project duplicated");
-                          }}
-                        >
-                          <Copy className="mr-2 h-4 w-4" /> Duplicate
-                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => printInvoice(p)}>
                           <Printer className="mr-2 h-4 w-4" /> Print Invoice
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => setDeleteId(p.id)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
-                        </DropdownMenuItem>
+                        {!readOnly && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditing(p);
+                                setModalOpen(true);
+                              }}
+                            >
+                              <Pencil className="mr-2 h-4 w-4" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                duplicateProject(p.id);
+                                toast.success("Project duplicated");
+                              }}
+                            >
+                              <Copy className="mr-2 h-4 w-4" /> Duplicate
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => setDeleteId(p.id)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

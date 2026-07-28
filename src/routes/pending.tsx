@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ProjectsTable } from "@/components/projects-table";
+import { StatsCards } from "@/components/stats-cards";
 import { useProjects } from "@/lib/projects-context";
 import { getBalance } from "@/lib/project-types";
 
@@ -20,5 +21,10 @@ export const Route = createFileRoute("/pending")({
 function PendingPage() {
   const { projects } = useProjects();
   const pending = projects.filter((p) => getBalance(p) > 0);
-  return <ProjectsTable title="Pending Payments" data={pending} showAdd={false} />;
-}
+  return (
+    <div className="space-y-6">
+      <StatsCards />
+      <ProjectsTable title="Pending Payments" data={pending} showAdd={false} readOnly={true} />
+    </div>
+  );
+}

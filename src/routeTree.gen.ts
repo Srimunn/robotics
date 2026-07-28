@@ -9,25 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SpotRouteImport } from './routes/spot'
-import { Route as PendingRouteImport } from './routes/pending'
-import { Route as OngoingRouteImport } from './routes/ongoing'
-import { Route as CompletedRouteImport } from './routes/completed'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CompletedRouteImport } from './routes/completed'
+import { Route as OngoingRouteImport } from './routes/ongoing'
+import { Route as PendingRouteImport } from './routes/pending'
+import { Route as ProjectRouteImport } from './routes/project'
+import { Route as SpotRouteImport } from './routes/spot'
 
-const SpotRoute = SpotRouteImport.update({
-  id: '/spot',
-  path: '/spot',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PendingRoute = PendingRouteImport.update({
-  id: '/pending',
-  path: '/pending',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OngoingRoute = OngoingRouteImport.update({
-  id: '/ongoing',
-  path: '/ongoing',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CompletedRoute = CompletedRouteImport.update({
@@ -35,9 +26,24 @@ const CompletedRoute = CompletedRouteImport.update({
   path: '/completed',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const OngoingRoute = OngoingRouteImport.update({
+  id: '/ongoing',
+  path: '/ongoing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PendingRoute = PendingRouteImport.update({
+  id: '/pending',
+  path: '/pending',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectRoute = ProjectRouteImport.update({
+  id: '/project',
+  path: '/project',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SpotRoute = SpotRouteImport.update({
+  id: '/spot',
+  path: '/spot',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/completed': typeof CompletedRoute
   '/ongoing': typeof OngoingRoute
   '/pending': typeof PendingRoute
+  '/project': typeof ProjectRoute
   '/spot': typeof SpotRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/completed': typeof CompletedRoute
   '/ongoing': typeof OngoingRoute
   '/pending': typeof PendingRoute
+  '/project': typeof ProjectRoute
   '/spot': typeof SpotRoute
 }
 export interface FileRoutesById {
@@ -61,14 +69,22 @@ export interface FileRoutesById {
   '/completed': typeof CompletedRoute
   '/ongoing': typeof OngoingRoute
   '/pending': typeof PendingRoute
+  '/project': typeof ProjectRoute
   '/spot': typeof SpotRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/completed' | '/ongoing' | '/pending' | '/spot'
+  fullPaths: '/' | '/completed' | '/ongoing' | '/pending' | '/project' | '/spot'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/completed' | '/ongoing' | '/pending' | '/spot'
-  id: '__root__' | '/' | '/completed' | '/ongoing' | '/pending' | '/spot'
+  to: '/' | '/completed' | '/ongoing' | '/pending' | '/project' | '/spot'
+  id:
+    | '__root__'
+    | '/'
+    | '/completed'
+    | '/ongoing'
+    | '/pending'
+    | '/project'
+    | '/spot'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -76,30 +92,17 @@ export interface RootRouteChildren {
   CompletedRoute: typeof CompletedRoute
   OngoingRoute: typeof OngoingRoute
   PendingRoute: typeof PendingRoute
+  ProjectRoute: typeof ProjectRoute
   SpotRoute: typeof SpotRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/spot': {
-      id: '/spot'
-      path: '/spot'
-      fullPath: '/spot'
-      preLoaderRoute: typeof SpotRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pending': {
-      id: '/pending'
-      path: '/pending'
-      fullPath: '/pending'
-      preLoaderRoute: typeof PendingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/ongoing': {
-      id: '/ongoing'
-      path: '/ongoing'
-      fullPath: '/ongoing'
-      preLoaderRoute: typeof OngoingRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/completed': {
@@ -109,11 +112,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CompletedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/ongoing': {
+      id: '/ongoing'
+      path: '/ongoing'
+      fullPath: '/ongoing'
+      preLoaderRoute: typeof OngoingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pending': {
+      id: '/pending'
+      path: '/pending'
+      fullPath: '/pending'
+      preLoaderRoute: typeof PendingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/project': {
+      id: '/project'
+      path: '/project'
+      fullPath: '/project'
+      preLoaderRoute: typeof ProjectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/spot': {
+      id: '/spot'
+      path: '/spot'
+      fullPath: '/spot'
+      preLoaderRoute: typeof SpotRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -124,8 +148,19 @@ const rootRouteChildren: RootRouteChildren = {
   CompletedRoute: CompletedRoute,
   OngoingRoute: OngoingRoute,
   PendingRoute: PendingRoute,
+  ProjectRoute: ProjectRoute,
   SpotRoute: SpotRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

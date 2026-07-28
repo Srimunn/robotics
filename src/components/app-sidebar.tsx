@@ -1,7 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
-  CheckCircle2,
+  FolderKanban,
   HardHat,
   Clock,
   Wallet,
@@ -21,7 +21,7 @@ import {
 
 const items = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Completed Projects", url: "/completed", icon: CheckCircle2 },
+  { title: "Project", url: "/project", icon: FolderKanban },
   { title: "Ongoing Works", url: "/ongoing", icon: HardHat },
   { title: "Pending Payments", url: "/pending", icon: Clock },
   { title: "Spot Payments", url: "/spot", icon: Wallet },

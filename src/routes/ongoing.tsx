@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { OngoingTable } from "@/components/ongoing-table";
+import { StatsCards } from "@/components/stats-cards";
 
 export const Route = createFileRoute("/ongoing")({
   head: () => ({
@@ -16,5 +17,10 @@ export const Route = createFileRoute("/ongoing")({
 });
 
 function OngoingPage() {
-  return <OngoingTable />;
-}
+  return (
+    <div className="space-y-6">
+      <StatsCards />
+      <OngoingTable readOnly={true} />
+    </div>
+  );
+}

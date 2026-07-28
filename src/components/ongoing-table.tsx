@@ -25,7 +25,7 @@ import { OngoingModal } from "./ongoing-modal";
 import { DeleteConfirm } from "./delete-confirm";
 import { ExportButtons } from "./export-buttons";
 
-export function OngoingTable() {
+export function OngoingTable({ readOnly = false }: { readOnly?: boolean }) {
   const { ongoing, addOngoing, updateOngoing, deleteOngoing } = useProjects();
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -65,14 +65,16 @@ export function OngoingTable() {
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <ExportButtons rows={exportRows} filename="Ongoing Works" />
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setModalOpen(true);
-            }}
-          >
-            + Add Work
-          </Button>
+          {!readOnly && (
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setModalOpen(true);
+              }}
+            >
+              + Add Work
+            </Button>
+          )}
         </div>
       </div>
 
@@ -133,18 +135,22 @@ export function OngoingTable() {
                         onClick={() => setViewing(p)}>
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8"
-                        onClick={() => {
-                          setEditing(p);
-                          setModalOpen(true);
-                        }}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => setDeleteId(p.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {!readOnly && (
+                        <>
+                          <Button variant="ghost" size="icon" className="h-8 w-8"
+                            onClick={() => {
+                              setEditing(p);
+                              setModalOpen(true);
+                            }}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => setDeleteId(p.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

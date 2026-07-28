@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ProjectsTable } from "@/components/projects-table";
+import { StatsCards } from "@/components/stats-cards";
 import { useProjects } from "@/lib/projects-context";
 
 export const Route = createFileRoute("/spot")({
@@ -19,5 +20,10 @@ export const Route = createFileRoute("/spot")({
 function SpotPage() {
   const { projects } = useProjects();
   const spot = projects.filter((p) => p.paymentReceived > 0);
-  return <ProjectsTable title="Spot Payments" data={spot} showAdd={false} />;
-}
+  return (
+    <div className="space-y-6">
+      <StatsCards />
+      <ProjectsTable title="Spot Payments" data={spot} showAdd={false} readOnly={true} />
+    </div>
+  );
+}

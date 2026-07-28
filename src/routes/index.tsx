@@ -31,7 +31,7 @@ function Dashboard() {
       <StatsCards />
       <DashboardCharts />
       <div className="pt-2">
-        <ProjectsTable title="Recent Projects" data={projects.slice(0, 10)} />
+        <ProjectsTable title="Recent Projects" data={projects.slice(0, 10)} showAdd={false} readOnly={true} />
       </div>
     </div>
   );
