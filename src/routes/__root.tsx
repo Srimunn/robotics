@@ -11,6 +11,10 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
+import { ProjectsProvider } from "@/lib/projects-context";
+import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
   return (
@@ -119,8 +123,23 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <ProjectsProvider>
+        <SidebarProvider>
+          <div className="flex min-h-screen w-full bg-muted/30">
+            <AppSidebar />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur">
+                <SidebarTrigger />
+                <div className="text-sm font-semibold">BuildFlow</div>
+              </header>
+              <main className="flex-1 p-4 sm:p-6">
+                <Outlet />
+              </main>
+            </div>
+          </div>
+          <Toaster richColors position="top-right" />
+        </SidebarProvider>
+      </ProjectsProvider>
     </QueryClientProvider>
   );
 }

@@ -1,24 +1,38 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { StatsCards } from "@/components/stats-cards";
+import { DashboardCharts } from "@/components/dashboard-charts";
+import { ProjectsTable } from "@/components/projects-table";
+import { useProjects } from "@/lib/projects-context";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
-  component: Index,
+  head: () => ({
+    meta: [
+      { title: "BuildFlow · Construction Project Dashboard" },
+      { name: "description", content: "Manage completed projects, ongoing works, and payments with a modern construction ERP dashboard." },
+      { property: "og:title", content: "BuildFlow · Construction Project Dashboard" },
+      { property: "og:description", content: "Manage completed projects, ongoing works, and payments with a modern construction ERP dashboard." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
+  component: Dashboard,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+function Dashboard() {
+  const { projects } = useProjects();
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard</h1>
+        <p className="text-sm text-muted-foreground">
+          Overview of your projects, payments and ongoing sites.
+        </p>
+      </div>
+      <StatsCards />
+      <DashboardCharts />
+      <div className="pt-2">
+        <ProjectsTable title="Recent Projects" data={projects.slice(0, 10)} />
+      </div>
     </div>
   );
 }
