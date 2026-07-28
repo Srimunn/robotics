@@ -9,8 +9,32 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SpotRouteImport } from './routes/spot'
+import { Route as PendingRouteImport } from './routes/pending'
+import { Route as OngoingRouteImport } from './routes/ongoing'
+import { Route as CompletedRouteImport } from './routes/completed'
 import { Route as IndexRouteImport } from './routes/index'
 
+const SpotRoute = SpotRouteImport.update({
+  id: '/spot',
+  path: '/spot',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PendingRoute = PendingRouteImport.update({
+  id: '/pending',
+  path: '/pending',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OngoingRoute = OngoingRouteImport.update({
+  id: '/ongoing',
+  path: '/ongoing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompletedRoute = CompletedRouteImport.update({
+  id: '/completed',
+  path: '/completed',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -19,28 +43,72 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/completed': typeof CompletedRoute
+  '/ongoing': typeof OngoingRoute
+  '/pending': typeof PendingRoute
+  '/spot': typeof SpotRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/completed': typeof CompletedRoute
+  '/ongoing': typeof OngoingRoute
+  '/pending': typeof PendingRoute
+  '/spot': typeof SpotRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/completed': typeof CompletedRoute
+  '/ongoing': typeof OngoingRoute
+  '/pending': typeof PendingRoute
+  '/spot': typeof SpotRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/completed' | '/ongoing' | '/pending' | '/spot'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/completed' | '/ongoing' | '/pending' | '/spot'
+  id: '__root__' | '/' | '/completed' | '/ongoing' | '/pending' | '/spot'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CompletedRoute: typeof CompletedRoute
+  OngoingRoute: typeof OngoingRoute
+  PendingRoute: typeof PendingRoute
+  SpotRoute: typeof SpotRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/spot': {
+      id: '/spot'
+      path: '/spot'
+      fullPath: '/spot'
+      preLoaderRoute: typeof SpotRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pending': {
+      id: '/pending'
+      path: '/pending'
+      fullPath: '/pending'
+      preLoaderRoute: typeof PendingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ongoing': {
+      id: '/ongoing'
+      path: '/ongoing'
+      fullPath: '/ongoing'
+      preLoaderRoute: typeof OngoingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/completed': {
+      id: '/completed'
+      path: '/completed'
+      fullPath: '/completed'
+      preLoaderRoute: typeof CompletedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -53,7 +121,21 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CompletedRoute: CompletedRoute,
+  OngoingRoute: OngoingRoute,
+  PendingRoute: PendingRoute,
+  SpotRoute: SpotRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
