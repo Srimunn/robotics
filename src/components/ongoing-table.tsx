@@ -131,22 +131,33 @@ export function OngoingTable({ readOnly = false }: { readOnly?: boolean }) {
                   <TableCell className="max-w-[200px] truncate">{p.remarks}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8"
-                        onClick={() => setViewing(p)}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setViewing(p)}
+                      >
                         <Eye className="h-4 w-4" />
                       </Button>
                       {!readOnly && (
                         <>
-                          <Button variant="ghost" size="icon" className="h-8 w-8"
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
                             onClick={() => {
                               setEditing(p);
                               setModalOpen(true);
-                            }}>
+                            }}
+                          >
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon"
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => setDeleteId(p.id)}>
+                            onClick={() => setDeleteId(p.id)}
+                          >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </>
@@ -195,11 +206,21 @@ export function OngoingTable({ readOnly = false }: { readOnly?: boolean }) {
           </DialogHeader>
           {viewing && (
             <div className="grid gap-2 text-sm">
-              <div><strong>Date:</strong> {viewing.date}</div>
-              <div><strong>Contact:</strong> {viewing.contactNumber}</div>
-              <div><strong>Location:</strong> {viewing.location}</div>
-              <div><strong>Labour:</strong> {viewing.labourCount} {viewing.labourType}</div>
-              <div><strong>Remarks:</strong> {viewing.remarks || "—"}</div>
+              <div>
+                <strong>Date:</strong> {viewing.date}
+              </div>
+              <div>
+                <strong>Contact:</strong> {viewing.contactNumber}
+              </div>
+              <div>
+                <strong>Location:</strong> {viewing.location}
+              </div>
+              <div>
+                <strong>Labour:</strong> {viewing.labourCount} {viewing.labourType}
+              </div>
+              <div>
+                <strong>Remarks:</strong> {viewing.remarks || "—"}
+              </div>
             </div>
           )}
         </DialogContent>

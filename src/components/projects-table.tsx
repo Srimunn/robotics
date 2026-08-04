@@ -220,15 +220,25 @@ export function ProjectsTable({
             <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur">
               <TableRow>
                 <TableHead>S.No</TableHead>
-                <TableHead><SortHead k="date">Date</SortHead></TableHead>
-                <TableHead><SortHead k="clientName">Client</SortHead></TableHead>
+                <TableHead>
+                  <SortHead k="date">Date</SortHead>
+                </TableHead>
+                <TableHead>
+                  <SortHead k="clientName">Client</SortHead>
+                </TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead>Nature of Work</TableHead>
-                <TableHead className="text-right"><SortHead k="projectValue">Value</SortHead></TableHead>
-                <TableHead className="text-right"><SortHead k="paymentReceived">Received</SortHead></TableHead>
+                <TableHead className="text-right">
+                  <SortHead k="projectValue">Value</SortHead>
+                </TableHead>
+                <TableHead className="text-right">
+                  <SortHead k="paymentReceived">Received</SortHead>
+                </TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right"><SortHead k="balance">Balance</SortHead></TableHead>
+                <TableHead className="text-right">
+                  <SortHead k="balance">Balance</SortHead>
+                </TableHead>
                 <TableHead className="w-12" />
               </TableRow>
             </TableHeader>
@@ -259,7 +269,9 @@ export function ProjectsTable({
                   <TableCell className="text-right text-emerald-600 dark:text-emerald-400">
                     {formatCurrency(p.paymentReceived)}
                   </TableCell>
-                  <TableCell><StatusBadge status={getStatus(p)} /></TableCell>
+                  <TableCell>
+                    <StatusBadge status={getStatus(p)} />
+                  </TableCell>
                   <TableCell className="text-right font-semibold">
                     {formatCurrency(getBalance(p))}
                   </TableCell>
@@ -316,12 +328,24 @@ export function ProjectsTable({
       </div>
 
       <div className="flex items-center justify-between text-sm">
-        <div className="text-muted-foreground">Page {curPage} of {totalPages}</div>
+        <div className="text-muted-foreground">
+          Page {curPage} of {totalPages}
+        </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" disabled={curPage === 1} onClick={() => setPage(curPage - 1)}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={curPage === 1}
+            onClick={() => setPage(curPage - 1)}
+          >
             Previous
           </Button>
-          <Button variant="outline" size="sm" disabled={curPage === totalPages} onClick={() => setPage(curPage + 1)}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={curPage === totalPages}
+            onClick={() => setPage(curPage + 1)}
+          >
             Next
           </Button>
         </div>

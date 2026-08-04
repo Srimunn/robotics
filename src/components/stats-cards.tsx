@@ -50,7 +50,10 @@ export function StatsCards() {
       subtext: netProfitLoss >= 0 ? "Surplus Profit" : "Net Deficit",
       icon: Scale,
       gradient: netProfitLoss >= 0 ? "from-emerald-600 to-teal-600" : "from-amber-500 to-red-500",
-      textColor: netProfitLoss >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400",
+      textColor:
+        netProfitLoss >= 0
+          ? "text-emerald-600 dark:text-emerald-400"
+          : "text-amber-600 dark:text-amber-400",
     },
     {
       label: "Ongoing Sites",
@@ -69,7 +72,9 @@ export function StatsCards() {
           key={c.label}
           className="relative overflow-hidden border-0 bg-card p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
         >
-          <div className={`absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br ${c.gradient} opacity-10`} />
+          <div
+            className={`absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br ${c.gradient} opacity-10`}
+          />
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -80,7 +85,9 @@ export function StatsCards() {
                 {c.subtext}
               </div>
             </div>
-            <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${c.gradient} text-white shadow-md`}>
+            <div
+              className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${c.gradient} text-white shadow-md`}
+            >
               <c.icon className="h-5 w-5" />
             </div>
           </div>

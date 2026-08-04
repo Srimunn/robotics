@@ -76,45 +76,73 @@ export function ProjectModal({
         >
           <div className="grid gap-2">
             <Label>Date</Label>
-            <Input type="date" required value={form.date}
-              onChange={(e) => setForm({ ...form, date: e.target.value })} />
+            <Input
+              type="date"
+              required
+              value={form.date}
+              onChange={(e) => setForm({ ...form, date: e.target.value })}
+            />
           </div>
           <div className="grid gap-2">
             <Label>Client Name</Label>
-            <Input required value={form.clientName}
-              onChange={(e) => setForm({ ...form, clientName: e.target.value })} />
+            <Input
+              required
+              value={form.clientName}
+              onChange={(e) => setForm({ ...form, clientName: e.target.value })}
+            />
           </div>
           <div className="grid gap-2">
             <Label>Contact Number</Label>
-            <Input required value={form.contactNumber}
-              onChange={(e) => setForm({ ...form, contactNumber: e.target.value })} />
+            <Input
+              required
+              value={form.contactNumber}
+              onChange={(e) => setForm({ ...form, contactNumber: e.target.value })}
+            />
           </div>
           <div className="grid gap-2">
             <Label>Location</Label>
-            <Input required value={form.location}
-              onChange={(e) => setForm({ ...form, location: e.target.value })} />
+            <Input
+              required
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+            />
           </div>
           <div className="grid gap-2 sm:col-span-2">
             <Label>Nature of Work</Label>
-            <Input required value={form.natureOfWork}
-              onChange={(e) => setForm({ ...form, natureOfWork: e.target.value })} />
+            <Input
+              required
+              value={form.natureOfWork}
+              onChange={(e) => setForm({ ...form, natureOfWork: e.target.value })}
+            />
           </div>
           <div className="grid gap-2">
             <Label>Project Value</Label>
-            <Input type="number" min={0} required value={form.projectValue}
-              onChange={(e) => setForm({ ...form, projectValue: Number(e.target.value) })} />
+            <Input
+              type="number"
+              min={0}
+              required
+              value={form.projectValue}
+              onChange={(e) => setForm({ ...form, projectValue: Number(e.target.value) })}
+            />
           </div>
           <div className="grid gap-2">
             <Label>Payment Received</Label>
-            <Input type="number" min={0} required value={form.paymentReceived}
-              onChange={(e) => setForm({ ...form, paymentReceived: Number(e.target.value) })} />
+            <Input
+              type="number"
+              min={0}
+              required
+              value={form.paymentReceived}
+              onChange={(e) => setForm({ ...form, paymentReceived: Number(e.target.value) })}
+            />
           </div>
           <div className="rounded-lg bg-muted/60 p-3 sm:col-span-2">
             <div className="text-sm text-muted-foreground">Balance Amount (auto)</div>
             <div className="text-xl font-bold">{formatCurrency(balance)}</div>
           </div>
           <DialogFooter className="sm:col-span-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
             <Button type="submit">{initial ? "Save Changes" : "Add Project"}</Button>
           </DialogFooter>
         </form>

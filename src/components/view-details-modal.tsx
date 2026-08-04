@@ -58,8 +58,11 @@ export function ViewDetailsModal({
           <Row icon={MapPin} label="Location" value={project.location} />
           <Row icon={Briefcase} label="Nature of Work" value={project.natureOfWork} />
           <Row icon={Calendar} label="Project Date" value={project.date} />
-          <Row icon={Calendar} label="Created"
-            value={new Date(project.createdAt).toLocaleDateString()} />
+          <Row
+            icon={Calendar}
+            label="Created"
+            value={new Date(project.createdAt).toLocaleDateString()}
+          />
         </div>
 
         <div className="mt-2 grid gap-3 sm:grid-cols-3">
@@ -71,9 +74,7 @@ export function ViewDetailsModal({
           </div>
           <div className="rounded-xl bg-emerald-500/10 p-4">
             <div className="text-xs text-emerald-700 dark:text-emerald-400">Received</div>
-            <div className="mt-1 text-lg font-bold">
-              {formatCurrency(project.paymentReceived)}
-            </div>
+            <div className="mt-1 text-lg font-bold">{formatCurrency(project.paymentReceived)}</div>
           </div>
           <div className="rounded-xl bg-orange-500/10 p-4">
             <div className="text-xs text-orange-700 dark:text-orange-400">Balance</div>

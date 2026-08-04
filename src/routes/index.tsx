@@ -1,38 +1,1810 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { StatsCards } from "@/components/stats-cards";
-import { DashboardCharts } from "@/components/dashboard-charts";
-import { ProjectsTable } from "@/components/projects-table";
-import { useProjects } from "@/lib/projects-context";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
+import { useRobotics, calculateHoursFromTimes } from "@/lib/robotics-context";
+import type {
+  Enquiry,
+  Project,
+  Labour,
+  Payment,
+  ProjectStatus,
+  SiteVisitStatus,
+  LabourType,
+  PaymentMode,
+} from "@/lib/robotics-types";
+import {
+  PhoneCall,
+  UserCheck,
+  FileText,
+  CheckCircle2,
+  FolderKanban,
+  Clock,
+  CheckCheck,
+  AlertTriangle,
+  TrendingUp,
+  Wallet,
+  Coins,
+  Users,
+  Calendar,
+  ArrowRight,
+  MapPin,
+  Sparkles,
+  Plus,
+  PlayCircle,
+  HardHat,
+  DollarSign,
+  UserPlus,
+  Receipt,
+  CalendarCheck,
+  Activity,
+  Check,
+  ChevronRight,
+  Eye,
+  AlertCircle,
+  ShieldAlert,
+  Building2,
+  Phone,
+  Wrench,
+  Boxes,
+  Package,
+  Send,
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  CartesianGrid,
+} from "recharts";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "BuildFlow · Construction Project Dashboard" },
-      { name: "description", content: "Manage completed projects, ongoing works, and payments with a modern construction ERP dashboard." },
-      { property: "og:title", content: "BuildFlow · Construction Project Dashboard" },
-      { property: "og:description", content: "Manage completed projects, ongoing works, and payments with a modern construction ERP dashboard." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
-  component: Dashboard,
+  component: DashboardComponent,
 });
 
-function Dashboard() {
-  const { projects } = useProjects();
+function DashboardComponent() {
+  const {
+    enquiries,
+    projects,
+    payments,
+    labours,
+    attendance,
+    engineers,
+    settings,
+    machines,
+    materials,
+    machineIssues,
+    materialIssues,
+    addEnquiry,
+    updateEnquiry,
+    updateProject,
+    updateProjectStatus,
+    recordAttendance,
+    addPayment,
+    addLabour,
+    updateProjectLabourLog,
+  } = useRobotics();
+
+  const navigate = useNavigate();
+
+  // Floating & Quick Action Dialog States
+  const [newEnqOpen, setNewEnqOpen] = useState(false);
+  const [assignEngOpen, setAssignEngOpen] = useState(false);
+  const [recordPayOpen, setRecordPayOpen] = useState(false);
+  const [attendanceOpen, setAttendanceOpen] = useState(false);
+  const [addLabourOpen, setAddLabourOpen] = useState(false);
+
+  // Selected Target States for Modals
+  const [selectedEnquiryId, setSelectedEnquiryId] = useState<string>("");
+  const [selectedEngId, setSelectedEngId] = useState<string>("");
+
+  const [selectedPayProjectId, setSelectedPayProjectId] = useState<string>("");
+  const [payAmountInput, setPayAmountInput] = useState<number>(0);
+  const [payModeInput, setPayModeInput] = useState<PaymentMode>("Bank Transfer");
+  const [payRefInput, setPayRefInput] = useState<string>("");
+
+  const [selectedAttLabourId, setSelectedAttLabourId] = useState<string>("");
+  const [attInTimeInput, setAttInTimeInput] = useState<string>("09:00 AM");
+  const [attOutTimeInput, setAttOutTimeInput] = useState<string>("06:00 PM");
+
+  // Form Inputs for New Enquiry
+  const [enqCustName, setEnqCustName] = useState("");
+  const [enqPhone, setEnqPhone] = useState("");
+  const [enqLocation, setEnqLocation] = useState("");
+  const [enqLeadSource, setEnqLeadSource] = useState("Website Enquiry");
+  const [enqLeakageType, setEnqLeakageType] = useState("Robotic Arm Oil Leakage & Joint Seal");
+  const [enqEngineerId, setEnqEngineerId] = useState("");
+
+  // Form Inputs for New Labour
+  const [labourName, setLabourName] = useState("");
+  const [labourPhone, setLabourPhone] = useState("");
+  const [labourType, setLabourType] = useState<LabourType>("Permanent");
+  const [labourWage, setLabourWage] = useState<number>(1400);
+
+  // Details Cockpit Dialog States
+  const [activeSiteVisitEnquiry, setActiveSiteVisitEnquiry] = useState<Enquiry | null>(null);
+  const [activeProjectModal, setActiveProjectModal] = useState<Project | null>(null);
+
+  // ---------------------------------------------------------------------------
+  // TODAY'S CALCULATED METRICS
+  // ---------------------------------------------------------------------------
+  const todayStr = "2026-07-28";
+
+  // Card 1: Today's Site Visits (Enquiries with siteVisitDate or assigned engineer)
+  const todaysSiteVisits = enquiries.filter(
+    (e) => e.siteVisitStatus !== "Completed" || e.siteVisitDate === todayStr
+  );
+
+  // Card 2: Today's Scheduled / Ongoing Projects
+  const todaysScheduledProjects = projects.filter(
+    (p) => p.status === "Scheduled" || p.status === "Waiting" || p.status === "Ongoing"
+  );
+
+  // Card 3: Permanent Labour Yet To Check In (Assigned today, type === "Permanent", no In Time logged)
+  const permanentLabourPendingCheckIn = labours.filter((l) => {
+    if (l.type !== "Permanent") return false;
+    const attRecord = attendance[`${l.id}_${todayStr}`];
+    const isCheckedIn = attRecord && attRecord.status === "Present" && Boolean(attRecord.inTime);
+    return !isCheckedIn;
+  });
+
+  // Card 4: Pending Payments (Outstanding Amount > 0)
+  const pendingPaymentsProjects = projects.filter((p) => p.balanceAmount > 0);
+
+  // Card 5: Today's Completed Works
+  const todaysCompletedWorks = projects.filter(
+    (p) => p.status === "Completed" || p.status === "Closed"
+  );
+
+  // Today's Summary Right Side Panel Indicators
+  const newEnquiriesToday = enquiries.filter(
+    (e) => e.enquiryDate === todayStr || e.customerDecision === "Thinking" || e.customerDecision === "Follow-up"
+  ).length;
+
+  const siteVisitsCompletedCount = enquiries.filter(
+    (e) => e.siteVisitStatus === "Completed"
+  ).length;
+
+  // Machine & Material KPI Calculations
+  const kpiTotalMachines = machines.reduce((acc, m) => acc + m.currentStock, 0);
+  const kpiAvailableMachines = machines.reduce((acc, m) => acc + m.availableQuantity, 0);
+  const kpiIssuedMachines = machines.reduce((acc, m) => acc + m.issuedQuantity, 0);
+  const kpiMachinesUnderRepair = machines.reduce((acc, m) => acc + m.repairQuantity, 0);
+  const kpiLowStockMaterials = materials.filter((m) => m.currentStock <= m.minimumStock).length;
+  const kpiTotalInventoryValuation = materials.reduce((acc, m) => acc + m.currentStock * m.purchaseCost, 0);
+  const kpiTodaysMaterialConsumption = materialIssues
+    .filter((mi) => mi.issueDate === todayStr)
+    .reduce((acc, mi) => acc + (mi.totalCost || 0), 0);
+  const kpiTodaysMachineIssues = machineIssues.filter((mi) => mi.issueDate === todayStr).length;
+
+  const projectsStartedCount = projects.filter(
+    (p) => p.status === "Ongoing"
+  ).length;
+
+  const projectsCompletedCount = todaysCompletedWorks.length;
+
+  const totalCollectionToday = payments.reduce((sum, p) => sum + p.amount, 0);
+
+  const totalRevenue = projects.reduce((sum, p) => sum + p.projectValue, 0);
+  const amountCollected = projects.reduce((sum, p) => sum + p.receivedAmount, 0);
+  const totalOutstandingAmount = Math.max(0, totalRevenue - amountCollected);
+
+  const permanentLabourWorkingCount = labours.filter((l) => {
+    if (l.type !== "Permanent") return false;
+    const rec = attendance[`${l.id}_${todayStr}`];
+    return rec && rec.status === "Present";
+  }).length;
+
+  const contractLabourWorkingCount = labours.filter((l) => {
+    if (l.type !== "Contract") return false;
+    const rec = attendance[`${l.id}_${todayStr}`];
+    return rec && rec.status === "Present";
+  }).length;
+
+  // Chronological Activity Timeline
+  const recentActivitiesTimeline = [
+    { time: "09:00 AM", event: "Engineer Suresh assigned to Raja Construction", type: "assignment" },
+    { time: "09:30 AM", event: "Quotation QT-AEROTECH-2026.pdf uploaded", type: "quotation" },
+    { time: "10:15 AM", event: "Customer Approved Project PRJ-2026-001", type: "approval" },
+    { time: "10:45 AM", event: "Project PRJ-2026-001 Work Started on site", type: "started" },
+    { time: "11:00 AM", event: "Rajesh Kumar (Permanent Labour) checked in (In Time: 09:00 AM)", type: "checkin" },
+    { time: "11:05 AM", event: "Arunachalam S. (Contract Labour) checked in (In Time: 09:00 AM)", type: "checkin" },
+    { time: "02:30 PM", event: "₹1,00,000 Payment Received (Ref: NEFT-HDFC982347192)", type: "payment" },
+    { time: "04:50 PM", event: "Site Inspection Completed for ENQ-2026-001", type: "completed" },
+  ];
+
+  // Quick Action Handlers
+  const handleCreateEnquirySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!enqCustName || !enqPhone) {
+      toast.error("Please enter Customer Name and Phone Number");
+      return;
+    }
+
+    const eng = engineers.find((x) => x.id === enqEngineerId);
+
+    addEnquiry({
+      enquiryDate: todayStr,
+      customerName: enqCustName,
+      phone: enqPhone,
+      location: enqLocation || "Hyderabad",
+      leadSource: enqLeadSource,
+      leakageType: enqLeakageType,
+      assignedEngineerId: enqEngineerId || undefined,
+      assignedEngineerName: eng?.name || undefined,
+      siteVisitDate: todayStr,
+      workCommittedDate: "",
+      actualWorkStartedDate: "",
+      remarks: "Direct entry from Today's Operations Board",
+    });
+
+    setNewEnqOpen(false);
+    setEnqCustName("");
+    setEnqPhone("");
+    setEnqLocation("");
+  };
+
+  const handleAssignEngineerSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEnquiryId || !selectedEngId) {
+      toast.error("Select both an Enquiry and an Engineer");
+      return;
+    }
+    const eng = engineers.find((x) => x.id === selectedEngId);
+    updateEnquiry(selectedEnquiryId, {
+      assignedEngineerId: selectedEngId,
+      assignedEngineerName: eng?.name,
+      siteVisitStatus: "Assigned",
+      siteVisitDate: todayStr,
+    });
+    setAssignEngOpen(false);
+  };
+
+  const handleRecordPaymentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPayProjectId || payAmountInput <= 0) {
+      toast.error("Please select a project and enter a valid payment amount");
+      return;
+    }
+    addPayment({
+      projectId: selectedPayProjectId,
+      paymentDate: todayStr,
+      amount: payAmountInput,
+      mode: payModeInput,
+      referenceNumber: payRefInput || `PAY-REF-${Math.floor(Math.random() * 1000000)}`,
+      remarks: `Recorded via Today's Operations Quick Action`,
+    });
+    setRecordPayOpen(false);
+    setPayAmountInput(0);
+    setPayRefInput("");
+  };
+
+  const handleQuickCheckInSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAttLabourId) {
+      toast.error("Please select a Labour");
+      return;
+    }
+    const lab = labours.find((x) => x.id === selectedAttLabourId);
+
+    // Find active project assigned to this labour or pick PRJ-2026-001
+    const proj = projects.find((p) => p.assignedLabourIds.includes(selectedAttLabourId)) || projects[0];
+
+    if (proj) {
+      updateProjectLabourLog(proj.id, {
+        labourId: selectedAttLabourId,
+        labourName: lab?.name || selectedAttLabourId,
+        labourType: lab?.type || "Permanent",
+        weeklyWage: lab?.defaultWeeklyWage || 1400,
+        dailyWage: lab?.dailyWage || 1400,
+        date: todayStr,
+        inTime: attInTimeInput,
+        outTime: attOutTimeInput,
+        attendance: "Present",
+        hoursWorked: calculateHoursFromTimes(attInTimeInput, attOutTimeInput),
+        workDescription: "On-site robotic servicing check-in",
+      });
+    } else {
+      recordAttendance({
+        labourId: selectedAttLabourId,
+        labourName: lab?.name,
+        date: todayStr,
+        status: "Present",
+        inTime: attInTimeInput,
+        outTime: attOutTimeInput,
+        hoursWorked: calculateHoursFromTimes(attInTimeInput, attOutTimeInput),
+      });
+    }
+
+    setAttendanceOpen(false);
+  };
+
+  const handleAddLabourSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!labourName || !labourPhone) {
+      toast.error("Please enter Labour Name and Phone Number");
+      return;
+    }
+    addLabour({
+      name: labourName,
+      phone: labourPhone,
+      type: labourType,
+      defaultWeeklyWage: labourWage,
+      dailyWage: labourWage,
+      status: "Available",
+      skills: ["Robotic Joint Seals", "Servicing"],
+      wageHistory: [],
+    });
+    setAddLabourOpen(false);
+    setLabourName("");
+    setLabourPhone("");
+  };
+
+  const handleStartWorkForProject = (projectId: string) => {
+    updateProject(projectId, {
+      actualWorkStartedDate: todayStr,
+      status: "Ongoing",
+    });
+  };
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          Overview of your projects, payments and ongoing sites.
-        </p>
+    <div className="space-y-8 bg-slate-50/50 p-1 -m-1 pb-16">
+      {/* ===========================================================================
+          STICKY PAGE HEADER BANNER WITH QUICK ACTION TRIGGER PILLS
+          =========================================================================== */}
+      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-border px-6 py-4 rounded-xl shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              <Activity className="h-5 w-5 text-blue-600" /> Executive Dashboard
+            </h1>
+            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-bold">
+              30-Second Operations Board
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Enterprise Robotics Operations & Live Execution Management Cockpit.
+          </p>
+        </div>
+
+        {/* Header Quick Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            onClick={() => setNewEnqOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1 shadow-2xs cursor-pointer"
+          >
+            <Plus className="h-3.5 w-3.5" /> New Enquiry
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setAssignEngOpen(true)}
+            className="border-purple-200 text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg text-xs gap-1 cursor-pointer"
+          >
+            <UserPlus className="h-3.5 w-3.5" /> Assign Engineer
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setRecordPayOpen(true)}
+            className="border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg text-xs gap-1 cursor-pointer"
+          >
+            <Receipt className="h-3.5 w-3.5" /> Record Payment
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setAttendanceOpen(true)}
+            className="border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg text-xs gap-1 cursor-pointer"
+          >
+            <CalendarCheck className="h-3.5 w-3.5" /> Mark Attendance
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setAddLabourOpen(true)}
+            className="border-slate-200 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs gap-1 cursor-pointer"
+          >
+            <HardHat className="h-3.5 w-3.5" /> Add Labour
+          </Button>
+        </div>
       </div>
-      <StatsCards />
-      <DashboardCharts />
-      <div className="pt-2">
-        <ProjectsTable title="Recent Projects" data={projects.slice(0, 10)} showAdd={false} readOnly={true} />
+
+      {/* ===========================================================================
+          TOP KPI CARDS SUMMARY (10 HIGH-LEVEL EXECUTIVE TILES)
+          =========================================================================== */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+        <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm transition-all">
+          <CardContent className="p-3.5">
+            <div className="flex items-center justify-between text-muted-foreground mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider">New Enquiries</span>
+              <PhoneCall className="h-4 w-4 text-blue-500" />
+            </div>
+            <div className="text-xl font-bold text-foreground">{newEnquiriesToday}</div>
+            <p className="text-[10px] text-muted-foreground">Action required</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm transition-all">
+          <CardContent className="p-3.5">
+            <div className="flex items-center justify-between text-muted-foreground mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider">Today's Visits</span>
+              <UserCheck className="h-4 w-4 text-purple-500" />
+            </div>
+            <div className="text-xl font-bold text-purple-600">{todaysSiteVisits.length}</div>
+            <p className="text-[10px] text-purple-600/80">Engineers assigned</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm transition-all">
+          <CardContent className="p-3.5">
+            <div className="flex items-center justify-between text-muted-foreground mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider">Pending Check-Ins</span>
+              <AlertCircle className="h-4 w-4 text-rose-500" />
+            </div>
+            <div className="text-xl font-bold text-rose-600">{permanentLabourPendingCheckIn.length}</div>
+            <p className="text-[10px] text-rose-600/80">Permanent staff</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm transition-all">
+          <CardContent className="p-3.5">
+            <div className="flex items-center justify-between text-muted-foreground mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider">Ongoing Works</span>
+              <Clock className="h-4 w-4 text-amber-500" />
+            </div>
+            <div className="text-xl font-bold text-amber-600">{projectsStartedCount}</div>
+            <p className="text-[10px] text-amber-600/80">Active on site</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm transition-all">
+          <CardContent className="p-3.5">
+            <div className="flex items-center justify-between text-muted-foreground mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider">Completed Works</span>
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            </div>
+            <div className="text-xl font-bold text-emerald-600">{projectsCompletedCount}</div>
+            <p className="text-[10px] text-emerald-600/80">Signed off</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm transition-all">
+          <CardContent className="p-3.5">
+            <div className="flex items-center justify-between text-muted-foreground mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider">Permanent Staff</span>
+              <Users className="h-4 w-4 text-blue-600" />
+            </div>
+            <div className="text-xl font-bold text-blue-600">{permanentLabourWorkingCount} / {labours.filter(l=>l.type==="Permanent").length}</div>
+            <p className="text-[10px] text-muted-foreground">Present today</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm transition-all">
+          <CardContent className="p-3.5">
+            <div className="flex items-center justify-between text-muted-foreground mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider">Contract Staff</span>
+              <HardHat className="h-4 w-4 text-purple-600" />
+            </div>
+            <div className="text-xl font-bold text-purple-600">{contractLabourWorkingCount} / {labours.filter(l=>l.type==="Contract").length}</div>
+            <p className="text-[10px] text-muted-foreground">Present today</p>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* ===========================================================================
+          CEO FINANCIAL & ACCOUNTS RECEIVABLE COCKPIT (6 KPIS + 3 CHARTS)
+          =========================================================================== */}
+      {(() => {
+        const todayDateStr = new Date().toISOString().slice(0, 10);
+        const thisMonthStr = todayDateStr.slice(0, 7);
+
+        // 1. Today's Collection
+        const todaysCollectionVal = payments
+          .filter((p) => p.paymentDate === todayDateStr)
+          .reduce((sum, p) => sum + p.amount, 0);
+
+        // 2. Outstanding Amount
+        const outstandingVal = projects.reduce((acc, p) => acc + p.balanceAmount, 0);
+
+        // 3. Payments Due Today
+        const dueTodayProjects = projects.filter((p) => {
+          if (p.balanceAmount <= 0) return false;
+          const pendingStages = (p.paymentStages || []).filter((s) => (s.paidAmount || 0) < s.amount);
+          if (pendingStages.length > 0) {
+            return pendingStages.some((s) => s.dueDate === todayDateStr);
+          }
+          return p.workCommittedDate === todayDateStr;
+        });
+        const dueTodayCount = dueTodayProjects.length;
+        const dueTodayAmount = dueTodayProjects.reduce((acc, p) => acc + p.balanceAmount, 0);
+
+        // 4. Overdue Payments
+        const overdueProjects = projects.filter((p) => {
+          if (p.balanceAmount <= 0) return false;
+          const pendingStages = (p.paymentStages || []).filter((s) => (s.paidAmount || 0) < s.amount);
+          if (pendingStages.length > 0) {
+            return pendingStages.some((s) => s.dueDate < todayDateStr);
+          }
+          return (p.workCommittedDate && p.workCommittedDate < todayDateStr) || p.paymentStatus === "Overdue";
+        });
+        const overdueCount = overdueProjects.length;
+        const overdueAmount = overdueProjects.reduce((acc, p) => acc + p.balanceAmount, 0);
+
+        // 5. Collections This Month
+        const monthCollectionsVal = payments
+          .filter((p) => p.paymentDate.startsWith(thisMonthStr))
+          .reduce((sum, p) => sum + p.amount, 0);
+
+        // 6. Collection Rate
+        const totalVal = projects.reduce((acc, p) => acc + p.projectValue, 0);
+        const totalColl = payments.reduce((acc, p) => acc + p.amount, 0);
+        const overallCollRate = totalVal > 0 ? Math.round((totalColl / totalVal) * 100) : 0;
+
+        // Chart 1: Monthly Collections
+        const monthlyData = [
+          { month: "May 2026", amount: 150000 },
+          { month: "Jun 2026", amount: 280000 },
+          { month: "Jul 2026", amount: totalColl > 0 ? totalColl : 420000 },
+          { month: "Aug 2026", amount: 190000 },
+        ];
+
+        // Chart 2: Outstanding by Customer
+        const customerMap = new Map<string, number>();
+        projects.forEach((p) => {
+          if (p.balanceAmount > 0) {
+            const current = customerMap.get(p.customerName) || 0;
+            customerMap.set(p.customerName, current + p.balanceAmount);
+          }
+        });
+        const customerOutstandingData = Array.from(customerMap.entries())
+          .map(([name, amount]) => ({ name, amount }))
+          .sort((a, b) => b.amount - a.amount)
+          .slice(0, 5);
+
+        // Chart 3: Payment Status Distribution
+        const statusCounts = {
+          Paid: projects.filter((p) => p.paymentStatus === "Paid").length,
+          Partial: projects.filter((p) => p.paymentStatus === "Partial").length,
+          Pending: projects.filter((p) => p.paymentStatus === "Pending").length,
+          Overdue: projects.filter((p) => p.paymentStatus === "Overdue" || overdueProjects.includes(p)).length,
+        };
+
+        const pieData = [
+          { name: "Paid", value: statusCounts.Paid, color: "#10b981" },
+          { name: "Partial", value: statusCounts.Partial, color: "#3b82f6" },
+          { name: "Pending", value: statusCounts.Pending, color: "#f59e0b" },
+          { name: "Overdue", value: statusCounts.Overdue, color: "#ef4444" },
+        ].filter((d) => d.value > 0);
+
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between bg-white dark:bg-card p-4 rounded-xl border border-border shadow-xs">
+              <div>
+                <h2 className="text-base font-extrabold tracking-tight text-foreground flex items-center gap-2">
+                  <Wallet className="h-5 w-5 text-emerald-600" /> CEO Financial Cockpit & Accounts Receivable
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Real-time executive financial metrics, milestone collection tracking & customer credit risk distribution.
+                </p>
+              </div>
+              <Link to="/payments" className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1">
+                Open Full Accounts Receivable →
+              </Link>
+            </div>
+
+            {/* 6 Executive KPI Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              <Card className="rounded-xl border border-emerald-200/80 bg-emerald-50/30 dark:bg-emerald-950/20 shadow-xs">
+                <CardContent className="p-3.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Today's Collection</p>
+                  <h3 className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">₹{todaysCollectionVal.toLocaleString("en-IN")}</h3>
+                  <p className="text-[10px] text-emerald-600/80 mt-0.5">Receipts today</p>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-xl border border-rose-200/80 bg-rose-50/30 dark:bg-rose-950/20 shadow-xs">
+                <CardContent className="p-3.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">Outstanding Amount</p>
+                  <h3 className="text-lg font-extrabold text-rose-600 dark:text-rose-400 mt-1">₹{outstandingVal.toLocaleString("en-IN")}</h3>
+                  <p className="text-[10px] text-rose-600/80 mt-0.5">Total uncollected balance</p>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-xl border border-blue-200/80 bg-blue-50/30 dark:bg-blue-950/20 shadow-xs">
+                <CardContent className="p-3.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400">Payments Due Today</p>
+                  <h3 className="text-lg font-extrabold text-blue-600 dark:text-blue-400 mt-1">{dueTodayCount} Accounts</h3>
+                  <p className="text-[10px] text-blue-600/80 mt-0.5">₹{dueTodayAmount.toLocaleString("en-IN")} target</p>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-xl border border-amber-200/80 bg-amber-50/30 dark:bg-amber-950/20 shadow-xs">
+                <CardContent className="p-3.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">Overdue Payments</p>
+                  <h3 className="text-lg font-extrabold text-amber-600 dark:text-amber-400 mt-1">{overdueCount} Accounts</h3>
+                  <p className="text-[10px] text-amber-600/80 mt-0.5">₹{overdueAmount.toLocaleString("en-IN")} past due</p>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-xl border border-purple-200/80 bg-purple-50/30 dark:bg-purple-950/20 shadow-xs">
+                <CardContent className="p-3.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-400">Collections This Month</p>
+                  <h3 className="text-lg font-extrabold text-purple-700 dark:text-purple-400 mt-1">₹{monthCollectionsVal.toLocaleString("en-IN")}</h3>
+                  <p className="text-[10px] text-purple-600/80 mt-0.5">Monthly revenue total</p>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-xl border border-slate-200 bg-white dark:bg-card shadow-xs">
+                <CardContent className="p-3.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Collection Rate</p>
+                  <h3 className="text-lg font-extrabold text-foreground mt-1">{overallCollRate}%</h3>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Overall collection efficiency</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* 3 Executive Financial Charts */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Chart 1: Monthly Collections */}
+              <Card className="rounded-xl border border-border bg-white dark:bg-card shadow-xs">
+                <CardHeader className="p-3.5 border-b">
+                  <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
+                    <TrendingUp className="h-3.5 w-3.5 text-emerald-600" /> Monthly Collections Trend
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 h-52">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 10 }} tickFormatter={(val) => `₹${(val / 1000).toFixed(0)}k`} />
+                      <Tooltip formatter={(val: any) => [`₹${Number(val).toLocaleString("en-IN")}`, "Collections"]} />
+                      <Bar dataKey="amount" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Chart 2: Outstanding by Customer */}
+              <Card className="rounded-xl border border-border bg-white dark:bg-card shadow-xs">
+                <CardHeader className="p-3.5 border-b">
+                  <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
+                    <ShieldAlert className="h-3.5 w-3.5 text-rose-600" /> Outstanding Credit by Customer
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 h-52">
+                  {customerOutstandingData.length === 0 ? (
+                    <div className="h-full grid place-items-center text-xs text-muted-foreground">
+                      No outstanding customer credit balances.
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart layout="vertical" data={customerOutstandingData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                        <XAxis type="number" tick={{ fontSize: 9 }} tickFormatter={(val) => `₹${(val / 1000).toFixed(0)}k`} />
+                        <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={90} />
+                        <Tooltip formatter={(val: any) => [`₹${Number(val).toLocaleString("en-IN")}`, "Outstanding"]} />
+                        <Bar dataKey="amount" fill="#f43f5e" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Chart 3: Payment Status Distribution */}
+              <Card className="rounded-xl border border-border bg-white dark:bg-card shadow-xs">
+                <CardHeader className="p-3.5 border-b">
+                  <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
+                    <PieChart className="h-3.5 w-3.5 text-blue-600" /> Payment Status Distribution
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 h-52 flex flex-col items-center justify-center">
+                  <ResponsiveContainer width="100%" height={140}>
+                    <PieChart>
+                      <Pie data={pieData} cx="50%" cy="50%" innerRadius={35} outerRadius={60} paddingAngle={4} dataKey="value">
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="flex items-center gap-3 text-[10px] mt-1">
+                    {pieData.map((d) => (
+                      <span key={d.name} className="flex items-center gap-1">
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: d.color }} />
+                        <span className="font-bold">{d.name}:</span> {d.value}
+                      </span>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ===========================================================================
+          MACHINE & MATERIAL INVENTORY COMMAND CENTER (8 REQUESTED KPIS)
+          =========================================================================== */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Wrench className="h-4 w-4 text-blue-600" />
+            <h2 className="text-xs font-bold tracking-wider text-foreground uppercase">
+              Machine & Material Inventory Control
+            </h2>
+            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+              Live Automated Stock
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link to="/machines" className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline">
+              Manage Machines →
+            </Link>
+            <span className="text-slate-300">|</span>
+            <Link to="/materials" className="text-xs font-semibold text-purple-600 hover:text-purple-700 hover:underline">
+              Manage Materials →
+            </Link>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+          {/* Card 1: Total Machines */}
+          <Card className="rounded-xl border border-border bg-white shadow-xs">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-[10px] font-bold uppercase">Total Machines</span>
+                <Wrench className="h-3.5 w-3.5 text-blue-600" />
+              </div>
+              <div className="text-lg font-extrabold text-foreground">{kpiTotalMachines}</div>
+              <p className="text-[9px] text-muted-foreground">{machines.length} models</p>
+            </CardContent>
+          </Card>
+
+          {/* Card 2: Available Machines */}
+          <Card className="rounded-xl border border-emerald-200/80 bg-emerald-50/30 dark:bg-emerald-950/20 shadow-xs">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between text-emerald-700 mb-1">
+                <span className="text-[10px] font-bold uppercase">Available</span>
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+              </div>
+              <div className="text-lg font-extrabold text-emerald-700">{kpiAvailableMachines}</div>
+              <p className="text-[9px] text-emerald-600 font-medium">Ready to issue</p>
+            </CardContent>
+          </Card>
+
+          {/* Card 3: Issued Machines */}
+          <Card className="rounded-xl border border-blue-200/80 bg-blue-50/30 dark:bg-blue-950/20 shadow-xs">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between text-blue-700 mb-1">
+                <span className="text-[10px] font-bold uppercase">Issued</span>
+                <Send className="h-3.5 w-3.5 text-blue-600" />
+              </div>
+              <div className="text-lg font-extrabold text-blue-700">{kpiIssuedMachines}</div>
+              <p className="text-[9px] text-blue-600 font-medium">Active on site</p>
+            </CardContent>
+          </Card>
+
+          {/* Card 4: Machines Under Repair */}
+          <Card className="rounded-xl border border-amber-200/80 bg-amber-50/30 dark:bg-amber-950/20 shadow-xs">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between text-amber-700 mb-1">
+                <span className="text-[10px] font-bold uppercase">Under Repair</span>
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+              </div>
+              <div className="text-lg font-extrabold text-amber-700">{kpiMachinesUnderRepair}</div>
+              <p className="text-[9px] text-amber-600 font-medium">Workshop repair</p>
+            </CardContent>
+          </Card>
+
+          {/* Card 5: Low Stock Materials */}
+          <Card className="rounded-xl border border-rose-200/80 bg-rose-50/30 dark:bg-rose-950/20 shadow-xs">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between text-rose-700 mb-1">
+                <span className="text-[10px] font-bold uppercase">Low Materials</span>
+                <AlertCircle className="h-3.5 w-3.5 text-rose-600" />
+              </div>
+              <div className="text-lg font-extrabold text-rose-700">{kpiLowStockMaterials}</div>
+              <p className="text-[9px] text-rose-600 font-medium">Below threshold</p>
+            </CardContent>
+          </Card>
+
+          {/* Card 6: Inventory Value */}
+          <Card className="rounded-xl border border-purple-200/80 bg-purple-50/30 dark:bg-purple-950/20 shadow-xs">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between text-purple-700 mb-1">
+                <span className="text-[10px] font-bold uppercase">Inventory Value</span>
+                <Boxes className="h-3.5 w-3.5 text-purple-600" />
+              </div>
+              <div className="text-base font-extrabold text-purple-800">₹{(kpiTotalInventoryValuation / 1000).toFixed(0)}k</div>
+              <p className="text-[9px] text-purple-600 font-medium">Stock valuation</p>
+            </CardContent>
+          </Card>
+
+          {/* Card 7: Today's Material Consumption */}
+          <Card className="rounded-xl border border-border bg-white shadow-xs">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-[10px] font-bold uppercase">Material Expense</span>
+                <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+              </div>
+              <div className="text-base font-extrabold text-emerald-600">₹{kpiTodaysMaterialConsumption.toLocaleString("en-IN")}</div>
+              <p className="text-[9px] text-muted-foreground">Today's site use</p>
+            </CardContent>
+          </Card>
+
+          {/* Card 8: Today's Machine Issues */}
+          <Card className="rounded-xl border border-border bg-white shadow-xs">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-[10px] font-bold uppercase">Machine Issues</span>
+                <Wrench className="h-3.5 w-3.5 text-blue-600" />
+              </div>
+              <div className="text-lg font-extrabold text-blue-600">{kpiTodaysMachineIssues}</div>
+              <p className="text-[9px] text-muted-foreground">Issued today</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* ===========================================================================
+          NEW SECTION: TODAY'S OPERATIONS (5 CARDS GRID + RIGHT SIDE SUMMARY PANEL)
+          =========================================================================== */}
+      <div className="space-y-4">
+        {/* Section Header */}
+        <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-border shadow-xs">
+          <div>
+            <h2 className="text-lg font-extrabold tracking-tight text-foreground flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-blue-600" /> Today's Operations
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Live overview of all work scheduled for today. Understand work status in &lt;30 seconds.
+            </p>
+          </div>
+          <Badge className="bg-blue-600 text-white font-bold text-xs">
+            Live Automated Sync Active
+          </Badge>
+        </div>
+
+        {/* Main Grid: 5 Operations Cards (Col-span-3) & Right Summary Panel (Col-span-1) */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* LEFT & CENTER CARDS CONTAINER (COL-SPAN 3) */}
+          <div className="lg:col-span-3 space-y-6">
+            {/* GRID OF 5 MODERN OPERATIONS CARDS */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+              {/* -------------------------------------------------------------------
+                  CARD 1: Today's Site Visits
+                  ------------------------------------------------------------------- */}
+              <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-md transition-all duration-200">
+                <CardHeader className="p-4 border-b bg-slate-50/60 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <UserCheck className="h-4 w-4 text-purple-600" /> Today's Site Visits
+                    </CardTitle>
+                    <CardDescription className="text-[11px]">
+                      Scheduled engineer site inspections ({todaysSiteVisits.length})
+                    </CardDescription>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => navigate({ to: "/enquiries" })}
+                    className="text-xs text-blue-600 hover:text-blue-800"
+                  >
+                    View All →
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+                    {todaysSiteVisits.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-muted-foreground">
+                        No site visits scheduled for today.
+                      </div>
+                    ) : (
+                      todaysSiteVisits.map((visit) => (
+                        <div
+                          key={visit.id}
+                          onClick={() => setActiveSiteVisitEnquiry(visit)}
+                          className="p-3 hover:bg-slate-50/80 transition-colors cursor-pointer flex items-center justify-between text-xs group"
+                        >
+                          <div className="space-y-0.5 min-w-0 pr-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-foreground truncate">{visit.customerName}</span>
+                              <span className="text-[10px] text-blue-600 font-semibold">{visit.id}</span>
+                            </div>
+                            <div className="text-[11px] text-muted-foreground flex items-center gap-2">
+                              <span>📍 {visit.location}</span>
+                              <span>• 👷 {visit.assignedEngineerName || "Unassigned"}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                visit.siteVisitStatus === "Completed"
+                                  ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                  : visit.siteVisitStatus === "Visited" || visit.siteVisitStatus === "Assigned"
+                                  ? "bg-blue-100 text-blue-800 border border-blue-300"
+                                  : "bg-amber-100 text-amber-800 border border-amber-300"
+                              }`}
+                            >
+                              {visit.siteVisitStatus}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveSiteVisitEnquiry(visit);
+                              }}
+                              className="h-7 text-[10px] font-semibold text-blue-600 border-blue-200 hover:bg-blue-50"
+                            >
+                              View Details
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* -------------------------------------------------------------------
+                  CARD 2: Today's Scheduled Projects
+                  ------------------------------------------------------------------- */}
+              <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-md transition-all duration-200">
+                <CardHeader className="p-4 border-b bg-slate-50/60 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <FolderKanban className="h-4 w-4 text-blue-600" /> Today's Scheduled Projects
+                    </CardTitle>
+                    <CardDescription className="text-[11px]">
+                      Active site deployments ({todaysScheduledProjects.length})
+                    </CardDescription>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => navigate({ to: "/projects" })}
+                    className="text-xs text-blue-600 hover:text-blue-800"
+                  >
+                    View All →
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+                    {todaysScheduledProjects.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-muted-foreground">
+                        No projects scheduled for today.
+                      </div>
+                    ) : (
+                      todaysScheduledProjects.map((proj) => (
+                        <div
+                          key={proj.id}
+                          onClick={() => setActiveProjectModal(proj)}
+                          className="p-3 hover:bg-slate-50/80 transition-colors cursor-pointer flex items-center justify-between text-xs group"
+                        >
+                          <div className="space-y-0.5 min-w-0 pr-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-foreground">{proj.id}</span>
+                              <span className="font-semibold text-slate-700 truncate">{proj.customerName}</span>
+                            </div>
+                            <div className="text-[11px] text-muted-foreground flex items-center gap-2">
+                              <span>📍 {proj.location}</span>
+                              <span>• 👷 {proj.assignedLabourIds.length} Labour</span>
+                              <span>• 📅 {proj.workCommittedDate || proj.scheduledDate}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveProjectModal(proj);
+                              }}
+                              className="h-7 text-[10px] font-semibold text-slate-700 border-slate-200"
+                            >
+                              Open Project
+                            </Button>
+                            {proj.status !== "Ongoing" && proj.status !== "Completed" && (
+                              <Button
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStartWorkForProject(proj.id);
+                                }}
+                                className="h-7 text-[10px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white gap-1"
+                              >
+                                <PlayCircle className="h-3 w-3" /> Start Work
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* -------------------------------------------------------------------
+                  CARD 3: Labour Yet To Check In (Smart Auto-Removal on In Time Entry)
+                  ------------------------------------------------------------------- */}
+              <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-md transition-all duration-200">
+                <CardHeader className="p-4 border-b bg-slate-50/60 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-rose-700 flex items-center gap-1.5">
+                      <AlertTriangle className="h-4 w-4 text-rose-600 animate-pulse" /> Labour Yet To Check In
+                    </CardTitle>
+                    <CardDescription className="text-[11px]">
+                      Permanent staff assigned today pending In Time check-in ({permanentLabourPendingCheckIn.length})
+                    </CardDescription>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setAttendanceOpen(true)}
+                    className="text-xs text-rose-700 border-rose-200 bg-rose-50 hover:bg-rose-100"
+                  >
+                    Quick Check-In
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+                    {permanentLabourPendingCheckIn.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-emerald-700 bg-emerald-50/50 font-medium">
+                        <CheckCircle2 className="h-5 w-5 text-emerald-600 mx-auto mb-1" />
+                        All assigned Permanent Labour have checked in for today!
+                      </div>
+                    ) : (
+                      permanentLabourPendingCheckIn.map((lab) => {
+                        const assignedProj = projects.find((p) => p.assignedLabourIds.includes(lab.id)) || projects[0];
+
+                        return (
+                          <div
+                            key={lab.id}
+                            className="p-3 hover:bg-rose-50/30 transition-colors flex items-center justify-between text-xs"
+                          >
+                            <div className="space-y-0.5">
+                              <div className="font-bold text-foreground flex items-center gap-1.5">
+                                <span>{lab.name}</span>
+                                <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 rounded font-mono">
+                                  {lab.id}
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-muted-foreground">
+                                Proj: <span className="font-semibold text-slate-700">{assignedProj?.id}</span> • Scheduled: <span className="font-semibold">09:00 AM</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 animate-pulse">
+                                Check-In Pending
+                              </span>
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedAttLabourId(lab.id);
+                                  setAttendanceOpen(true);
+                                }}
+                                className="h-7 text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white"
+                              >
+                                Check In
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* -------------------------------------------------------------------
+                  CARD 4: Pending Payments (Outstanding Amounts)
+                  ------------------------------------------------------------------- */}
+              <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-md transition-all duration-200">
+                <CardHeader className="p-4 border-b bg-slate-50/60 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-rose-700 flex items-center gap-1.5">
+                      <Coins className="h-4 w-4 text-rose-600" /> Pending Payments
+                    </CardTitle>
+                    <CardDescription className="text-[11px]">
+                      Outstanding project contract balances ({pendingPaymentsProjects.length})
+                    </CardDescription>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => navigate({ to: "/payments" })}
+                    className="text-xs text-blue-600 hover:text-blue-800"
+                  >
+                    View All →
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+                    {pendingPaymentsProjects.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-emerald-700 bg-emerald-50/50 font-medium">
+                        <CheckCircle2 className="h-5 w-5 text-emerald-600 mx-auto mb-1" />
+                        All project payments are fully collected!
+                      </div>
+                    ) : (
+                      pendingPaymentsProjects.map((proj) => (
+                        <div
+                          key={proj.id}
+                          className="p-3 hover:bg-slate-50/80 transition-colors flex items-center justify-between text-xs"
+                        >
+                          <div className="space-y-0.5">
+                            <div className="font-bold text-foreground flex items-center gap-1.5">
+                              <span>{proj.customerName}</span>
+                              <span className="text-[10px] text-blue-600 font-semibold">{proj.id}</span>
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">
+                              Due: <span className="font-semibold text-slate-700">{proj.workCommittedDate || "Immediate"}</span> • <span className="font-bold text-rose-600">₹{proj.balanceAmount.toLocaleString("en-IN")} due</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                              Priority: High
+                            </span>
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setSelectedPayProjectId(proj.id);
+                                setPayAmountInput(proj.balanceAmount);
+                                setRecordPayOpen(true);
+                              }}
+                              className="h-7 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
+                            >
+                              Record Payment
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* -------------------------------------------------------------------
+                  CARD 5: Today's Completed Works
+                  ------------------------------------------------------------------- */}
+              <Card className="md:col-span-2 rounded-xl border border-border bg-white shadow-xs hover:shadow-md transition-all duration-200">
+                <CardHeader className="p-4 border-b bg-slate-50/60 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                      <CheckCheck className="h-4 w-4 text-emerald-600" /> Today's Completed Works
+                    </CardTitle>
+                    <CardDescription className="text-[11px]">
+                      Successfully completed and signed off projects ({todaysCompletedWorks.length})
+                    </CardDescription>
+                  </div>
+                  <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">
+                    ● Signed Off
+                  </Badge>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+                    {todaysCompletedWorks.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-muted-foreground">
+                        No projects completed yet today.
+                      </div>
+                    ) : (
+                      todaysCompletedWorks.map((proj) => (
+                        <div
+                          key={proj.id}
+                          onClick={() => setActiveProjectModal(proj)}
+                          className="p-3 hover:bg-emerald-50/30 transition-colors flex items-center justify-between text-xs cursor-pointer"
+                        >
+                          <div className="space-y-0.5">
+                            <div className="font-bold text-foreground flex items-center gap-2">
+                              <span className="text-blue-600">{proj.id}</span>
+                              <span>{proj.customerName}</span>
+                              <span className="text-muted-foreground font-normal">• {proj.natureOfWork}</span>
+                            </div>
+                            <div className="text-[11px] text-muted-foreground flex items-center gap-3">
+                              <span>👷 Engineer: {proj.assignedEngineerName || "Er. Rajesh Kumar"}</span>
+                              <span>• 👥 {proj.assignedLabourIds.length} Workers</span>
+                              <span>• 💰 Collected: ₹{proj.receivedAmount.toLocaleString("en-IN")}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                              <Check className="h-3 w-3" /> Completed
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* -------------------------------------------------------------------
+                BOTTOM SECTION: RECENT ACTIVITY TIMELINE
+                ------------------------------------------------------------------- */}
+            <Card className="rounded-xl border border-border bg-white shadow-xs">
+              <CardHeader className="p-4 border-b bg-slate-50/60 flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Activity className="h-4 w-4 text-blue-600" /> Live Recent Activity Timeline
+                  </CardTitle>
+                  <CardDescription className="text-[11px]">
+                    Chronological audit of today's site events, check-ins, & payment receipts
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200">
+                  Real-time Feed
+                </Badge>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="relative border-l-2 border-slate-200 ml-3 space-y-4 text-xs">
+                  {recentActivitiesTimeline.map((item, idx) => (
+                    <div key={idx} className="relative pl-6 group">
+                      <div className="absolute -left-[9px] top-1 h-4 w-4 rounded-full bg-white border-2 border-blue-600 group-hover:scale-110 transition-transform" />
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-800">{item.event}</span>
+                        <span className="text-[11px] font-semibold text-muted-foreground bg-slate-100 px-2 py-0.5 rounded">
+                          {item.time}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* -------------------------------------------------------------------
+              RIGHT SIDE PANEL: TODAY'S SUMMARY (STICKY)
+              ------------------------------------------------------------------- */}
+          <div className="space-y-6">
+            <div className="sticky top-20 space-y-6">
+              <Card className="rounded-xl border border-border bg-white shadow-xs">
+                <CardHeader className="p-4 border-b bg-slate-50/60">
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <TrendingUp className="h-4 w-4 text-blue-600" /> Today's Summary
+                  </CardTitle>
+                  <CardDescription className="text-[11px]">
+                    Live aggregated operations stats
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-4 space-y-3.5 text-xs">
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                    <span className="text-muted-foreground font-medium">New Enquiries Today</span>
+                    <span className="font-bold text-foreground bg-slate-100 px-2.5 py-0.5 rounded">
+                      {newEnquiriesToday}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                    <span className="text-muted-foreground font-medium">Site Visits Completed</span>
+                    <span className="font-bold text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded border border-purple-100">
+                      {siteVisitsCompletedCount}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                    <span className="text-muted-foreground font-medium">Projects Started</span>
+                    <span className="font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded border border-amber-100">
+                      {projectsStartedCount}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                    <span className="text-muted-foreground font-medium">Projects Completed</span>
+                    <span className="font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-100">
+                      {projectsCompletedCount}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                    <span className="text-muted-foreground font-medium">Total Collection Today</span>
+                    <span className="font-bold text-emerald-700">
+                      ₹{totalCollectionToday.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                    <span className="text-muted-foreground font-medium">Outstanding Amount</span>
+                    <span className="font-bold text-rose-600">
+                      ₹{totalOutstandingAmount.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                    <span className="text-muted-foreground font-medium">Permanent Labour Working</span>
+                    <span className="font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded border border-blue-100">
+                      {permanentLabourWorkingCount} Staff
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground font-medium">Contract Labour Working</span>
+                    <span className="font-bold text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded">
+                      {contractLabourWorkingCount} Staff
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ===========================================================================
+          QUICK ACTION MODALS & DIALOGS
+          =========================================================================== */}
+
+      {/* 1. New Enquiry Dialog */}
+      <Dialog open={newEnqOpen} onOpenChange={setNewEnqOpen}>
+        <DialogContent className="max-w-md rounded-xl border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold">
+              <Plus className="h-4 w-4 text-blue-600" /> Add New Customer Enquiry
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateEnquirySubmit} className="space-y-3 text-xs">
+            <div>
+              <Label className="text-xs font-semibold">Customer / Client Name *</Label>
+              <Input
+                value={enqCustName}
+                onChange={(e) => setEnqCustName(e.target.value)}
+                placeholder="e.g. Acme Industrial Robotics"
+                className="h-8 text-xs rounded-lg mt-1"
+                required
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold">Phone Number *</Label>
+              <Input
+                value={enqPhone}
+                onChange={(e) => setEnqPhone(e.target.value)}
+                placeholder="e.g. 9876543210"
+                className="h-8 text-xs rounded-lg mt-1"
+                required
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold">Location / Address</Label>
+              <Input
+                value={enqLocation}
+                onChange={(e) => setEnqLocation(e.target.value)}
+                placeholder="e.g. Hyderabad - HITEC City"
+                className="h-8 text-xs rounded-lg mt-1"
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold">Service Need / Leakage Type</Label>
+              <Select value={enqLeakageType} onValueChange={setEnqLeakageType}>
+                <SelectTrigger className="h-8 text-xs rounded-lg mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {settings.defaultLeakageTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold">Assign Lead Engineer</Label>
+              <Select value={enqEngineerId} onValueChange={setEnqEngineerId}>
+                <SelectTrigger className="h-8 text-xs rounded-lg mt-1">
+                  <SelectValue placeholder="Select Engineer" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {engineers.map((eng) => (
+                    <SelectItem key={eng.id} value={eng.id}>
+                      {eng.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs">
+                Create Customer Enquiry
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* 2. Assign Engineer Dialog */}
+      <Dialog open={assignEngOpen} onOpenChange={setAssignEngOpen}>
+        <DialogContent className="max-w-md rounded-xl border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-purple-700">
+              <UserPlus className="h-4 w-4 text-purple-600" /> Assign Engineer to Site Visit
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleAssignEngineerSubmit} className="space-y-3 text-xs">
+            <div>
+              <Label className="text-xs font-semibold">Select Customer Enquiry</Label>
+              <Select value={selectedEnquiryId} onValueChange={setSelectedEnquiryId}>
+                <SelectTrigger className="h-8 text-xs rounded-lg mt-1">
+                  <SelectValue placeholder="Choose Enquiry..." />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {enquiries.map((enq) => (
+                    <SelectItem key={enq.id} value={enq.id}>
+                      {enq.id} - {enq.customerName} ({enq.leakageType})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold">Select Field Engineer</Label>
+              <Select value={selectedEngId} onValueChange={setSelectedEngId}>
+                <SelectTrigger className="h-8 text-xs rounded-lg mt-1">
+                  <SelectValue placeholder="Choose Engineer..." />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {engineers.map((eng) => (
+                    <SelectItem key={eng.id} value={eng.id}>
+                      {eng.name} ({eng.specialty})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs">
+                Assign Engineer & Schedule Site Visit
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* 3. Record Payment Dialog */}
+      <Dialog open={recordPayOpen} onOpenChange={setRecordPayOpen}>
+        <DialogContent className="max-w-md rounded-xl border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-emerald-700">
+              <Receipt className="h-4 w-4 text-emerald-600" /> Record Project Payment
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleRecordPaymentSubmit} className="space-y-3 text-xs">
+            <div>
+              <Label className="text-xs font-semibold">Select Project *</Label>
+              <Select
+                value={selectedPayProjectId}
+                onValueChange={(val) => {
+                  setSelectedPayProjectId(val);
+                  const p = projects.find((x) => x.id === val);
+                  if (p) setPayAmountInput(p.balanceAmount);
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs rounded-lg mt-1">
+                  <SelectValue placeholder="Choose Project..." />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.id} - {p.customerName} (Bal: ₹{p.balanceAmount.toLocaleString("en-IN")})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold">Payment Amount (₹) *</Label>
+              <Input
+                type="number"
+                value={payAmountInput}
+                onChange={(e) => setPayAmountInput(Number(e.target.value))}
+                className="h-8 text-xs font-bold text-emerald-700 rounded-lg mt-1"
+                required
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold">Payment Mode</Label>
+              <Select value={payModeInput} onValueChange={(val: PaymentMode) => setPayModeInput(val)}>
+                <SelectTrigger className="h-8 text-xs rounded-lg mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="Bank Transfer">Bank Transfer (NEFT/RTGS)</SelectItem>
+                  <SelectItem value="UPI">UPI Payment</SelectItem>
+                  <SelectItem value="Cash">Cash</SelectItem>
+                  <SelectItem value="Cheque">Cheque</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold">Reference / UTR Number</Label>
+              <Input
+                value={payRefInput}
+                onChange={(e) => setPayRefInput(e.target.value)}
+                placeholder="e.g. HDFC-NEFT-9812739"
+                className="h-8 text-xs rounded-lg mt-1"
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold">
+                Confirm & Record Payment
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* 4. Mark Attendance / Quick Check-In Dialog */}
+      <Dialog open={attendanceOpen} onOpenChange={setAttendanceOpen}>
+        <DialogContent className="max-w-md rounded-xl border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-amber-700">
+              <CalendarCheck className="h-4 w-4 text-amber-600" /> Labour Attendance Quick Check-In
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleQuickCheckInSubmit} className="space-y-3 text-xs">
+            <div>
+              <Label className="text-xs font-semibold">Select Labour Staff *</Label>
+              <Select value={selectedAttLabourId} onValueChange={setSelectedAttLabourId}>
+                <SelectTrigger className="h-8 text-xs rounded-lg mt-1">
+                  <SelectValue placeholder="Choose Labour..." />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {labours.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.name} ({l.type} - {l.skills.join(", ")})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-semibold">In Time</Label>
+                <Input
+                  value={attInTimeInput}
+                  onChange={(e) => setAttInTimeInput(e.target.value)}
+                  placeholder="09:00 AM"
+                  className="h-8 text-xs rounded-lg mt-1 font-semibold"
+                />
+              </div>
+
+              <div>
+                <Label className="text-xs font-semibold">Out Time</Label>
+                <Input
+                  value={attOutTimeInput}
+                  onChange={(e) => setAttOutTimeInput(e.target.value)}
+                  placeholder="06:00 PM"
+                  className="h-8 text-xs rounded-lg mt-1 font-semibold"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button type="submit" className="w-full bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold">
+                Log In Time & Mark Present
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* 5. Add Labour Dialog */}
+      <Dialog open={addLabourOpen} onOpenChange={setAddLabourOpen}>
+        <DialogContent className="max-w-md rounded-xl border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-800">
+              <HardHat className="h-4 w-4 text-slate-700" /> Add New Labour Staff
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleAddLabourSubmit} className="space-y-3 text-xs">
+            <div>
+              <Label className="text-xs font-semibold">Labour Full Name *</Label>
+              <Input
+                value={labourName}
+                onChange={(e) => setLabourName(e.target.value)}
+                placeholder="e.g. Ramesh Kumar"
+                className="h-8 text-xs rounded-lg mt-1"
+                required
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold">Mobile Phone *</Label>
+              <Input
+                value={labourPhone}
+                onChange={(e) => setLabourPhone(e.target.value)}
+                placeholder="e.g. 9840112233"
+                className="h-8 text-xs rounded-lg mt-1"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-semibold">Labour Type</Label>
+                <Select value={labourType} onValueChange={(val: LabourType) => setLabourType(val)}>
+                  <SelectTrigger className="h-8 text-xs rounded-lg mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="Permanent">Permanent</SelectItem>
+                    <SelectItem value="Contract">Contract</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs font-semibold">Daily Wage (₹)</Label>
+                <Input
+                  type="number"
+                  value={labourWage}
+                  onChange={(e) => setLabourWage(Number(e.target.value))}
+                  className="h-8 text-xs font-bold rounded-lg mt-1"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button type="submit" className="w-full bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold">
+                Add Labour Staff
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Details Modal for Site Visit Enquiry */}
+      {activeSiteVisitEnquiry && (
+        <Dialog open={!!activeSiteVisitEnquiry} onOpenChange={() => setActiveSiteVisitEnquiry(null)}>
+          <DialogContent className="max-w-md rounded-xl border">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base font-bold text-blue-600">
+                <Building2 className="h-4 w-4" /> {activeSiteVisitEnquiry.id} - {activeSiteVisitEnquiry.customerName}
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Location:</span>
+                <span className="font-semibold">{activeSiteVisitEnquiry.location}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Phone:</span>
+                <span className="font-semibold">📞 {activeSiteVisitEnquiry.phone}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Leakage / Service:</span>
+                <span className="font-bold text-blue-700">{activeSiteVisitEnquiry.leakageType}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Assigned Engineer:</span>
+                <span className="font-bold text-purple-700">{activeSiteVisitEnquiry.assignedEngineerName || "Unassigned"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Site Visit Status:</span>
+                <Badge variant="outline" className="text-[10px]">
+                  {activeSiteVisitEnquiry.siteVisitStatus}
+                </Badge>
+              </div>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                onClick={() => {
+                  setActiveSiteVisitEnquiry(null);
+                  navigate({ to: "/enquiries" });
+                }}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs"
+              >
+                Manage Full Enquiry Workflow →
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Details Modal for Project */}
+      {activeProjectModal && (
+        <Dialog open={!!activeProjectModal} onOpenChange={() => setActiveProjectModal(null)}>
+          <DialogContent className="max-w-md rounded-xl border">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base font-bold text-blue-600">
+                <FolderKanban className="h-4 w-4" /> {activeProjectModal.id} - {activeProjectModal.customerName}
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Nature of Work:</span>
+                <span className="font-semibold">{activeProjectModal.natureOfWork}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Lead Engineer:</span>
+                <span className="font-bold text-purple-700">{activeProjectModal.assignedEngineerName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Work Committed Date:</span>
+                <span className="font-semibold text-purple-800">{activeProjectModal.workCommittedDate || "TBD"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Actual Work Started:</span>
+                <span className="font-bold text-emerald-700">{activeProjectModal.actualWorkStartedDate || "Work Pending"}</span>
+              </div>
+              <div className="flex justify-between border-t pt-1">
+                <span className="text-muted-foreground">Total Value:</span>
+                <span className="font-bold">₹{activeProjectModal.projectValue.toLocaleString("en-IN")}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Balance Outstanding:</span>
+                <span className="font-bold text-rose-600">₹{activeProjectModal.balanceAmount.toLocaleString("en-IN")}</span>
+              </div>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                onClick={() => {
+                  setActiveProjectModal(null);
+                  navigate({ to: "/projects" });
+                }}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs"
+              >
+                Open Full Project Master →
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

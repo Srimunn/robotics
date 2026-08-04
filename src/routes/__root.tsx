@@ -7,14 +7,26 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { ProjectsProvider } from "@/lib/projects-context";
+import { RoboticsProvider, useRobotics } from "@/lib/robotics-context";
 import { Toaster } from "@/components/ui/sonner";
+import { GlobalSearchModal } from "@/components/global-search-modal";
+import { Search, Plus, Bell, User, CheckCircle2, AlertCircle, PhoneCall, DollarSign, Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 
 function NotFoundComponent() {
   return (
@@ -28,9 +40,9 @@ function NotFoundComponent() {
         <div className="mt-6">
           <Link
             to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors"
           >
-            Go home
+            Return to Dashboard
           </Link>
         </div>
       </div>
@@ -49,10 +61,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
+          Application Error
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+          Something went wrong loading this view. You can reload or return to the main dashboard.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
@@ -60,13 +72,13 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
               router.invalidate();
               reset();
             }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
           >
             Try again
           </button>
           <a
             href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            className="inline-flex items-center justify-center rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
           >
             Go home
           </a>
@@ -76,19 +88,15 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
+import { TooltipProvider } from "@/components/ui/tooltip";
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
+      { title: "Robotics Service Management System" },
+      { name: "description", content: "Enterprise ERP for Robotics & Industrial Automation Service Operations" },
     ],
     links: [
       {
@@ -110,11 +118,212 @@ function RootShell({ children }: { children: ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body>
+      <body className="antialiased bg-background text-foreground font-sans">
         {children}
         <Scripts />
       </body>
     </html>
+  );
+}
+
+function MainHeader() {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const { enquiries, projects, resetToCleanDemoMode } = useRobotics();
+  const router = useRouter();
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Global Search: Ctrl+K or Ctrl+F
+      if ((e.key === "k" || e.key === "f") && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+      // Print: Ctrl+P
+      if (e.key === "p" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        window.print();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const activeEnquiriesCount = enquiries.filter((e) => e.customerDecision === "Thinking" || e.customerDecision === "Follow-up").length;
+  const pendingPaymentsProjects = projects.filter((p) => p.paymentStatus !== "Paid").length;
+
+  return (
+    <>
+      <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-4 border-b bg-background/95 px-4 backdrop-blur shadow-xs">
+        <div className="flex items-center gap-3">
+          <SidebarTrigger />
+          <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="font-semibold text-foreground">Robotics ERP</span>
+            <span>/</span>
+            <span className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 px-2 py-0.5 rounded-full font-semibold text-[10px] border border-emerald-200 dark:border-emerald-800">
+              🟢 MongoDB Atlas Connected (robodb)
+            </span>
+          </div>
+        </div>
+
+        {/* Global Search trigger */}
+        <div className="flex-1 max-w-md">
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="w-full flex items-center justify-between text-xs text-muted-foreground bg-muted/40 hover:bg-muted/70 border border-input rounded-lg px-3 py-1.5 transition-colors shadow-2xs cursor-pointer"
+          >
+            <div className="flex items-center gap-2 truncate">
+              <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span className="truncate">Search Customer, Project, Enquiry, Phone (Ctrl+K)...</span>
+            </div>
+            <kbd className="hidden sm:inline-block text-[10px] font-mono bg-background border px-1.5 py-0.5 rounded shadow-2xs text-muted-foreground">
+              Ctrl + K
+            </kbd>
+          </button>
+        </div>
+
+        {/* Action Controls */}
+        <div className="flex items-center gap-2">
+          {/* Clean Demo Mode Reset Button */}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              if (confirm("Reset ERP to Clean Demo Mode?\n\nAll current enquiry, project, payment, and attendance records will be cleared for a 100% fresh live executive demonstration.")) {
+                resetToCleanDemoMode();
+              }
+            }}
+            className="text-xs rounded-lg gap-1 border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/40"
+          >
+            🧹 Clean Demo Reset
+          </Button>
+          {/* Quick Action Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1.5 shadow-xs hover:scale-[1.02] active:scale-[0.98] transition-transform">
+                <Plus className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline font-medium">Quick Action</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 rounded-xl">
+              <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground uppercase">
+                Create & Record
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to="/enquiries" className="flex items-center gap-2 text-xs">
+                  <PhoneCall className="h-4 w-4 text-blue-600" />
+                  New Customer Enquiry
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/payments" className="flex items-center gap-2 text-xs">
+                  <DollarSign className="h-4 w-4 text-emerald-600" />
+                  Record Payment
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/labours" className="flex items-center gap-2 text-xs">
+                  <Calendar className="h-4 w-4 text-amber-600" />
+                  Log Attendance
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Notifications Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-lg">
+                <Bell className="h-4 w-4" />
+                {activeEnquiriesCount > 0 && (
+                  <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-background" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80 rounded-xl p-0 overflow-hidden">
+              <div className="p-3 bg-muted/30 border-b flex justify-between items-center">
+                <h4 className="text-xs font-semibold text-foreground">System Notifications</h4>
+                <Badge variant="secondary" className="text-[10px]">
+                  {activeEnquiriesCount + pendingPaymentsProjects} Alerts
+                </Badge>
+              </div>
+              <div className="max-h-64 overflow-y-auto p-2 space-y-1">
+                {activeEnquiriesCount > 0 && (
+                  <Link
+                    to="/enquiries"
+                    className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-accent text-xs transition-colors"
+                  >
+                    <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-foreground">
+                        {activeEnquiriesCount} Active Customer Enquiry(ies)
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Site visit & quotation decision pending.
+                      </p>
+                    </div>
+                  </Link>
+                )}
+
+                {pendingPaymentsProjects > 0 && (
+                  <Link
+                    to="/payments"
+                    className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-accent text-xs transition-colors"
+                  >
+                    <DollarSign className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-foreground">
+                        {pendingPaymentsProjects} Project(s) Pending Collection
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Outstanding contract balances awaiting entry.
+                      </p>
+                    </div>
+                  </Link>
+                )}
+
+                <div className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-accent text-xs transition-colors">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-foreground">Workflow Engine Active</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      "Enter Data Once. Never Type Twice" active.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* User Profile */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-2 rounded-lg px-2 text-xs">
+                <div className="h-6 w-6 rounded-full bg-blue-100 text-blue-700 font-bold grid place-items-center text-[10px]">
+                  AD
+                </div>
+                <span className="hidden md:inline font-medium text-foreground">Admin User</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 rounded-xl">
+              <DropdownMenuLabel>
+                <p className="text-xs font-semibold">Service Admin</p>
+                <p className="text-[10px] text-muted-foreground font-normal">admin@robotics-mgmt.com</p>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to="/settings">System Settings</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/reports">Export Reports</Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </header>
+
+      <GlobalSearchModal open={searchOpen} onOpenChange={setSearchOpen} />
+    </>
   );
 }
 
@@ -123,23 +332,20 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ProjectsProvider>
+      <RoboticsProvider>
         <SidebarProvider>
-          <div className="flex min-h-screen w-full bg-muted/30">
+          <div className="flex min-h-screen w-full bg-slate-50/50 dark:bg-background">
             <AppSidebar />
             <div className="flex min-w-0 flex-1 flex-col">
-              <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur">
-                <SidebarTrigger />
-                <div className="text-sm font-semibold">BuildFlow</div>
-              </header>
-              <main className="flex-1 p-4 sm:p-6">
+              <MainHeader />
+              <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full space-y-6">
                 <Outlet />
               </main>
             </div>
           </div>
           <Toaster richColors position="top-right" />
         </SidebarProvider>
-      </ProjectsProvider>
+      </RoboticsProvider>
     </QueryClientProvider>
   );
 }

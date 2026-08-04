@@ -64,9 +64,19 @@ export function DashboardCharts() {
         <div className="h-64">
           <ResponsiveContainer>
             <PieChart>
-              <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
-                innerRadius={50} outerRadius={85} paddingAngle={3}>
-                {pieData.map((_, i) => (<Cell key={i} fill={COLORS[i]} />))}
+              <Pie
+                data={pieData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius={50}
+                outerRadius={85}
+                paddingAngle={3}
+              >
+                {pieData.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i]} />
+                ))}
               </Pie>
               <Tooltip />
               <Legend />
@@ -99,8 +109,14 @@ export function DashboardCharts() {
               <XAxis dataKey="month" fontSize={12} />
               <YAxis fontSize={12} />
               <Tooltip />
-              <Line type="monotone" dataKey="income" stroke="#6366f1" strokeWidth={3}
-                dot={{ r: 4, fill: "#6366f1" }} activeDot={{ r: 6 }} />
+              <Line
+                type="monotone"
+                dataKey="income"
+                stroke="#6366f1"
+                strokeWidth={3}
+                dot={{ r: 4, fill: "#6366f1" }}
+                activeDot={{ r: 6 }}
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>

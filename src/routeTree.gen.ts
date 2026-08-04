@@ -10,90 +10,193 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as CompletedRouteImport } from './routes/completed'
-import { Route as OngoingRouteImport } from './routes/ongoing'
-import { Route as PendingRouteImport } from './routes/pending'
-import { Route as ProjectRouteImport } from './routes/project'
-import { Route as SpotRouteImport } from './routes/spot'
+import { Route as AttendanceRouteImport } from './routes/attendance'
+import { Route as CustomersRouteImport } from './routes/customers'
+import { Route as DocumentsRouteImport } from './routes/documents'
+import { Route as EngineersRouteImport } from './routes/engineers'
+import { Route as EnquiriesRouteImport } from './routes/enquiries'
+import { Route as LaboursRouteImport } from './routes/labours'
+import { Route as MachinesRouteImport } from './routes/machines'
+import { Route as MaterialsRouteImport } from './routes/materials'
+import { Route as PaymentsRouteImport } from './routes/payments'
+import { Route as ProjectsRouteImport } from './routes/projects'
+import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as SettingsRouteImport } from './routes/settings'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CompletedRoute = CompletedRouteImport.update({
-  id: '/completed',
-  path: '/completed',
+const AttendanceRoute = AttendanceRouteImport.update({
+  id: '/attendance',
+  path: '/attendance',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OngoingRoute = OngoingRouteImport.update({
-  id: '/ongoing',
-  path: '/ongoing',
+const CustomersRoute = CustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PendingRoute = PendingRouteImport.update({
-  id: '/pending',
-  path: '/pending',
+const DocumentsRoute = DocumentsRouteImport.update({
+  id: '/documents',
+  path: '/documents',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProjectRoute = ProjectRouteImport.update({
-  id: '/project',
-  path: '/project',
+const EngineersRoute = EngineersRouteImport.update({
+  id: '/engineers',
+  path: '/engineers',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SpotRoute = SpotRouteImport.update({
-  id: '/spot',
-  path: '/spot',
+const EnquiriesRoute = EnquiriesRouteImport.update({
+  id: '/enquiries',
+  path: '/enquiries',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LaboursRoute = LaboursRouteImport.update({
+  id: '/labours',
+  path: '/labours',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MachinesRoute = MachinesRouteImport.update({
+  id: '/machines',
+  path: '/machines',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MaterialsRoute = MaterialsRouteImport.update({
+  id: '/materials',
+  path: '/materials',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentsRoute = PaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsRoute = ProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/completed': typeof CompletedRoute
-  '/ongoing': typeof OngoingRoute
-  '/pending': typeof PendingRoute
-  '/project': typeof ProjectRoute
-  '/spot': typeof SpotRoute
+  '/attendance': typeof AttendanceRoute
+  '/customers': typeof CustomersRoute
+  '/documents': typeof DocumentsRoute
+  '/engineers': typeof EngineersRoute
+  '/enquiries': typeof EnquiriesRoute
+  '/labours': typeof LaboursRoute
+  '/machines': typeof MachinesRoute
+  '/materials': typeof MaterialsRoute
+  '/payments': typeof PaymentsRoute
+  '/projects': typeof ProjectsRoute
+  '/reports': typeof ReportsRoute
+  '/settings': typeof SettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/completed': typeof CompletedRoute
-  '/ongoing': typeof OngoingRoute
-  '/pending': typeof PendingRoute
-  '/project': typeof ProjectRoute
-  '/spot': typeof SpotRoute
+  '/attendance': typeof AttendanceRoute
+  '/customers': typeof CustomersRoute
+  '/documents': typeof DocumentsRoute
+  '/engineers': typeof EngineersRoute
+  '/enquiries': typeof EnquiriesRoute
+  '/labours': typeof LaboursRoute
+  '/machines': typeof MachinesRoute
+  '/materials': typeof MaterialsRoute
+  '/payments': typeof PaymentsRoute
+  '/projects': typeof ProjectsRoute
+  '/reports': typeof ReportsRoute
+  '/settings': typeof SettingsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/completed': typeof CompletedRoute
-  '/ongoing': typeof OngoingRoute
-  '/pending': typeof PendingRoute
-  '/project': typeof ProjectRoute
-  '/spot': typeof SpotRoute
+  '/attendance': typeof AttendanceRoute
+  '/customers': typeof CustomersRoute
+  '/documents': typeof DocumentsRoute
+  '/engineers': typeof EngineersRoute
+  '/enquiries': typeof EnquiriesRoute
+  '/labours': typeof LaboursRoute
+  '/machines': typeof MachinesRoute
+  '/materials': typeof MaterialsRoute
+  '/payments': typeof PaymentsRoute
+  '/projects': typeof ProjectsRoute
+  '/reports': typeof ReportsRoute
+  '/settings': typeof SettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/completed' | '/ongoing' | '/pending' | '/project' | '/spot'
+  fullPaths:
+    | '/'
+    | '/attendance'
+    | '/customers'
+    | '/documents'
+    | '/engineers'
+    | '/enquiries'
+    | '/labours'
+    | '/machines'
+    | '/materials'
+    | '/payments'
+    | '/projects'
+    | '/reports'
+    | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/completed' | '/ongoing' | '/pending' | '/project' | '/spot'
+  to:
+    | '/'
+    | '/attendance'
+    | '/customers'
+    | '/documents'
+    | '/engineers'
+    | '/enquiries'
+    | '/labours'
+    | '/machines'
+    | '/materials'
+    | '/payments'
+    | '/projects'
+    | '/reports'
+    | '/settings'
   id:
     | '__root__'
     | '/'
-    | '/completed'
-    | '/ongoing'
-    | '/pending'
-    | '/project'
-    | '/spot'
+    | '/attendance'
+    | '/customers'
+    | '/documents'
+    | '/engineers'
+    | '/enquiries'
+    | '/labours'
+    | '/machines'
+    | '/materials'
+    | '/payments'
+    | '/projects'
+    | '/reports'
+    | '/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  CompletedRoute: typeof CompletedRoute
-  OngoingRoute: typeof OngoingRoute
-  PendingRoute: typeof PendingRoute
-  ProjectRoute: typeof ProjectRoute
-  SpotRoute: typeof SpotRoute
+  AttendanceRoute: typeof AttendanceRoute
+  CustomersRoute: typeof CustomersRoute
+  DocumentsRoute: typeof DocumentsRoute
+  EngineersRoute: typeof EngineersRoute
+  EnquiriesRoute: typeof EnquiriesRoute
+  LaboursRoute: typeof LaboursRoute
+  MachinesRoute: typeof MachinesRoute
+  MaterialsRoute: typeof MaterialsRoute
+  PaymentsRoute: typeof PaymentsRoute
+  ProjectsRoute: typeof ProjectsRoute
+  ReportsRoute: typeof ReportsRoute
+  SettingsRoute: typeof SettingsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -105,39 +208,88 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/completed': {
-      id: '/completed'
-      path: '/completed'
-      fullPath: '/completed'
-      preLoaderRoute: typeof CompletedRouteImport
+    '/attendance': {
+      id: '/attendance'
+      path: '/attendance'
+      fullPath: '/attendance'
+      preLoaderRoute: typeof AttendanceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/ongoing': {
-      id: '/ongoing'
-      path: '/ongoing'
-      fullPath: '/ongoing'
-      preLoaderRoute: typeof OngoingRouteImport
+    '/customers': {
+      id: '/customers'
+      path: '/customers'
+      fullPath: '/customers'
+      preLoaderRoute: typeof CustomersRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/pending': {
-      id: '/pending'
-      path: '/pending'
-      fullPath: '/pending'
-      preLoaderRoute: typeof PendingRouteImport
+    '/documents': {
+      id: '/documents'
+      path: '/documents'
+      fullPath: '/documents'
+      preLoaderRoute: typeof DocumentsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/project': {
-      id: '/project'
-      path: '/project'
-      fullPath: '/project'
-      preLoaderRoute: typeof ProjectRouteImport
+    '/engineers': {
+      id: '/engineers'
+      path: '/engineers'
+      fullPath: '/engineers'
+      preLoaderRoute: typeof EngineersRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/spot': {
-      id: '/spot'
-      path: '/spot'
-      fullPath: '/spot'
-      preLoaderRoute: typeof SpotRouteImport
+    '/enquiries': {
+      id: '/enquiries'
+      path: '/enquiries'
+      fullPath: '/enquiries'
+      preLoaderRoute: typeof EnquiriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/labours': {
+      id: '/labours'
+      path: '/labours'
+      fullPath: '/labours'
+      preLoaderRoute: typeof LaboursRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/machines': {
+      id: '/machines'
+      path: '/machines'
+      fullPath: '/machines'
+      preLoaderRoute: typeof MachinesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/materials': {
+      id: '/materials'
+      path: '/materials'
+      fullPath: '/materials'
+      preLoaderRoute: typeof MaterialsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payments': {
+      id: '/payments'
+      path: '/payments'
+      fullPath: '/payments'
+      preLoaderRoute: typeof PaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects': {
+      id: '/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof ProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports': {
+      id: '/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -145,11 +297,18 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  CompletedRoute: CompletedRoute,
-  OngoingRoute: OngoingRoute,
-  PendingRoute: PendingRoute,
-  ProjectRoute: ProjectRoute,
-  SpotRoute: SpotRoute,
+  AttendanceRoute: AttendanceRoute,
+  CustomersRoute: CustomersRoute,
+  DocumentsRoute: DocumentsRoute,
+  EngineersRoute: EngineersRoute,
+  EnquiriesRoute: EnquiriesRoute,
+  LaboursRoute: LaboursRoute,
+  MachinesRoute: MachinesRoute,
+  MaterialsRoute: MaterialsRoute,
+  PaymentsRoute: PaymentsRoute,
+  ProjectsRoute: ProjectsRoute,
+  ReportsRoute: ReportsRoute,
+  SettingsRoute: SettingsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
