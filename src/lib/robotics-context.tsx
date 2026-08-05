@@ -129,12 +129,9 @@ const initialMasterData: MasterDataItem[] = [
 
   // Customer Decision
   { id: "MD-CD-1", category: "Customer Decision", value: "Follow Up", isActive: true, isDefault: true, createdAt: new Date().toISOString() },
-  { id: "MD-CD-2", category: "Customer Decision", value: "Approved", isActive: true, isDefault: true, createdAt: new Date().toISOString() },
-  { id: "MD-CD-3", category: "Customer Decision", value: "Cancelled", isActive: true, isDefault: true, createdAt: new Date().toISOString() },
-  { id: "MD-CD-4", category: "Customer Decision", value: "Work Scheduled", isActive: true, isDefault: true, createdAt: new Date().toISOString() },
-  { id: "MD-CD-5", category: "Customer Decision", value: "Work Started", isActive: true, isDefault: true, createdAt: new Date().toISOString() },
-  { id: "MD-CD-6", category: "Customer Decision", value: "Completed", isActive: true, isDefault: true, createdAt: new Date().toISOString() },
-  { id: "MD-CD-7", category: "Customer Decision", value: "Closed", isActive: true, isDefault: true, createdAt: new Date().toISOString() },
+  { id: "MD-CD-2", category: "Customer Decision", value: "Thinking", isActive: true, isDefault: true, createdAt: new Date().toISOString() },
+  { id: "MD-CD-3", category: "Customer Decision", value: "Approved", isActive: true, isDefault: true, createdAt: new Date().toISOString() },
+  { id: "MD-CD-4", category: "Customer Decision", value: "Cancelled", isActive: true, isDefault: true, createdAt: new Date().toISOString() },
 
   // Customer Status
   { id: "MD-CS-1", category: "Customer Status", value: "Active", isActive: true, isDefault: true, createdAt: new Date().toISOString() },
@@ -236,9 +233,61 @@ export const calculateHoursFromTimes = (inTimeStr?: string, outTimeStr?: string)
   }
 };
 
+export const calculateEarnedWage = (weeklyWage: number = 1400, hoursWorked: number = 0): number => {
+  if (!hoursWorked || hoursWorked <= 0) return 0;
+  // Standard weekly wage covers 48 hours (6 days x 8 hrs)
+  const hourlyRate = (weeklyWage || 1400) / 48;
+  return Math.round(hoursWorked * hourlyRate);
+};
+
 const initialEnquiries: Enquiry[] = [];
 
-const initialLabours: Labour[] = [];
+const initialLabours: Labour[] = [
+  {
+    id: "LBR-101",
+    name: "Ramesh Chandra",
+    phone: "9840998877",
+    type: "Permanent",
+    defaultWeeklyWage: 1400,
+    status: "Assigned",
+    skills: ["Robotic Joint Seals", "General Servicing", "Pneumatic Controls"],
+    wageHistory: [
+      { projectId: "PRJ-2026-001", projectName: "AeroTech Solutions", weeklyWage: 1400, assignedDate: "2026-08-01" },
+    ],
+  },
+  {
+    id: "LBR-102",
+    name: "Suresh Kumar",
+    phone: "9876543210",
+    type: "Permanent",
+    defaultWeeklyWage: 1600,
+    status: "Available",
+    skills: ["Hydraulics", "PLC Wiring", "Motor Repair"],
+    wageHistory: [],
+  },
+  {
+    id: "LBR-201",
+    name: "Ganesh M.",
+    phone: "9123456789",
+    type: "Contract",
+    defaultWeeklyWage: 1800,
+    status: "Assigned",
+    skills: ["SCADA Servicing", "Electrical Wiring", "Leaking"],
+    wageHistory: [
+      { projectId: "PRJ-2026-001", projectName: "AeroTech Solutions", weeklyWage: 1800, assignedDate: "2026-08-02" },
+    ],
+  },
+  {
+    id: "LBR-202",
+    name: "Selvam K.",
+    phone: "9988776655",
+    type: "Contract",
+    defaultWeeklyWage: 2200,
+    status: "Available",
+    skills: ["Conveyor Alignment", "Hydraulics"],
+    wageHistory: [],
+  },
+];
 
 const initialProjects: Project[] = [];
 
@@ -259,7 +308,53 @@ const initialStockAuditLogs: StockAuditLog[] = [];
 const initialDocuments: ProjectDocument[] = [];
 
 const generateInitialAttendance = (): Record<string, AttendanceRecord> => {
-  return {};
+  return {
+    "LBR-101_2026-08-01": {
+      id: "LBR-101_2026-08-01",
+      labourId: "LBR-101",
+      labourName: "Ramesh Chandra",
+      projectId: "PRJ-2026-001",
+      projectName: "AeroTech Solutions",
+      date: "2026-08-01",
+      status: "Present",
+      inTime: "09:00 AM",
+      outTime: "06:00 PM",
+      hoursWorked: 9,
+      earnedMoney: 263,
+      workDescription: "Robotic Joint Seal Alignment",
+      weeklyWage: 1400,
+    },
+    "LBR-101_2026-08-02": {
+      id: "LBR-101_2026-08-02",
+      labourId: "LBR-101",
+      labourName: "Ramesh Chandra",
+      projectId: "PRJ-2026-001",
+      projectName: "AeroTech Solutions",
+      date: "2026-08-02",
+      status: "Present",
+      inTime: "09:00 AM",
+      outTime: "05:00 PM",
+      hoursWorked: 8,
+      earnedMoney: 233,
+      workDescription: "Hydraulic Pump Overhaul",
+      weeklyWage: 1400,
+    },
+    "LBR-201_2026-08-01": {
+      id: "LBR-201_2026-08-01",
+      labourId: "LBR-201",
+      labourName: "Ganesh M.",
+      projectId: "PRJ-2026-001",
+      projectName: "AeroTech Solutions",
+      date: "2026-08-01",
+      status: "Present",
+      inTime: "08:30 AM",
+      outTime: "06:30 PM",
+      hoursWorked: 10,
+      earnedMoney: 375,
+      workDescription: "PLC Wiring & Sensor Calibration",
+      weeklyWage: 1800,
+    },
+  };
 };
 
 type RoboticsContextType = {
@@ -848,9 +943,7 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
         else payStatus = "Pending";
 
         let newStatus = proj.status;
-        if (e.actualWorkStartedDate && (proj.status === "Waiting" || proj.status === "Scheduled")) {
-          newStatus = "Ongoing";
-        } else if (e.workCommittedDate && proj.status === "Waiting") {
+        if (e.workCommittedDate && proj.status === "Waiting") {
           newStatus = "Scheduled";
         }
 
@@ -931,11 +1024,7 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
     const costValue = enq.quotationAmount || 0;
     const nowStr = new Date().toISOString().slice(0, 16).replace("T", " ");
 
-    const initialStatus: ProjectStatus = enq.actualWorkStartedDate
-      ? "Ongoing"
-      : enq.workCommittedDate
-      ? "Scheduled"
-      : "Waiting";
+    const initialStatus: ProjectStatus = "Scheduled";
 
     const initialActivities: ProjectActivity[] = [
       { id: `ACT-${Math.random().toString(36).slice(2, 6)}`, timestamp: enq.createdAt.slice(0, 16).replace("T", " "), event: "Enquiry Created", actor: "System", details: `Logged ${enq.id} via ${enq.leadSource}` },
@@ -1206,12 +1295,14 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
     const hasInTime = Boolean(log.inTime && log.inTime.trim().length > 0);
     const autoAttendance: AttendanceStatus = hasInTime ? "Present" : "Absent";
     const autoHours = hasInTime ? calculateHoursFromTimes(log.inTime, log.outTime) : 0;
+    const autoEarned = calculateEarnedWage(log.weeklyWage || 1400, autoHours);
     const nowStr = new Date().toISOString().slice(0, 16).replace("T", " ");
 
     const updatedLog: ProjectLabourLog = {
       ...log,
       attendance: autoAttendance,
       hoursWorked: autoHours,
+      earnedMoney: autoEarned,
     };
 
     setProjects((prev) =>
@@ -1231,7 +1322,7 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
           timestamp: nowStr,
           event: "Attendance Logged",
           actor: "Site Supervisor",
-          details: `Logged ${log.labourName} In Time (${log.inTime || "None"}) -> Attendance: ${autoAttendance} (${autoHours} hrs)`,
+          details: `Logged ${log.labourName} (${log.inTime || "None"} to ${log.outTime || "None"}) -> Attendance: ${autoAttendance} (${autoHours} hrs | ₹${autoEarned.toLocaleString("en-IN")})`,
         };
 
         return {
@@ -1259,13 +1350,14 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
         inTime: log.inTime,
         outTime: log.outTime,
         hoursWorked: autoHours,
+        earnedMoney: autoEarned,
         workDescription: log.workDescription,
         weeklyWage: log.weeklyWage,
       },
     }));
 
     toast.success(
-      `Logged In Time for ${log.labourName}! Attendance set to ${autoAttendance} (${autoHours} hrs).`
+      `Logged ${log.labourName}! ${autoHours} hrs worked • Earned Wages: ₹${autoEarned.toLocaleString("en-IN")}`
     );
   };
 

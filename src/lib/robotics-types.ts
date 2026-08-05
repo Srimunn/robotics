@@ -5,11 +5,7 @@ export type CustomerDecision =
   | "Follow-up"
   | "Thinking"
   | "Approved"
-  | "Cancelled"
-  | "Work Scheduled"
-  | "Work Started"
-  | "Completed"
-  | "Closed";
+  | "Cancelled";
 
 export type ProjectStatus = "Waiting" | "Scheduled" | "Ongoing" | "Completed" | "Closed";
 
@@ -74,6 +70,7 @@ export type MasterDataCategory =
   | "Nature Of Work"
   | "Engineer Names"
   | "Labour Types"
+  | "Labour Skills"
   | "Cancellation Reasons"
   | "Payment Modes"
   | "Payment Stage"
@@ -179,6 +176,7 @@ export interface ProjectLabourLog {
   outTime?: string;
   attendance: AttendanceStatus;
   hoursWorked: number;
+  earnedMoney?: number;
   workDescription: string;
   remarks?: string;
 }
@@ -392,6 +390,7 @@ export interface AttendanceRecord {
   inTime?: string;
   outTime?: string;
   hoursWorked?: number;
+  earnedMoney?: number;
   workDescription?: string;
   weeklyWage?: number;
   remarks?: string;

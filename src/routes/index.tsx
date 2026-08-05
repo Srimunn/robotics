@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { useRobotics, calculateHoursFromTimes } from "@/lib/robotics-context";
+import { cn } from "@/lib/utils";
+import { useRobotics, calculateHoursFromTimes, calculateEarnedWage } from "@/lib/robotics-context";
 import type {
   Enquiry,
   Project,
@@ -25,6 +26,7 @@ import {
   Coins,
   Users,
   Calendar,
+  CalendarCheck,
   ArrowRight,
   MapPin,
   Sparkles,
@@ -32,9 +34,9 @@ import {
   PlayCircle,
   HardHat,
   DollarSign,
+  User,
   UserPlus,
   Receipt,
-  CalendarCheck,
   Activity,
   Check,
   ChevronRight,
@@ -68,6 +70,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SmartComboBox } from "@/components/ui/SmartComboBox";
 import {
   ResponsiveContainer,
   BarChart,
@@ -94,6 +97,7 @@ function DashboardComponent() {
     labours,
     attendance,
     engineers,
+    checkEngineerAvailability,
     settings,
     machines,
     materials,
@@ -106,6 +110,7 @@ function DashboardComponent() {
     recordAttendance,
     addPayment,
     addLabour,
+    addMasterDataItem,
     updateProjectLabourLog,
   } = useRobotics();
 
@@ -135,15 +140,23 @@ function DashboardComponent() {
   const [enqCustName, setEnqCustName] = useState("");
   const [enqPhone, setEnqPhone] = useState("");
   const [enqLocation, setEnqLocation] = useState("");
-  const [enqLeadSource, setEnqLeadSource] = useState("Website Enquiry");
   const [enqLeakageType, setEnqLeakageType] = useState("Robotic Arm Oil Leakage & Joint Seal");
+  const [enqLeadSource, setEnqLeadSource] = useState("Phone Call");
+  const [enqReferredBy, setEnqReferredBy] = useState("");
+  const [enqEngineerName, setEnqEngineerName] = useState("Er. Rajesh Kumar");
   const [enqEngineerId, setEnqEngineerId] = useState("");
+  const [enqSiteVisitDate, setEnqSiteVisitDate] = useState("2026-08-07");
+  const [enqQuotationAmount, setEnqQuotationAmount] = useState<number>(150000);
+  const [enqWorkCommittedDate, setEnqWorkCommittedDate] = useState("2026-08-15");
+  const [enqActualWorkStartedDate, setEnqActualWorkStartedDate] = useState("");
+  const [enqRemarks, setEnqRemarks] = useState("");
 
   // Form Inputs for New Labour
   const [labourName, setLabourName] = useState("");
   const [labourPhone, setLabourPhone] = useState("");
   const [labourType, setLabourType] = useState<LabourType>("Permanent");
   const [labourWage, setLabourWage] = useState<number>(1400);
+  const [labourSkillsStr, setLabourSkillsStr] = useState("Robotic Joint Seals, Servicing");
 
   // Details Cockpit Dialog States
   const [activeSiteVisitEnquiry, setActiveSiteVisitEnquiry] = useState<Enquiry | null>(null);
@@ -240,32 +253,37 @@ function DashboardComponent() {
   // Quick Action Handlers
   const handleCreateEnquirySubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!enqCustName || !enqPhone) {
+    if (!enqCustName.trim() || !enqPhone.trim()) {
       toast.error("Please enter Customer Name and Phone Number");
       return;
     }
 
-    const eng = engineers.find((x) => x.id === enqEngineerId);
+    const eng = engineers.find((x) => x.id === enqEngineerId || x.name === enqEngineerName);
 
     addEnquiry({
       enquiryDate: todayStr,
       customerName: enqCustName,
       phone: enqPhone,
-      location: enqLocation || "Hyderabad",
-      leadSource: enqLeadSource,
-      leakageType: enqLeakageType,
-      assignedEngineerId: enqEngineerId || undefined,
-      assignedEngineerName: eng?.name || undefined,
-      siteVisitDate: todayStr,
-      workCommittedDate: "",
-      actualWorkStartedDate: "",
-      remarks: "Direct entry from Today's Operations Board",
+      location: enqLocation || "Plot 42, Industrial Park, HITEC City, Hyderabad",
+      leadSource: enqLeadSource || "Phone Call",
+      referredBy: enqReferredBy,
+      leakageType: enqLeakageType || "Robotic Arm Oil Leakage & Joint Seal",
+      assignedEngineerId: eng?.id || undefined,
+      assignedEngineerName: eng?.name || enqEngineerName || "Er. Rajesh Kumar",
+      siteVisitDate: enqSiteVisitDate || "2026-08-07",
+      quotationAmount: enqQuotationAmount || 0,
+      workCommittedDate: enqWorkCommittedDate || "2026-08-15",
+      actualWorkStartedDate: enqActualWorkStartedDate || "",
+      remarks: enqRemarks || "",
     });
 
     setNewEnqOpen(false);
     setEnqCustName("");
     setEnqPhone("");
     setEnqLocation("");
+    setEnqReferredBy("");
+    setEnqActualWorkStartedDate("");
+    setEnqRemarks("");
   };
 
   const handleAssignEngineerSubmit = (e: React.FormEvent) => {
@@ -349,6 +367,7 @@ function DashboardComponent() {
       toast.error("Please enter Labour Name and Phone Number");
       return;
     }
+
     addLabour({
       name: labourName,
       phone: labourPhone,
@@ -356,7 +375,7 @@ function DashboardComponent() {
       defaultWeeklyWage: labourWage,
       dailyWage: labourWage,
       status: "Available",
-      skills: ["Robotic Joint Seals", "Servicing"],
+      skills: [],
       wageHistory: [],
     });
     setAddLabourOpen(false);
@@ -376,7 +395,7 @@ function DashboardComponent() {
       {/* ===========================================================================
           STICKY PAGE HEADER BANNER WITH QUICK ACTION TRIGGER PILLS
           =========================================================================== */}
-      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-border px-6 py-4 rounded-xl shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="sticky top-14 z-20 bg-white/95 dark:bg-card/95 backdrop-blur-md border-b border-border px-6 py-4 rounded-xl shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
@@ -391,7 +410,7 @@ function DashboardComponent() {
           </p>
         </div>
 
-        {/* Header Quick Action Buttons */}
+        {/* Header Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
@@ -399,38 +418,6 @@ function DashboardComponent() {
             className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1 shadow-2xs cursor-pointer"
           >
             <Plus className="h-3.5 w-3.5" /> New Enquiry
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setAssignEngOpen(true)}
-            className="border-purple-200 text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg text-xs gap-1 cursor-pointer"
-          >
-            <UserPlus className="h-3.5 w-3.5" /> Assign Engineer
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setRecordPayOpen(true)}
-            className="border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg text-xs gap-1 cursor-pointer"
-          >
-            <Receipt className="h-3.5 w-3.5" /> Record Payment
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setAttendanceOpen(true)}
-            className="border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg text-xs gap-1 cursor-pointer"
-          >
-            <CalendarCheck className="h-3.5 w-3.5" /> Mark Attendance
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setAddLabourOpen(true)}
-            className="border-slate-200 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs gap-1 cursor-pointer"
-          >
-            <HardHat className="h-3.5 w-3.5" /> Add Labour
           </Button>
         </div>
       </div>
@@ -476,10 +463,10 @@ function DashboardComponent() {
           <CardContent className="p-3.5">
             <div className="flex items-center justify-between text-muted-foreground mb-1">
               <span className="text-[10px] font-bold uppercase tracking-wider">Ongoing Works</span>
-              <Clock className="h-4 w-4 text-amber-500" />
+              <Clock className="h-4 w-4 text-blue-500" />
             </div>
-            <div className="text-xl font-bold text-amber-600">{projectsStartedCount}</div>
-            <p className="text-[10px] text-amber-600/80">Active on site</p>
+            <div className="text-xl font-bold text-blue-600">{projectsStartedCount}</div>
+            <p className="text-[10px] text-blue-600/80">Active on site</p>
           </CardContent>
         </Card>
 
@@ -644,19 +631,19 @@ function DashboardComponent() {
                 </CardContent>
               </Card>
 
-              <Card className="rounded-xl border border-amber-200/80 bg-amber-50/30 dark:bg-amber-950/20 shadow-xs">
+              <Card className="rounded-xl border border-blue-200/80 bg-blue-50/30 dark:bg-blue-950/20 shadow-xs">
                 <CardContent className="p-3.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">Overdue Payments</p>
-                  <h3 className="text-lg font-extrabold text-amber-600 dark:text-amber-400 mt-1">{overdueCount} Accounts</h3>
-                  <p className="text-[10px] text-amber-600/80 mt-0.5">₹{overdueAmount.toLocaleString("en-IN")} past due</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400">Overdue Payments</p>
+                  <h3 className="text-lg font-extrabold text-blue-600 dark:text-blue-400 mt-1">{overdueCount} Accounts</h3>
+                  <p className="text-[10px] text-blue-600/80 mt-0.5">₹{overdueAmount.toLocaleString("en-IN")} past due</p>
                 </CardContent>
               </Card>
 
-              <Card className="rounded-xl border border-purple-200/80 bg-purple-50/30 dark:bg-purple-950/20 shadow-xs">
+              <Card className="rounded-xl border border-blue-200/80 bg-blue-50/30 dark:bg-blue-950/20 shadow-xs">
                 <CardContent className="p-3.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-400">Collections This Month</p>
-                  <h3 className="text-lg font-extrabold text-purple-700 dark:text-purple-400 mt-1">₹{monthCollectionsVal.toLocaleString("en-IN")}</h3>
-                  <p className="text-[10px] text-purple-600/80 mt-0.5">Monthly revenue total</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400">Collections This Month</p>
+                  <h3 className="text-lg font-extrabold text-blue-700 dark:text-blue-400 mt-1">₹{monthCollectionsVal.toLocaleString("en-IN")}</h3>
+                  <p className="text-[10px] text-blue-600/80 mt-0.5">Monthly revenue total</p>
                 </CardContent>
               </Card>
 
@@ -813,14 +800,14 @@ function DashboardComponent() {
           </Card>
 
           {/* Card 4: Machines Under Repair */}
-          <Card className="rounded-xl border border-amber-200/80 bg-amber-50/30 dark:bg-amber-950/20 shadow-xs">
+          <Card className="rounded-xl border border-blue-200/80 bg-blue-50/30 dark:bg-blue-950/20 shadow-xs">
             <CardContent className="p-3">
-              <div className="flex items-center justify-between text-amber-700 mb-1">
+              <div className="flex items-center justify-between text-blue-700 mb-1">
                 <span className="text-[10px] font-bold uppercase">Under Repair</span>
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                <AlertTriangle className="h-3.5 w-3.5 text-blue-600" />
               </div>
-              <div className="text-lg font-extrabold text-amber-700">{kpiMachinesUnderRepair}</div>
-              <p className="text-[9px] text-amber-600 font-medium">Workshop repair</p>
+              <div className="text-lg font-extrabold text-blue-700">{kpiMachinesUnderRepair}</div>
+              <p className="text-[9px] text-blue-600 font-medium">Workshop repair</p>
             </CardContent>
           </Card>
 
@@ -837,14 +824,14 @@ function DashboardComponent() {
           </Card>
 
           {/* Card 6: Inventory Value */}
-          <Card className="rounded-xl border border-purple-200/80 bg-purple-50/30 dark:bg-purple-950/20 shadow-xs">
+          <Card className="rounded-xl border border-blue-200/80 bg-blue-50/30 dark:bg-blue-950/20 shadow-xs">
             <CardContent className="p-3">
-              <div className="flex items-center justify-between text-purple-700 mb-1">
+              <div className="flex items-center justify-between text-blue-700 mb-1">
                 <span className="text-[10px] font-bold uppercase">Inventory Value</span>
-                <Boxes className="h-3.5 w-3.5 text-purple-600" />
+                <Boxes className="h-3.5 w-3.5 text-blue-600" />
               </div>
-              <div className="text-base font-extrabold text-purple-800">₹{(kpiTotalInventoryValuation / 1000).toFixed(0)}k</div>
-              <p className="text-[9px] text-purple-600 font-medium">Stock valuation</p>
+              <div className="text-base font-extrabold text-blue-700">₹{(kpiTotalInventoryValuation / 1000).toFixed(0)}k</div>
+              <p className="text-[9px] text-blue-600 font-medium">Stock valuation</p>
             </CardContent>
           </Card>
 
@@ -1292,7 +1279,7 @@ function DashboardComponent() {
               RIGHT SIDE PANEL: TODAY'S SUMMARY (STICKY)
               ------------------------------------------------------------------- */}
           <div className="space-y-6">
-            <div className="sticky top-20 space-y-6">
+            <div className="sticky top-36 space-y-6">
               <Card className="rounded-xl border border-border bg-white shadow-xs">
                 <CardHeader className="p-4 border-b bg-slate-50/60">
                   <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
@@ -1371,81 +1358,201 @@ function DashboardComponent() {
 
       {/* 1. New Enquiry Dialog */}
       <Dialog open={newEnqOpen} onOpenChange={setNewEnqOpen}>
-        <DialogContent className="max-w-md rounded-xl border">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-bold">
-              <Plus className="h-4 w-4 text-blue-600" /> Add New Customer Enquiry
+        <DialogContent className="max-w-2xl rounded-2xl p-6 bg-white dark:bg-card border border-border shadow-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="border-b pb-3">
+            <DialogTitle className="flex items-center gap-2.5 text-base font-extrabold text-foreground">
+              <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 grid place-items-center border border-blue-200 dark:border-blue-800">
+                <PhoneCall className="h-5 w-5" />
+              </div>
+              <div>
+                <span>Log New Customer Enquiry</span>
+                <p className="text-xs font-normal text-muted-foreground">
+                  Record client details, service needs, reference & engineer assignment
+                </p>
+              </div>
             </DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleCreateEnquirySubmit} className="space-y-3 text-xs">
-            <div>
-              <Label className="text-xs font-semibold">Customer / Client Name *</Label>
-              <Input
-                value={enqCustName}
-                onChange={(e) => setEnqCustName(e.target.value)}
-                placeholder="e.g. Acme Industrial Robotics"
-                className="h-8 text-xs rounded-lg mt-1"
-                required
+          <form onSubmit={handleCreateEnquirySubmit} className="space-y-4 text-xs pt-2">
+            {/* SECTION 1: CUSTOMER CONTACT INFORMATION */}
+            <div className="p-4 rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/20 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
+                <User className="h-4 w-4 text-blue-600" /> Section 1: Customer Contact Information
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Customer Full Name *</Label>
+                  <Input
+                    required
+                    placeholder="e.g. AeroTech Solutions / Ramesh"
+                    value={enqCustName}
+                    onChange={(e) => setEnqCustName(e.target.value)}
+                    className="h-9 text-xs rounded-xl bg-background"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Mobile Phone Number *</Label>
+                  <Input
+                    required
+                    placeholder="e.g. 9876543210"
+                    value={enqPhone}
+                    onChange={(e) => setEnqPhone(e.target.value)}
+                    className="h-9 text-xs rounded-xl bg-background"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">Site Address / Location</Label>
+                <Input
+                  placeholder="e.g. Plot 42, Industrial Park, HITEC City, Hyderabad"
+                  value={enqLocation}
+                  onChange={(e) => setEnqLocation(e.target.value)}
+                  className="h-9 text-xs rounded-xl bg-background"
+                />
+              </div>
+            </div>
+
+            {/* SECTION 2: SERVICE NEED & LEAD SOURCE */}
+            <div className="p-4 rounded-xl border border-purple-100 dark:border-purple-900/40 bg-purple-50/40 dark:bg-purple-950/20 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-purple-600" /> Section 2: Service Need & Lead Source
+              </h3>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">Service Need / Leakage Type *</Label>
+                <SmartComboBox
+                  category="Leakage Type"
+                  value={enqLeakageType}
+                  onChange={(val) => setEnqLeakageType(val)}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Lead Source</Label>
+                  <SmartComboBox
+                    category="Lead Source"
+                    value={enqLeadSource}
+                    onChange={(val) => setEnqLeadSource(val)}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Referred By / Reference</Label>
+                  <SmartComboBox
+                    category="Referred By Options"
+                    value={enqReferredBy}
+                    placeholder="Select or type custom..."
+                    onChange={(val) => setEnqReferredBy(val)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION 3: ENGINEERING ASSIGNMENT & SITE VISIT */}
+            <div className="p-4 rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/20 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
+                <UserCheck className="h-4 w-4 text-blue-600" /> Section 3: Engineering Assignment & Site Visit
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Assign Lead Engineer</Label>
+                  <SmartComboBox
+                    category="Engineer Names"
+                    value={enqEngineerName}
+                    onChange={(val) => {
+                      setEnqEngineerName(val);
+                      const eng = engineers.find((x) => x.name === val);
+                      if (eng) setEnqEngineerId(eng.id);
+                    }}
+                    siteVisitDate={enqSiteVisitDate}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Site Visit Date</Label>
+                  <Input
+                    type="date"
+                    value={enqSiteVisitDate}
+                    onChange={(e) => setEnqSiteVisitDate(e.target.value)}
+                    className="h-9 text-xs rounded-xl bg-background"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Quotation Estimate (₹)</Label>
+                  <Input
+                    type="number"
+                    placeholder="e.g. 150000"
+                    value={enqQuotationAmount || ""}
+                    onChange={(e) => {
+                      const val = e.target.value === "" ? 0 : Number(e.target.value);
+                      setEnqQuotationAmount(val);
+                    }}
+                    className="h-9 text-xs rounded-xl font-bold text-blue-700 dark:text-blue-400 bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION 4: WORK COMMITMENT & EXECUTION DATES */}
+            <div className="p-4 rounded-xl border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-950/20 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                <CalendarCheck className="h-4 w-4 text-emerald-600" /> Section 4: Work Commitment & Execution Dates
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center gap-1">
+                    <CalendarCheck className="h-3.5 w-3.5 text-purple-600" /> Work Committed Date *
+                  </Label>
+                  <Input
+                    type="date"
+                    value={enqWorkCommittedDate}
+                    onChange={(e) => setEnqWorkCommittedDate(e.target.value)}
+                    className="h-9 text-xs rounded-xl bg-background border-purple-300 font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1">
+                    <PlayCircle className="h-3.5 w-3.5 text-emerald-600" /> Actual Work Started Date
+                  </Label>
+                  <Input
+                    type="date"
+                    value={enqActualWorkStartedDate}
+                    onChange={(e) => setEnqActualWorkStartedDate(e.target.value)}
+                    placeholder="dd-mm-yyyy"
+                    className="h-9 text-xs rounded-xl bg-background border-emerald-300 font-semibold"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* INITIAL REMARKS */}
+            <div className="space-y-1 pt-1">
+              <Label className="text-xs font-semibold">Initial Remarks & Notes</Label>
+              <SmartComboBox
+                category="Remarks Templates"
+                value={enqRemarks}
+                placeholder="Select or type custom..."
+                onChange={(val) => setEnqRemarks(val)}
               />
             </div>
 
-            <div>
-              <Label className="text-xs font-semibold">Phone Number *</Label>
-              <Input
-                value={enqPhone}
-                onChange={(e) => setEnqPhone(e.target.value)}
-                placeholder="e.g. 9876543210"
-                className="h-8 text-xs rounded-lg mt-1"
-                required
-              />
-            </div>
-
-            <div>
-              <Label className="text-xs font-semibold">Location / Address</Label>
-              <Input
-                value={enqLocation}
-                onChange={(e) => setEnqLocation(e.target.value)}
-                placeholder="e.g. Hyderabad - HITEC City"
-                className="h-8 text-xs rounded-lg mt-1"
-              />
-            </div>
-
-            <div>
-              <Label className="text-xs font-semibold">Service Need / Leakage Type</Label>
-              <Select value={enqLeakageType} onValueChange={setEnqLeakageType}>
-                <SelectTrigger className="h-8 text-xs rounded-lg mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {settings.defaultLeakageTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label className="text-xs font-semibold">Assign Lead Engineer</Label>
-              <Select value={enqEngineerId} onValueChange={setEnqEngineerId}>
-                <SelectTrigger className="h-8 text-xs rounded-lg mt-1">
-                  <SelectValue placeholder="Select Engineer" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {engineers.map((eng) => (
-                    <SelectItem key={eng.id} value={eng.id}>
-                      {eng.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <DialogFooter className="pt-2">
-              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs">
-                Create Customer Enquiry
+            <DialogFooter className="pt-3 border-t flex items-center justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setNewEnqOpen(false)} className="rounded-xl text-xs">
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-10 text-xs font-bold shadow-md px-5"
+              >
+                Save Enquiry
               </Button>
             </DialogFooter>
           </form>
@@ -1454,49 +1561,90 @@ function DashboardComponent() {
 
       {/* 2. Assign Engineer Dialog */}
       <Dialog open={assignEngOpen} onOpenChange={setAssignEngOpen}>
-        <DialogContent className="max-w-md rounded-xl border">
+        <DialogContent className="max-w-lg rounded-2xl p-6 bg-white dark:bg-card border border-border shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-purple-700">
-              <UserPlus className="h-4 w-4 text-purple-600" /> Assign Engineer to Site Visit
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-purple-700 dark:text-purple-400">
+              <UserPlus className="h-5 w-5 text-purple-600" /> Assign Engineer to Site Visit
             </DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleAssignEngineerSubmit} className="space-y-3 text-xs">
-            <div>
-              <Label className="text-xs font-semibold">Select Customer Enquiry</Label>
+          <form onSubmit={handleAssignEngineerSubmit} className="space-y-4 text-xs pt-1">
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold text-foreground">Select Customer Enquiry</Label>
               <Select value={selectedEnquiryId} onValueChange={setSelectedEnquiryId}>
-                <SelectTrigger className="h-8 text-xs rounded-lg mt-1">
+                <SelectTrigger className="h-9 text-xs rounded-xl mt-1 border-input bg-background px-3 font-normal shadow-2xs">
                   <SelectValue placeholder="Choose Enquiry..." />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl">
+                <SelectContent className="rounded-xl max-h-[220px]">
                   {enquiries.map((enq) => (
-                    <SelectItem key={enq.id} value={enq.id}>
-                      {enq.id} - {enq.customerName} ({enq.leakageType})
+                    <SelectItem
+                      key={enq.id}
+                      value={enq.id}
+                      textValue={`${enq.id} - ${enq.customerName}`}
+                      className="py-2 cursor-pointer"
+                    >
+                      <div className="flex flex-col min-w-0 pr-1">
+                        <span className="font-semibold text-foreground truncate">{enq.id} - {enq.customerName}</span>
+                        <span className="text-[11px] text-muted-foreground truncate">{enq.leakageType}</span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <div>
-              <Label className="text-xs font-semibold">Select Field Engineer</Label>
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold text-foreground">Select Field Engineer</Label>
               <Select value={selectedEngId} onValueChange={setSelectedEngId}>
-                <SelectTrigger className="h-8 text-xs rounded-lg mt-1">
+                <SelectTrigger className="h-9 text-xs rounded-xl mt-1 border-input bg-background px-3 font-normal shadow-2xs">
                   <SelectValue placeholder="Choose Engineer..." />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {engineers.map((eng) => (
-                    <SelectItem key={eng.id} value={eng.id}>
-                      {eng.name} ({eng.specialty})
-                    </SelectItem>
-                  ))}
+                <SelectContent className="rounded-xl max-h-[240px]">
+                  {engineers.map((eng) => {
+                    const avail = checkEngineerAvailability(eng.id, eng.name);
+                    const isBooked = !avail.isAvailable;
+                    const bookedReason = avail.currentProject ? `Assigned to ${avail.currentProject.id}` : "Booked for Site Visit";
+                    return (
+                      <SelectItem
+                        key={eng.id}
+                        value={eng.id}
+                        textValue={`${eng.name} (${eng.specialty})`}
+                        disabled={isBooked}
+                        className={cn(
+                          "py-2 transition-colors",
+                          isBooked ? "opacity-50 cursor-not-allowed bg-rose-50/50 dark:bg-rose-950/20 text-muted-foreground" : "cursor-pointer"
+                        )}
+                      >
+                        <div className="flex items-center justify-between w-full gap-3 min-w-0 pr-1">
+                          <div className="flex flex-col min-w-0 truncate">
+                            <span className={cn("font-semibold truncate text-foreground", isBooked && "line-through text-slate-400")}>
+                              {eng.name}
+                            </span>
+                            <span className="text-[11px] text-muted-foreground truncate font-normal">{eng.specialty}</span>
+                          </div>
+                          {isBooked ? (
+                            <Badge variant="outline" className="text-[10px] bg-rose-50 text-rose-700 border-rose-200 font-bold shrink-0">
+                              🔴 Booked
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 font-bold shrink-0">
+                              🟢 Available
+                            </Badge>
+                          )}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
 
-            <DialogFooter className="pt-2">
-              <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs">
-                Assign Engineer & Schedule Site Visit
+            <DialogFooter className="pt-3">
+              <Button
+                type="submit"
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-10 text-xs font-bold shadow-md shadow-purple-500/20 gap-2 transition-all"
+              >
+                <UserPlus className="h-4 w-4" /> Assign Engineer & Schedule Site Visit
               </Button>
             </DialogFooter>
           </form>
@@ -1585,8 +1733,8 @@ function DashboardComponent() {
       <Dialog open={attendanceOpen} onOpenChange={setAttendanceOpen}>
         <DialogContent className="max-w-md rounded-xl border">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-amber-700">
-              <CalendarCheck className="h-4 w-4 text-amber-600" /> Labour Attendance Quick Check-In
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-blue-700">
+              <CalendarCheck className="h-4 w-4 text-blue-600" /> Labour Attendance Quick Check-In
             </DialogTitle>
           </DialogHeader>
 
@@ -1600,7 +1748,7 @@ function DashboardComponent() {
                 <SelectContent className="rounded-xl">
                   {labours.map((l) => (
                     <SelectItem key={l.id} value={l.id}>
-                      {l.name} ({l.type} - {l.skills.join(", ")})
+                      {l.name} ({l.type})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1609,7 +1757,7 @@ function DashboardComponent() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-semibold">In Time</Label>
+                <Label className="text-xs font-semibold">Start Time / In Time</Label>
                 <Input
                   value={attInTimeInput}
                   onChange={(e) => setAttInTimeInput(e.target.value)}
@@ -1619,7 +1767,7 @@ function DashboardComponent() {
               </div>
 
               <div>
-                <Label className="text-xs font-semibold">Out Time</Label>
+                <Label className="text-xs font-semibold">End Time / Out Time</Label>
                 <Input
                   value={attOutTimeInput}
                   onChange={(e) => setAttOutTimeInput(e.target.value)}
@@ -1628,6 +1776,26 @@ function DashboardComponent() {
                 />
               </div>
             </div>
+
+            {/* REAL-TIME CALCULATED HOURS & EARNED MONEY */}
+            {(() => {
+              const selectedL = labours.find((l) => l.id === selectedAttLabourId);
+              const wage = selectedL ? selectedL.defaultWeeklyWage || 1400 : 1400;
+              const hours = calculateHoursFromTimes(attInTimeInput, attOutTimeInput);
+              const money = calculateEarnedWage(wage, hours);
+              return (
+                <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg border border-emerald-200 dark:border-emerald-800 flex items-center justify-between text-xs font-semibold">
+                  <div>
+                    <span className="text-emerald-900 dark:text-emerald-300">Worked Hours:</span>
+                    <p className="text-sm font-extrabold text-emerald-700 dark:text-emerald-400">{hours > 0 ? `${hours} hrs` : "0 hrs"}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-emerald-900 dark:text-emerald-300">Earned Money:</span>
+                    <p className="text-sm font-extrabold text-emerald-700 dark:text-emerald-400">₹{money.toLocaleString("en-IN")}</p>
+                  </div>
+                </div>
+              );
+            })()}
 
             <DialogFooter className="pt-2">
               <Button type="submit" className="w-full bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold">
@@ -1640,64 +1808,89 @@ function DashboardComponent() {
 
       {/* 5. Add Labour Dialog */}
       <Dialog open={addLabourOpen} onOpenChange={setAddLabourOpen}>
-        <DialogContent className="max-w-md rounded-xl border">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-800">
-              <HardHat className="h-4 w-4 text-slate-700" /> Add New Labour Staff
+        <DialogContent className="max-w-xl rounded-2xl p-6 bg-white dark:bg-card border border-border shadow-2xl">
+          <DialogHeader className="border-b pb-3">
+            <DialogTitle className="flex items-center gap-2.5 text-base font-extrabold text-foreground">
+              <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 grid place-items-center border border-blue-200 dark:border-blue-800">
+                <HardHat className="h-5 w-5" />
+              </div>
+              <div>
+                <span>Add New Labour Staff Profile</span>
+                <p className="text-xs font-normal text-muted-foreground">Register permanent staff or contract workers with wage configuration.</p>
+              </div>
             </DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleAddLabourSubmit} className="space-y-3 text-xs">
-            <div>
-              <Label className="text-xs font-semibold">Labour Full Name *</Label>
-              <Input
-                value={labourName}
-                onChange={(e) => setLabourName(e.target.value)}
-                placeholder="e.g. Ramesh Kumar"
-                className="h-8 text-xs rounded-lg mt-1"
-                required
-              />
-            </div>
+          <form onSubmit={handleAddLabourSubmit} className="space-y-4 text-xs pt-2">
+            {/* SECTION 1: PERSONAL & CONTACT INFORMATION */}
+            <div className="p-4 rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/20 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
+                <User className="h-4 w-4 text-blue-600" /> Section 1: Contact Information
+              </h3>
 
-            <div>
-              <Label className="text-xs font-semibold">Mobile Phone *</Label>
-              <Input
-                value={labourPhone}
-                onChange={(e) => setLabourPhone(e.target.value)}
-                placeholder="e.g. 9840112233"
-                className="h-8 text-xs rounded-lg mt-1"
-                required
-              />
-            </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Labour Full Name *</Label>
+                  <Input
+                    required
+                    placeholder="e.g. Ramesh Kumar"
+                    value={labourName}
+                    onChange={(e) => setLabourName(e.target.value)}
+                    className="h-9 text-xs rounded-xl bg-background"
+                  />
+                </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs font-semibold">Labour Type</Label>
-                <Select value={labourType} onValueChange={(val: LabourType) => setLabourType(val)}>
-                  <SelectTrigger className="h-8 text-xs rounded-lg mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="Permanent">Permanent</SelectItem>
-                    <SelectItem value="Contract">Contract</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label className="text-xs font-semibold">Daily Wage (₹)</Label>
-                <Input
-                  type="number"
-                  value={labourWage}
-                  onChange={(e) => setLabourWage(Number(e.target.value))}
-                  className="h-8 text-xs font-bold rounded-lg mt-1"
-                />
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Mobile Phone Number *</Label>
+                  <Input
+                    required
+                    placeholder="e.g. 9840112233"
+                    value={labourPhone}
+                    onChange={(e) => setLabourPhone(e.target.value)}
+                    className="h-9 text-xs rounded-xl bg-background"
+                  />
+                </div>
               </div>
             </div>
 
-            <DialogFooter className="pt-2">
-              <Button type="submit" className="w-full bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold">
-                Add Labour Staff
+            {/* SECTION 2: EMPLOYMENT TYPE & WAGES */}
+            <div className="p-4 rounded-xl border border-purple-100 dark:border-purple-900/40 bg-purple-50/40 dark:bg-purple-950/20 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
+                <DollarSign className="h-4 w-4 text-purple-600" /> Section 2: Employment Type & Wage Setup
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Labour Type (Contract / Permanent) *</Label>
+                  <Select value={labourType} onValueChange={(val: LabourType) => setLabourType(val)}>
+                    <SelectTrigger className="h-9 text-xs rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="Permanent">Permanent Staff</SelectItem>
+                      <SelectItem value="Contract">Contract Worker</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Daily Wage (₹)</Label>
+                  <Input
+                    type="number"
+                    value={labourWage}
+                    onChange={(e) => setLabourWage(Number(e.target.value))}
+                    className="h-9 text-xs font-bold rounded-xl text-purple-700 dark:text-purple-400 bg-background"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="pt-3 border-t flex items-center justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setAddLabourOpen(false)} className="rounded-xl text-xs">
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-10 text-xs font-bold shadow-md px-5">
+                Add Labour Staff Profile
               </Button>
             </DialogFooter>
           </form>

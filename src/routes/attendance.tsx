@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { useRobotics } from "@/lib/robotics-context";
+import { useRobotics, calculateHoursFromTimes, calculateEarnedWage } from "@/lib/robotics-context";
 import type { AttendanceRecord, LabourType } from "@/lib/robotics-types";
 import { DataPagination } from "@/components/ui/DataPagination";
 import {
@@ -51,44 +51,136 @@ export const Route = createFileRoute("/attendance")({
 });
 
 function AttendancePageComponent() {
-  const { labours, attendance, projects } = useRobotics();
+  const { labours, attendance, projects, updateProjectLabourLog } = useRobotics();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [projectFilter, setProjectFilter] = useState<string>("all");
-  const [selectedMonth, setSelectedMonth] = useState<string>("2026-07");
+  const [selectedMonth, setSelectedMonth] = useState<string>("all");
+
+  // Mark Attendance Modal state
+  const [markAttendanceOpen, setMarkAttendanceOpen] = useState(false);
+  const [attLabourId, setAttLabourId] = useState("");
+  const [attProjectId, setAttProjectId] = useState("");
+  const [attDate, setAttDate] = useState(new Date().toISOString().slice(0, 10));
+  const [attInTime, setAttInTime] = useState("09:00 AM");
+  const [attOutTime, setAttOutTime] = useState("06:00 PM");
+  const [attWorkDesc, setAttWorkDesc] = useState("On-site servicing");
+
+  const handleMarkAttendanceSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!attLabourId) {
+      toast.error("Please select a Labour staff member");
+      return;
+    }
+    const lab = labours.find((l) => l.id === attLabourId);
+    const targetProj = projects.find((p) => p.id === attProjectId) || projects[0];
+    const weeklyWage = lab?.defaultWeeklyWage || 1400;
+
+    if (targetProj) {
+      updateProjectLabourLog(targetProj.id, {
+        labourId: attLabourId,
+        labourName: lab?.name || attLabourId,
+        labourType: lab?.type || "Permanent",
+        weeklyWage: weeklyWage,
+        date: attDate,
+        inTime: attInTime,
+        outTime: attOutTime,
+        attendance: "Present",
+        hoursWorked: calculateHoursFromTimes(attInTime, attOutTime),
+        earnedMoney: calculateEarnedWage(weeklyWage, calculateHoursFromTimes(attInTime, attOutTime)),
+        workDescription: attWorkDesc,
+      });
+    }
+    setMarkAttendanceOpen(false);
+  };
 
   // Selected Labour for Detailed Log Drawer
   const [selectedLabourId, setSelectedLabourId] = useState<string | null>(null);
 
-  // Convert raw attendance map into array of records
+  // Convert raw attendance map AND project logs into array of records
   const allAttendanceLogs = useMemo(() => {
-    return Object.values(attendance);
-  }, [attendance]);
+    const centralLogs = Object.values(attendance);
+    const projLogs: AttendanceRecord[] = projects.flatMap((p) =>
+      (p.labourLogs || []).map((lg) => ({
+        id: `${lg.labourId}_${lg.date}`,
+        labourId: lg.labourId,
+        labourName: lg.labourName,
+        projectId: p.id,
+        projectName: p.customerName,
+        date: lg.date,
+        status: lg.attendance || (lg.hoursWorked > 0 ? "Present" : "Absent"),
+        inTime: lg.inTime,
+        outTime: lg.outTime,
+        hoursWorked: lg.hoursWorked,
+        earnedMoney: lg.earnedMoney,
+        workDescription: lg.workDescription,
+        weeklyWage: lg.weeklyWage,
+      }))
+    );
+
+    const map = new Map<string, AttendanceRecord>();
+    [...centralLogs, ...projLogs].forEach((item) => {
+      const existing = map.get(item.id);
+      if (!existing || (item.hoursWorked && item.hoursWorked > 0)) {
+        map.set(item.id, item);
+      }
+    });
+
+    return Array.from(map.values());
+  }, [attendance, projects]);
 
   // Aggregate attendance and calculate weekly & monthly wages per labour
   const aggregatedPayroll = useMemo(() => {
-    return labours.map((lab) => {
+    let targetLabours = labours;
+    if (projectFilter !== "all") {
+      const proj = projects.find((p) => p.id === projectFilter);
+      if (proj && proj.assignedLabourIds && proj.assignedLabourIds.length > 0) {
+        targetLabours = labours.filter(
+          (lab) =>
+            proj.assignedLabourIds.includes(lab.id) ||
+            allAttendanceLogs.some((lg) => lg.labourId === lab.id && lg.projectId === projectFilter)
+        );
+      } else {
+        targetLabours = labours.filter((lab) =>
+          allAttendanceLogs.some((lg) => lg.labourId === lab.id && lg.projectId === projectFilter)
+        );
+      }
+    }
+
+    return targetLabours.map((lab) => {
       // Filter logs for this labour in selected month
       const labLogs = allAttendanceLogs.filter((log) => {
         const isLabour = log.labourId === lab.id;
-        const matchesMonth = !selectedMonth || log.date.startsWith(selectedMonth);
+        const matchesMonth = selectedMonth === "all" || !selectedMonth || log.date.startsWith(selectedMonth);
         const matchesProject = projectFilter === "all" || log.projectId === projectFilter;
         return isLabour && matchesMonth && matchesProject;
       });
 
-      const presentCount = labLogs.filter((l) => l.status === "Present").length;
+      const presentCount = labLogs.filter(
+        (l) => l.status === "Present" || Boolean(l.inTime && l.inTime.trim().length > 0) || (l.hoursWorked && l.hoursWorked > 0)
+      ).length;
       const halfDayCount = labLogs.filter((l) => l.status === "Half Day").length;
       const absentCount = labLogs.filter((l) => l.status === "Absent").length;
-      const overtimeHours = labLogs.reduce((acc, l) => acc + (l.status === "Overtime" ? (l.hoursWorked || 2) : 0), 0);
 
-      // Wage math rules:
-      // Effective Days = Present + (Half Day * 0.5)
-      const effectiveDays = presentCount + halfDayCount * 0.5;
-      const dailyEquivalent = (lab.defaultWeeklyWage || 14000) / 6;
-      const overtimeRatePerHour = dailyEquivalent / 8;
+      const overtimeHours = labLogs.reduce((acc, l) => {
+        if (l.hoursWorked && l.hoursWorked > 8) {
+          return acc + (l.hoursWorked - 8);
+        }
+        return acc + (l.status === "Overtime" ? (l.hoursWorked || 2) : 0);
+      }, 0);
 
-      const calculatedWeeklyWage = Math.round(effectiveDays * dailyEquivalent + overtimeHours * overtimeRatePerHour);
+      const defaultWage = lab.defaultWeeklyWage || 1400;
+
+      const totalEarnedFromLogs = labLogs.reduce((acc, l) => {
+        if (l.earnedMoney) return acc + l.earnedMoney;
+        return acc + calculateEarnedWage(defaultWage, l.hoursWorked || 0);
+      }, 0);
+
+      const calculatedWeeklyWage = totalEarnedFromLogs > 0
+        ? totalEarnedFromLogs
+        : Math.round((presentCount / 6) * defaultWage);
+
       const calculatedMonthlyWage = Math.round(calculatedWeeklyWage * 4.33);
 
       return {
@@ -98,12 +190,12 @@ function AttendancePageComponent() {
         halfDayCount,
         absentCount,
         overtimeHours,
-        effectiveDays,
+        defaultWeeklyWage: defaultWage,
         calculatedWeeklyWage,
         calculatedMonthlyWage,
       };
     });
-  }, [labours, allAttendanceLogs, selectedMonth, projectFilter]);
+  }, [labours, projects, allAttendanceLogs, selectedMonth, projectFilter]);
 
   const totalDaysLogged = allAttendanceLogs.length;
   const totalPresentCount = aggregatedPayroll.reduce((acc, a) => acc + a.presentCount, 0);
@@ -155,6 +247,16 @@ function AttendancePageComponent() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            onClick={() => {
+              if (labours.length > 0) setAttLabourId(labours[0].id);
+              if (projects.length > 0) setAttProjectId(projects[0].id);
+              setMarkAttendanceOpen(true);
+            }}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold h-9 rounded-xl gap-1.5 shadow-xs"
+          >
+            <CalendarCheck className="h-4 w-4" /> Mark Attendance
+          </Button>
           <Button
             variant="outline"
             onClick={() => toast.success("Exporting Payroll Summary to Excel / PDF...")}
@@ -240,12 +342,17 @@ function AttendancePageComponent() {
             <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
                 <Calendar className="h-3.5 w-3.5 text-blue-600" />
-                <Input
-                  type="month"
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="h-9 text-xs w-[140px] rounded-lg"
-                />
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger className="h-9 text-xs w-[140px] rounded-lg">
+                    <SelectValue placeholder="All Months" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Months</SelectItem>
+                    <SelectItem value="2026-08">August 2026</SelectItem>
+                    <SelectItem value="2026-07">July 2026</SelectItem>
+                    <SelectItem value="2026-06">June 2026</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -335,7 +442,13 @@ function AttendancePageComponent() {
                     </TableCell>
 
                     <TableCell className="text-center">
-                      <span className="font-bold text-emerald-600 text-xs bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">
+                      <span
+                        className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                          presentCount > 0
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                            : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                        }`}
+                      >
                         {presentCount} Days
                       </span>
                       {halfDayCount > 0 && (
@@ -348,7 +461,7 @@ function AttendancePageComponent() {
                     </TableCell>
 
                     <TableCell className="text-right font-mono text-xs font-medium text-slate-600">
-                      ₹{(labour.defaultWeeklyWage || 14000).toLocaleString("en-IN")}
+                      ₹{(labour.defaultWeeklyWage || 1400).toLocaleString("en-IN")}
                     </TableCell>
 
                     <TableCell className="text-right font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
@@ -360,14 +473,28 @@ function AttendancePageComponent() {
                     </TableCell>
 
                     <TableCell className="text-right pr-4">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setSelectedLabourId(labour.id)}
-                        className="h-7 text-[11px] font-semibold rounded-lg gap-1"
-                      >
-                        <Eye className="h-3 w-3 text-purple-600" /> View Daily Logs
-                      </Button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setAttLabourId(labour.id);
+                            if (projectFilter !== "all") setAttProjectId(projectFilter);
+                            else if (projects.length > 0) setAttProjectId(projects[0].id);
+                            setMarkAttendanceOpen(true);
+                          }}
+                          className="h-7 text-[11px] font-bold rounded-lg gap-1 bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs"
+                        >
+                          <Clock className="h-3 w-3" /> Log Time
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setSelectedLabourId(labour.id)}
+                          className="h-7 text-[11px] font-semibold rounded-lg gap-1"
+                        >
+                          <Eye className="h-3 w-3 text-purple-600" /> View Logs
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -461,6 +588,119 @@ function AttendancePageComponent() {
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* MARK ATTENDANCE DIALOG */}
+      <Dialog open={markAttendanceOpen} onOpenChange={setMarkAttendanceOpen}>
+        <DialogContent className="max-w-md rounded-2xl p-6 bg-white dark:bg-card border shadow-2xl">
+          <DialogHeader className="border-b pb-3">
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-foreground">
+              <CalendarCheck className="h-5 w-5 text-emerald-600" /> Mark Labour Attendance
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Log Start Time & End Time to calculate worked hours and earned daily wages.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleMarkAttendanceSubmit} className="space-y-3.5 text-xs">
+            <div>
+              <label className="text-xs font-semibold block mb-1">Select Labour Staff *</label>
+              <Select value={attLabourId} onValueChange={setAttLabourId}>
+                <SelectTrigger className="h-9 text-xs rounded-lg">
+                  <SelectValue placeholder="Choose Labour..." />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {labours.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.name} ({l.type} - ₹{(l.defaultWeeklyWage || 1400).toLocaleString("en-IN")}/wk)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold block mb-1">Select Site Project *</label>
+              <Select value={attProjectId} onValueChange={setAttProjectId}>
+                <SelectTrigger className="h-9 text-xs rounded-lg">
+                  <SelectValue placeholder="Choose Project..." />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.id} — {p.customerName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold block mb-1">Attendance Date</label>
+              <Input
+                type="date"
+                value={attDate}
+                onChange={(e) => setAttDate(e.target.value)}
+                className="h-9 rounded-lg font-mono text-xs"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold block mb-1">Start Time / In Time</label>
+                <Input
+                  value={attInTime}
+                  onChange={(e) => setAttInTime(e.target.value)}
+                  placeholder="09:00 AM"
+                  className="h-9 rounded-lg font-mono font-semibold text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold block mb-1">End Time / Out Time</label>
+                <Input
+                  value={attOutTime}
+                  onChange={(e) => setAttOutTime(e.target.value)}
+                  placeholder="06:00 PM"
+                  className="h-9 rounded-lg font-mono font-semibold text-xs"
+                />
+              </div>
+            </div>
+
+            {/* REALTIME HOURS & EARNED MONEY BOX */}
+            {(() => {
+              const selectedL = labours.find((l) => l.id === attLabourId);
+              const wage = selectedL ? selectedL.defaultWeeklyWage || 1400 : 1400;
+              const hours = calculateHoursFromTimes(attInTime, attOutTime);
+              const money = calculateEarnedWage(wage, hours);
+              return (
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 flex items-center justify-between text-xs font-semibold">
+                  <div>
+                    <span className="text-emerald-900 dark:text-emerald-300 font-bold">Calculated Working Hours:</span>
+                    <p className="text-base font-extrabold text-emerald-700 dark:text-emerald-400 mt-0.5">
+                      {hours > 0 ? `${hours} hrs` : "0 hrs"}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-emerald-900 dark:text-emerald-300 font-bold">Earned Wages:</span>
+                    <p className="text-base font-extrabold text-emerald-700 dark:text-emerald-400 mt-0.5">
+                      ₹{money.toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={() => setMarkAttendanceOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold">
+                Save & Mark Attendance
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

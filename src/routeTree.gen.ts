@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AttendanceRouteImport } from './routes/attendance'
 import { Route as CustomersRouteImport } from './routes/customers'
-import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as EngineersRouteImport } from './routes/engineers'
 import { Route as EnquiriesRouteImport } from './routes/enquiries'
 import { Route as LaboursRouteImport } from './routes/labours'
@@ -36,11 +35,6 @@ const AttendanceRoute = AttendanceRouteImport.update({
 const CustomersRoute = CustomersRouteImport.update({
   id: '/customers',
   path: '/customers',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DocumentsRoute = DocumentsRouteImport.update({
-  id: '/documents',
-  path: '/documents',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EngineersRoute = EngineersRouteImport.update({
@@ -93,7 +87,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/attendance': typeof AttendanceRoute
   '/customers': typeof CustomersRoute
-  '/documents': typeof DocumentsRoute
   '/engineers': typeof EngineersRoute
   '/enquiries': typeof EnquiriesRoute
   '/labours': typeof LaboursRoute
@@ -108,7 +101,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/attendance': typeof AttendanceRoute
   '/customers': typeof CustomersRoute
-  '/documents': typeof DocumentsRoute
   '/engineers': typeof EngineersRoute
   '/enquiries': typeof EnquiriesRoute
   '/labours': typeof LaboursRoute
@@ -124,7 +116,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/attendance': typeof AttendanceRoute
   '/customers': typeof CustomersRoute
-  '/documents': typeof DocumentsRoute
   '/engineers': typeof EngineersRoute
   '/enquiries': typeof EnquiriesRoute
   '/labours': typeof LaboursRoute
@@ -141,7 +132,6 @@ export interface FileRouteTypes {
     | '/'
     | '/attendance'
     | '/customers'
-    | '/documents'
     | '/engineers'
     | '/enquiries'
     | '/labours'
@@ -156,7 +146,6 @@ export interface FileRouteTypes {
     | '/'
     | '/attendance'
     | '/customers'
-    | '/documents'
     | '/engineers'
     | '/enquiries'
     | '/labours'
@@ -171,7 +160,6 @@ export interface FileRouteTypes {
     | '/'
     | '/attendance'
     | '/customers'
-    | '/documents'
     | '/engineers'
     | '/enquiries'
     | '/labours'
@@ -187,7 +175,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AttendanceRoute: typeof AttendanceRoute
   CustomersRoute: typeof CustomersRoute
-  DocumentsRoute: typeof DocumentsRoute
   EngineersRoute: typeof EngineersRoute
   EnquiriesRoute: typeof EnquiriesRoute
   LaboursRoute: typeof LaboursRoute
@@ -220,13 +207,6 @@ declare module '@tanstack/react-router' {
       path: '/customers'
       fullPath: '/customers'
       preLoaderRoute: typeof CustomersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/documents': {
-      id: '/documents'
-      path: '/documents'
-      fullPath: '/documents'
-      preLoaderRoute: typeof DocumentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/engineers': {
@@ -299,7 +279,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AttendanceRoute: AttendanceRoute,
   CustomersRoute: CustomersRoute,
-  DocumentsRoute: DocumentsRoute,
   EngineersRoute: EngineersRoute,
   EnquiriesRoute: EnquiriesRoute,
   LaboursRoute: LaboursRoute,

@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import { useRobotics } from "@/lib/robotics-context";
 import type { Enquiry, CustomerDecision, SiteVisitStatus } from "@/lib/robotics-types";
 import { SmartComboBox } from "@/components/ui/SmartComboBox";
@@ -42,6 +43,13 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/enquiries")({
@@ -308,7 +316,7 @@ function EnquiriesComponent() {
 
         <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
           <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Decision Filter:</span>
-          {["ALL", "Approved", "Thinking", "Follow-up", "Work Scheduled", "Work Started", "Cancelled"].map((dec) => (
+          {["ALL", "Follow-up", "Thinking", "Approved", "Cancelled"].map((dec) => (
             <Button
               key={dec}
               variant={decisionFilter === dec ? "default" : "outline"}
@@ -344,17 +352,17 @@ function EnquiriesComponent() {
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-muted/40 text-muted-foreground border-b font-medium">
+              <thead className="bg-slate-50/80 dark:bg-slate-900/50 text-muted-foreground border-b text-[11px] font-bold uppercase tracking-wider">
                 <tr>
-                  <th className="p-3 pl-4">Enquiry ID</th>
-                  <th className="p-3">Customer & Location</th>
-                  <th className="p-3">Service Need / Leakage</th>
-                  <th className="p-3">Assigned Engineer</th>
-                  <th className="p-3">Quotation Amount</th>
-                  <th className="p-3">Work Committed Date</th>
-                  <th className="p-3">Actual Work Started</th>
-                  <th className="p-3">Decision</th>
-                  <th className="p-3 text-right pr-4">Action</th>
+                  <th className="p-3 pl-4 whitespace-nowrap">Enquiry ID</th>
+                  <th className="p-3 whitespace-nowrap min-w-[160px]">Customer & Location</th>
+                  <th className="p-3 whitespace-nowrap min-w-[200px]">Service Need / Leakage</th>
+                  <th className="p-3 whitespace-nowrap">Assigned Engineer</th>
+                  <th className="p-3 whitespace-nowrap">Quotation Amount</th>
+                  <th className="p-3 whitespace-nowrap">Work Committed Date</th>
+                  <th className="p-3 whitespace-nowrap">Actual Work Started</th>
+                  <th className="p-3 whitespace-nowrap">Decision</th>
+                  <th className="p-3 text-right pr-4 whitespace-nowrap">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -384,13 +392,25 @@ function EnquiriesComponent() {
                     const linkedProj = projects.find((p) => p.enquiryId === enq.id);
                     const isConverted = Boolean(linkedProj);
 
+                    const cleanCustomerName = (() => {
+                      if (!enq.customerName) return "";
+                      const parts = enq.customerName.trim().split(/\s+/);
+                      const unique: string[] = [];
+                      parts.forEach((p) => {
+                        if (unique.length === 0 || unique[unique.length - 1].toLowerCase() !== p.toLowerCase()) {
+                          unique.push(p);
+                        }
+                      });
+                      return unique.join(" ");
+                    })();
+
                     return (
                       <tr
                         key={enq.id}
                         onClick={() => setActiveEnquiry(enq)}
                         className="hover:bg-accent/40 transition-colors cursor-pointer"
                       >
-                        <td className="p-3 pl-4 font-bold text-blue-600">
+                        <td className="p-3 pl-4 font-bold text-blue-600 whitespace-nowrap">
                           <div>{enq.id}</div>
                           {linkedProj && (
                             <Badge variant="outline" className="text-[9px] bg-purple-50 text-purple-700 border-purple-200 mt-0.5">
@@ -398,53 +418,73 @@ function EnquiriesComponent() {
                             </Badge>
                           )}
                         </td>
-                        <td className="p-3">
-                          <div className="font-semibold text-foreground">{enq.customerName}</div>
-                          <div className="text-[11px] text-muted-foreground">
-                            📞 {enq.phone} • 📍 {enq.location}
+                        <td className="p-3 whitespace-nowrap">
+                          <div className="font-bold text-xs text-foreground truncate max-w-[160px]" title={cleanCustomerName}>
+                            {cleanCustomerName}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground truncate max-w-[190px]" title={`${enq.phone} • ${enq.location}`}>
+                            📞 {enq.phone} {enq.location ? `• 📍 ${enq.location}` : ""}
                           </div>
                         </td>
                         <td className="p-3">
-                          <div className="font-medium text-foreground">{enq.leakageType}</div>
-                          <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 flex-wrap mt-0.5">
+                          <div className="font-semibold text-xs text-foreground truncate max-w-[210px]" title={enq.leakageType}>
+                            {enq.leakageType}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 whitespace-nowrap mt-0.5">
                             <span>Source: <strong>{enq.leadSource}</strong></span>
                             {enq.referredBy && (
-                              <Badge variant="outline" className="text-[9px] bg-purple-50 text-purple-700 border-purple-200">
+                              <Badge variant="outline" className="text-[9px] bg-purple-50 text-purple-700 border-purple-200 py-0">
                                 Ref: {enq.referredBy}
                               </Badge>
                             )}
                           </div>
                         </td>
-                        <td className="p-3">
+                        <td className="p-3 whitespace-nowrap">
                           {enq.assignedEngineerName ? (
-                            <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                            <span className="font-semibold text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 whitespace-nowrap inline-block">
                               {enq.assignedEngineerName}
                             </span>
                           ) : (
-                            <span className="text-amber-600 text-[11px]">Unassigned</span>
+                            <span className="text-amber-600 text-[11px] font-medium">Unassigned</span>
                           )}
                         </td>
-                        <td className="p-3 font-bold text-foreground">
+                        <td className="p-3 font-bold text-xs text-foreground whitespace-nowrap">
                           {enq.quotationAmount ? `₹${enq.quotationAmount.toLocaleString("en-IN")}` : "—"}
                         </td>
-                        <td className="p-3 font-semibold text-purple-700">
+                        <td className="p-3 font-semibold text-xs text-purple-700 whitespace-nowrap font-mono">
                           {enq.workCommittedDate ? `📅 ${enq.workCommittedDate}` : "Not Set"}
                         </td>
-                        <td className="p-3 font-semibold text-emerald-700">
+                        <td className="p-3 font-semibold text-xs text-emerald-700 whitespace-nowrap font-mono">
                           {enq.actualWorkStartedDate ? `⚡ ${enq.actualWorkStartedDate}` : "Pending"}
                         </td>
-                        <td className="p-3">
-                          <Badge
-                            className={`text-[10px] ${
-                              enq.customerDecision === "Approved"
-                                ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                                : enq.customerDecision === "Cancelled"
-                                ? "bg-rose-100 text-rose-800 border-rose-300"
-                                : "bg-amber-100 text-amber-800 border-amber-300"
-                            }`}
+                        <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                          <Select
+                            value={enq.customerDecision || "Follow Up"}
+                            onValueChange={(val: CustomerDecision) => {
+                              updateEnquiry(enq.id, { customerDecision: val });
+                            }}
                           >
-                            {enq.customerDecision}
-                          </Badge>
+                            <SelectTrigger
+                              className={cn(
+                                "h-7 w-28 text-xs font-semibold rounded-lg border px-2 shadow-2xs cursor-pointer",
+                                enq.customerDecision === "Approved"
+                                  ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                                  : enq.customerDecision === "Cancelled"
+                                  ? "bg-rose-50 text-rose-800 border-rose-300"
+                                  : enq.customerDecision === "Thinking"
+                                  ? "bg-purple-50 text-purple-800 border-purple-300"
+                                  : "bg-amber-50 text-amber-800 border-amber-300"
+                              )}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl">
+                              <SelectItem value="Follow Up">Follow Up</SelectItem>
+                              <SelectItem value="Thinking">Thinking</SelectItem>
+                              <SelectItem value="Approved">Approved</SelectItem>
+                              <SelectItem value="Cancelled">Cancelled</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </td>
                         <td className="p-3 text-right pr-4">
                           <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
@@ -554,13 +594,6 @@ function EnquiriesComponent() {
                     className="text-xs rounded-lg gap-1"
                   >
                     <ArrowLeft className="h-3.5 w-3.5" /> Back
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={() => setDeleteTargetId(activeEnquiry.id)}
-                    className="text-xs rounded-lg gap-1"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" /> Delete
                   </Button>
                 </div>
               </div>
@@ -799,41 +832,38 @@ function EnquiriesComponent() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-3 space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-3">
                     <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Customer Decision</Label>
-                      <SmartComboBox
-                        category="Customer Decision"
-                        value={activeEnquiry.customerDecision}
-                        onChange={(val) => {
-                          const dec = val as CustomerDecision;
-                          updateEnquiry(activeEnquiry.id, { customerDecision: dec });
-                          setActiveEnquiry({ ...activeEnquiry, customerDecision: dec });
+                      <Label className="text-xs font-semibold">Customer Decision *</Label>
+                      <Select
+                        value={activeEnquiry.customerDecision || "Follow Up"}
+                        onValueChange={(val: CustomerDecision) => {
+                          updateEnquiry(activeEnquiry.id, { customerDecision: val });
+                          setActiveEnquiry({ ...activeEnquiry, customerDecision: val });
                         }}
-                      />
+                      >
+                        <SelectTrigger className="h-9 text-xs rounded-xl border-input bg-background font-medium">
+                          <SelectValue placeholder="Select Decision..." />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                          <SelectItem value="Follow Up">Follow Up</SelectItem>
+                          <SelectItem value="Thinking">Thinking</SelectItem>
+                          <SelectItem value="Approved">Approved</SelectItem>
+                          <SelectItem value="Cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Customer Account Status</Label>
-                      <Input
-                        value={activeEnquiry.customerStatus || "Prospective"}
-                        onChange={(e) => {
-                          updateEnquiry(activeEnquiry.id, { customerStatus: e.target.value });
-                          setActiveEnquiry({ ...activeEnquiry, customerStatus: e.target.value });
-                        }}
-                        className="h-9 rounded-lg"
-                        placeholder="e.g. Active Account, Prospective, VIP Account"
-                      />
-                    </div>
-
+                    {/* Reason For Cancellation Box - Enabled ONLY when Cancelled is selected */}
                     {activeEnquiry.customerDecision === "Cancelled" && (
-                      <div className="col-span-1 sm:col-span-2 space-y-1">
-                        <Label className="text-xs font-semibold text-rose-600">
-                          Reason For Cancellation
+                      <div className="space-y-1.5 p-3 bg-rose-50/70 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-xl transition-all">
+                        <Label className="text-xs font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+                          <AlertTriangle className="h-3.5 w-3.5 text-rose-600" /> Reason For Cancellation *
                         </Label>
                         <SmartComboBox
                           category="Cancellation Reasons"
                           value={activeEnquiry.cancellationReason || ""}
+                          placeholder="Select or enter reason for cancellation..."
                           onChange={(val) => {
                             updateEnquiry(activeEnquiry.id, { cancellationReason: val });
                             setActiveEnquiry({ ...activeEnquiry, cancellationReason: val });
@@ -875,55 +905,32 @@ function EnquiriesComponent() {
               </Card>
             </div>
 
-            <DialogFooter className="pt-3 border-t flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={() => setDeleteTargetId(activeEnquiry.id)}
-                  className="rounded-lg text-xs gap-1"
-                >
-                  <Trash2 className="h-3.5 w-3.5" /> Delete
-                </Button>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button type="button" variant="outline" onClick={() => setActiveEnquiry(null)} className="rounded-lg text-xs">
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => {
-                    toast.success("Enquiry draft saved");
-                    setActiveEnquiry(null);
-                  }}
-                  className="rounded-lg text-xs"
-                >
-                  Save Draft
-                </Button>
+            <DialogFooter className="pt-3 border-t flex items-center justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setActiveEnquiry(null)} className="rounded-lg text-xs">
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  toast.success(`Enquiry ${activeEnquiry.id} saved successfully`);
+                  setActiveEnquiry(null);
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1 font-bold shadow-xs px-4"
+              >
+                <Save className="h-3.5 w-3.5" /> Save
+              </Button>
+              {activeEnquiry.customerDecision === "Approved" && !activeEnquiry.projectId && (
                 <Button
                   type="button"
                   onClick={() => {
-                    toast.success(`Enquiry ${activeEnquiry.id} saved successfully`);
+                    handleConvert(activeEnquiry.id);
                     setActiveEnquiry(null);
                   }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs gap-1.5 shadow-xs"
                 >
-                  <Save className="h-3.5 w-3.5" /> Save
+                  <Sparkles className="h-4 w-4" /> Save & Create Project
                 </Button>
-                {activeEnquiry.customerDecision === "Approved" && !activeEnquiry.projectId && (
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      handleConvert(activeEnquiry.id);
-                      setActiveEnquiry(null);
-                    }}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs gap-1.5 shadow-xs"
-                  >
-                    <Sparkles className="h-4 w-4" /> Save & Create Project
-                  </Button>
-                )}
-              </div>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -931,151 +938,185 @@ function EnquiriesComponent() {
 
       {/* CREATE NEW ENQUIRY DIALOG FORM */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-2xl rounded-xl border shadow-xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold flex items-center gap-2">
-              <PhoneCall className="h-5 w-5 text-blue-600" /> Log New Customer Enquiry
+        <DialogContent className="max-w-3xl rounded-2xl border border-border shadow-2xl p-6 max-h-[92vh] overflow-y-auto bg-background">
+          <DialogHeader className="border-b pb-3">
+            <DialogTitle className="text-lg font-extrabold flex items-center justify-between text-foreground">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-950 flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                  <PhoneCall className="h-5 w-5" />
+                </div>
+                <div>
+                  <span>Log New Customer Enquiry</span>
+                  <p className="text-xs font-normal text-muted-foreground">Record client details, service needs, reference & engineer assignment</p>
+                </div>
+              </div>
             </DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={(e) => handleCreateSubmit(e, false)} className="space-y-4 text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold">Customer Name *</Label>
-                <Input
-                  required
-                  placeholder="e.g. AeroTech Solutions"
-                  value={createData.customerName}
-                  onChange={(e) => setCreateData({ ...createData, customerName: e.target.value })}
-                  className="h-9 rounded-lg"
-                />
+          <form onSubmit={(e) => handleCreateSubmit(e, false)} className="space-y-4 text-xs pt-2">
+            {/* SECTION 1: CUSTOMER CONTACT INFORMATION */}
+            <div className="p-4 rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/20 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
+                <UserCheck className="h-4 w-4 text-blue-600" /> Section 1: Customer Contact Information
+              </h3>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Customer Full Name *</Label>
+                  <Input
+                    required
+                    placeholder="e.g. AeroTech Solutions / Ramesh"
+                    value={createData.customerName}
+                    onChange={(e) => setCreateData({ ...createData, customerName: e.target.value })}
+                    className="h-9 text-xs rounded-xl bg-background"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Mobile Phone Number *</Label>
+                  <Input
+                    required
+                    placeholder="e.g. 9876543210"
+                    value={createData.phone}
+                    onChange={(e) => setCreateData({ ...createData, phone: e.target.value })}
+                    className="h-9 text-xs rounded-xl bg-background"
+                  />
+                </div>
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs font-semibold">Mobile Number *</Label>
+                <Label className="text-xs font-semibold">Site Address / Location</Label>
                 <Input
-                  required
-                  placeholder="e.g. 9876543210"
-                  value={createData.phone}
-                  onChange={(e) => setCreateData({ ...createData, phone: e.target.value })}
-                  className="h-9 rounded-lg"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold">Location / Address</Label>
-                <Input
-                  placeholder="e.g. HITEC City, Hyderabad"
+                  placeholder="e.g. Plot 42, Industrial Park, HITEC City, Hyderabad"
                   value={createData.location}
                   onChange={(e) => setCreateData({ ...createData, location: e.target.value })}
-                  className="h-9 rounded-lg"
+                  className="h-9 text-xs rounded-xl bg-background"
                 />
               </div>
+            </div>
+
+            {/* SECTION 2: SERVICE NEED & REFERENCE DETAILS */}
+            <div className="p-4 rounded-xl border border-purple-100 dark:border-purple-900/40 bg-purple-50/40 dark:bg-purple-950/20 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-purple-600" /> Section 2: Service Need & Lead Source
+              </h3>
 
               <div className="space-y-1">
-                <Label className="text-xs font-semibold">Lead Source (Smart Combo)</Label>
+                <Label className="text-xs font-semibold">Service Need / Leakage Type *</Label>
                 <SmartComboBox
-                  category="Lead Source"
-                  value={createData.leadSource}
-                  onChange={(val) => setCreateData({ ...createData, leadSource: val })}
+                  category="Leakage Type"
+                  value={createData.leakageType}
+                  onChange={(val) => setCreateData({ ...createData, leakageType: val })}
                 />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Lead Source</Label>
+                  <SmartComboBox
+                    category="Lead Source"
+                    value={createData.leadSource}
+                    onChange={(val) => setCreateData({ ...createData, leadSource: val })}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold">Referred By / Reference</Label>
+                    {["Word of Mouth", "Existing Customer", "Builder Reference", "Engineer Reference", "CEO Reference"].includes(createData.leadSource) && (
+                      <Badge variant="outline" className="text-[9px] bg-purple-100 text-purple-700 border-purple-300">
+                        ★ Recommended
+                      </Badge>
+                    )}
+                  </div>
+                  <SmartComboBox
+                    category="Referred By Options"
+                    value={createData.referredBy || ""}
+                    onChange={(val) => setCreateData({ ...createData, referredBy: val })}
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold">Referred By / Reference Person</Label>
-                {["Word of Mouth", "Existing Customer", "Builder Reference", "Engineer Reference", "CEO Reference"].includes(createData.leadSource) && (
-                  <Badge variant="outline" className="text-[9px] bg-purple-50 text-purple-700 border-purple-200">
-                    ★ Recommended
-                  </Badge>
-                )}
-                {["Website", "Google Search"].includes(createData.leadSource) && (
-                  <span className="text-[10px] text-muted-foreground">(Optional)</span>
-                )}
-              </div>
-              <SmartComboBox
-                category="Referred By Options"
-                value={createData.referredBy || ""}
-                onChange={(val) => setCreateData({ ...createData, referredBy: val })}
-              />
-            </div>
+            {/* SECTION 3: ENGINEERING ASSIGNMENT & ESTIMATE */}
+            <div className="p-4 rounded-xl border border-amber-100 dark:border-amber-900/40 bg-amber-50/40 dark:bg-amber-950/20 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                <UserCheck className="h-4 w-4 text-amber-600" /> Section 3: Engineering Assignment & Site Visit
+              </h3>
 
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold">Service Need / Lead Type</Label>
-              <SmartComboBox
-                category="Leakage Type"
-                value={createData.leakageType}
-                onChange={(val) => setCreateData({ ...createData, leakageType: val })}
-              />
-            </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Assign Lead Engineer</Label>
+                  <SmartComboBox
+                    category="Engineer Names"
+                    value={createData.assignedEngineerName}
+                    onChange={(val) => handleEngineerSelectWithConflictCheck(val, false)}
+                    siteVisitDate={createData.siteVisitDate}
+                  />
+                </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold">Assign Engineer</Label>
-                <SmartComboBox
-                  category="Engineer Names"
-                  value={createData.assignedEngineerName}
-                  onChange={(val) => handleEngineerSelectWithConflictCheck(val, false)}
-                />
-              </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Site Visit Date</Label>
+                  <Input
+                    type="date"
+                    value={createData.siteVisitDate}
+                    onChange={(e) => setCreateData({ ...createData, siteVisitDate: e.target.value })}
+                    className="h-9 text-xs rounded-xl bg-background"
+                  />
+                </div>
 
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold">Site Visit Date</Label>
-                <Input
-                  type="date"
-                  value={createData.siteVisitDate}
-                  onChange={(e) => setCreateData({ ...createData, siteVisitDate: e.target.value })}
-                  className="h-9 rounded-lg"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold">Quotation Amount (₹)</Label>
-                <Input
-                  type="number"
-                  placeholder="e.g. 150000"
-                  value={createData.quotationAmount || ""}
-                  onChange={(e) => {
-                    const val = e.target.value === "" ? 0 : Number(e.target.value);
-                    setCreateData({ ...createData, quotationAmount: val });
-                  }}
-                  className="h-9 rounded-lg font-bold text-blue-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Quotation Estimate (₹)</Label>
+                  <Input
+                    type="number"
+                    placeholder="e.g. 150000"
+                    value={createData.quotationAmount || ""}
+                    onChange={(e) => {
+                      const val = e.target.value === "" ? 0 : Number(e.target.value);
+                      setCreateData({ ...createData, quotationAmount: val });
+                    }}
+                    className="h-9 text-xs rounded-xl font-bold text-amber-700 dark:text-amber-400 bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Work Committed Date & Actual Work Started Date */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-purple-50/60 p-3 rounded-xl border border-purple-100">
-              <div className="space-y-1">
-                <Label className="text-xs font-bold text-purple-900 flex items-center gap-1">
-                  <CalendarCheck className="h-3.5 w-3.5 text-purple-600" /> Work Committed Date *
-                </Label>
-                <Input
-                  type="date"
-                  value={createData.workCommittedDate}
-                  onChange={(e) => setCreateData({ ...createData, workCommittedDate: e.target.value })}
-                  className="h-9 rounded-lg bg-white border-purple-300 font-semibold"
-                />
-              </div>
+            {/* SECTION 4: WORK COMMITMENT TIMELINE */}
+            <div className="p-4 rounded-xl border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-950/20 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                <CalendarCheck className="h-4 w-4 text-emerald-600" /> Section 4: Work Commitment & Execution Dates
+              </h3>
 
-              <div className="space-y-1">
-                <Label className="text-xs font-bold text-emerald-900 flex items-center gap-1">
-                  <PlayCircle className="h-3.5 w-3.5 text-emerald-600" /> Actual Work Started Date
-                </Label>
-                <Input
-                  type="date"
-                  value={createData.actualWorkStartedDate}
-                  onChange={(e) => setCreateData({ ...createData, actualWorkStartedDate: e.target.value })}
-                  className="h-9 rounded-lg bg-white border-emerald-300 font-semibold"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center gap-1">
+                    <CalendarCheck className="h-3.5 w-3.5 text-purple-600" /> Work Committed Date *
+                  </Label>
+                  <Input
+                    type="date"
+                    value={createData.workCommittedDate}
+                    onChange={(e) => setCreateData({ ...createData, workCommittedDate: e.target.value })}
+                    className="h-9 text-xs rounded-xl bg-background border-purple-300 font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1">
+                    <PlayCircle className="h-3.5 w-3.5 text-emerald-600" /> Actual Work Started Date
+                  </Label>
+                  <Input
+                    type="date"
+                    value={createData.actualWorkStartedDate}
+                    onChange={(e) => setCreateData({ ...createData, actualWorkStartedDate: e.target.value })}
+                    className="h-9 text-xs rounded-xl bg-background border-emerald-300 font-semibold"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold">Initial Remarks (Smart Combo)</Label>
+            {/* SECTION 5: INITIAL REMARKS */}
+            <div className="space-y-1 pt-1">
+              <Label className="text-xs font-semibold">Initial Remarks & Notes</Label>
               <SmartComboBox
                 category="Remarks Templates"
                 value={createData.remarks}
@@ -1083,28 +1124,17 @@ function EnquiriesComponent() {
               />
             </div>
 
-            <DialogFooter className="pt-3 border-t flex flex-wrap items-center justify-between gap-2">
-              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} className="rounded-lg text-xs">
+            <DialogFooter className="pt-4 border-t flex items-center justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} className="rounded-xl text-xs">
                 Cancel
               </Button>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={isSaving}
-                  onClick={(e) => handleCreateSubmit(e, true)}
-                  className="rounded-lg text-xs gap-1"
-                >
-                  Save & Continue
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isSaving}
-                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1"
-                >
-                  {isSaving ? "Saving..." : "Save Enquiry"}
-                </Button>
-              </div>
+              <Button
+                type="submit"
+                disabled={isSaving}
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs gap-1 font-bold shadow-md px-5"
+              >
+                {isSaving ? "Saving..." : "Save Enquiry"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
@@ -5,17 +6,13 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Design system definition.
- *
- * The @theme inline block maps CSS custom properties to Tailwind utility
- * classes (e.g. --color-primary -> bg-primary, text-primary).
- *
- * The :root and .dark blocks define the actual color values using oklch.
- * All colors MUST use oklch format.
- *
- * To add a new semantic color:
- * 1. Add the variable to :root (light value) and .dark (dark value)
- * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ * Enterprise Robotics ERP Design System definition.
+ * Primary Theme Palette: Deep Navy Blue (#0f172a / #1e3a8a), Clean White (#ffffff), Slate Grey (#f8fafc)
+ * Status Color Indicators:
+ * - Ongoing / Approved / Present / Completed / Paid: Vibrant Emerald Green (#15803d)
+ * - Cancel / Cancelled / Absent / Overdue: Crimson Red (#b91c1c)
+ * - Scheduled / Pending / Thinking / Follow Up: Warm Amber (#b45309)
+ * - Main ERP Controls / Indicators: Deep Executive Navy Blue (#0f172a)
  */
 
 @theme inline {
@@ -63,73 +60,73 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
+  --background: oklch(0.99 0.005 240);
+  --foreground: oklch(0.18 0.05 265);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
+  --card-foreground: oklch(0.18 0.05 265);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --popover-foreground: oklch(0.18 0.05 265);
+  --primary: oklch(0.24 0.08 260); /* Executive Deep Navy Blue */
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.96 0.01 250);
+  --secondary-foreground: oklch(0.24 0.08 260);
+  --muted: oklch(0.96 0.01 250);
+  --muted-foreground: oklch(0.48 0.04 255);
+  --accent: oklch(0.96 0.01 250);
+  --accent-foreground: oklch(0.24 0.08 260);
+  --destructive: oklch(0.55 0.22 25); /* Professional Crimson Red */
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.92 0.01 255);
+  --input: oklch(0.92 0.01 255);
+  --ring: oklch(0.40 0.14 255);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.984 0.003 247.858);
-  --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
+  --sidebar: oklch(0.18 0.05 265);
+  --sidebar-foreground: oklch(0.99 0 0);
+  --sidebar-primary: oklch(0.40 0.14 255);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.25 0.05 265);
+  --sidebar-accent-foreground: oklch(0.99 0 0);
+  --sidebar-border: oklch(0.28 0.05 265);
+  --sidebar-ring: oklch(0.40 0.14 255);
 }
 
 .dark {
-  --background: oklch(0.129 0.042 264.695);
-  --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.208 0.042 265.755);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.208 0.042 265.755);
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(1 0 0 / 10%);
+  --background: oklch(0.15 0.04 265);
+  --foreground: oklch(0.98 0.005 245);
+  --card: oklch(0.20 0.05 265);
+  --card-foreground: oklch(0.98 0.005 245);
+  --popover: oklch(0.20 0.05 265);
+  --popover-foreground: oklch(0.98 0.005 245);
+  --primary: oklch(0.92 0.01 255);
+  --primary-foreground: oklch(0.18 0.05 265);
+  --secondary: oklch(0.26 0.04 260);
+  --secondary-foreground: oklch(0.98 0.005 245);
+  --muted: oklch(0.26 0.04 260);
+  --muted-foreground: oklch(0.70 0.04 256);
+  --accent: oklch(0.26 0.04 260);
+  --accent-foreground: oklch(0.98 0.005 245);
+  --destructive: oklch(0.65 0.20 25);
+  --destructive-foreground: oklch(0.98 0.005 245);
+  --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
+  --ring: oklch(0.55 0.05 260);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
-  --sidebar-foreground: oklch(0.984 0.003 247.858);
+  --sidebar: oklch(0.18 0.05 265);
+  --sidebar-foreground: oklch(0.98 0.005 245);
   --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.551 0.027 264.364);
+  --sidebar-primary-foreground: oklch(0.98 0.005 245);
+  --sidebar-accent: oklch(0.26 0.04 260);
+  --sidebar-accent-foreground: oklch(0.98 0.005 245);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.55 0.05 260);
 }
 
 @layer base {
@@ -140,50 +137,64 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-size: 15px;
-    line-height: 1.6;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Enterprise Headings */
+  /* Executive Typography Hierarchy */
   h1 {
-    font-size: 1.875rem; /* 30px */
-    line-height: 2.25rem;
+    font-size: 1.75rem; /* 28px */
+    line-height: 2.125rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    color: #0f172a;
+  }
+
+  h2 {
+    font-size: 1.5rem; /* 24px */
+    line-height: 1.875rem;
     font-weight: 700;
     letter-spacing: -0.02em;
   }
 
-  h2 {
-    font-size: 1.625rem; /* 26px */
-    line-height: 2rem;
-    font-weight: 600;
-  }
-
   h3 {
     font-size: 1.25rem; /* 20px */
-    line-height: 1.75rem;
-    font-weight: 600;
+    line-height: 1.625rem;
+    font-weight: 700;
   }
 
   h4 {
-    font-size: 1.125rem; /* 18px */
-    line-height: 1.625rem;
-    font-weight: 600;
+    font-size: 1rem; /* 16px */
+    line-height: 1.375rem;
+    font-weight: 700;
   }
 
-  /* Form Elements & Buttons */
+  /* Form Elements & Inputs */
   label {
-    font-size: 15px;
-    font-weight: 500;
+    font-size: 13px;
+    font-weight: 600;
     line-height: 1.4;
+    color: #334155;
   }
 
   input, select, textarea {
-    font-size: 15px;
-    line-height: 1.5;
+    font-size: 13px;
+    line-height: 1.4;
+    font-family: inherit;
+    border-radius: 0.5rem;
   }
 
-  /* Hide number input spinners / arrows */
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  }
+
+  /* Hide number input spinners */
   input[type="number"]::-webkit-outer-spin-button,
   input[type="number"]::-webkit-inner-spin-button {
     -webkit-appearance: none;
@@ -196,24 +207,26 @@
   }
 
   button {
-    font-size: 15px;
-    line-height: 1.4;
+    font-family: inherit;
+    font-weight: 600;
   }
 
-  /* Enterprise Table Styling */
+  /* Professional Enterprise Table Styling */
   table th {
-    font-size: 15px;
-    font-weight: 600;
-    line-height: 1.4;
-    padding-top: 0.75rem;
-    padding-bottom: 0.75rem;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #475569;
+    padding-top: 0.625rem;
+    padding-bottom: 0.625rem;
   }
 
   table td {
-    font-size: 15px;
-    line-height: 1.5;
-    padding-top: 0.75rem;
-    padding-bottom: 0.75rem;
+    font-size: 13px;
+    line-height: 1.4;
+    padding-top: 0.625rem;
+    padding-bottom: 0.625rem;
   }
 
   /* Sticky Table Headers */
@@ -223,4 +236,71 @@
     z-index: 10;
     background-color: var(--color-background);
   }
+}
+
+/* ---------------------------------------------------------------------------
+   STATUS COLOR UTILITY BADGES
+   Ongoing / Present / Approved / Completed / Paid: Vibrant Emerald Green
+   Cancel / Cancelled / Absent / Overdue: Crimson Red
+   Scheduled / Pending / Thinking / Follow Up: Warm Amber
+   General ERP Indicators: Dark Executive Navy Blue
+   --------------------------------------------------------------------------- */
+
+.badge-status-ongoing,
+.badge-status-approved,
+.badge-status-present,
+.badge-status-completed,
+.badge-status-paid {
+  background-color: #f0fdf4 !important;
+  color: #15803d !important;
+  border: 1px solid #bbf7d0 !important;
+  font-weight: 700 !important;
+}
+
+.badge-status-cancelled,
+.badge-status-cancel,
+.badge-status-absent,
+.badge-status-overdue {
+  background-color: #fef2f2 !important;
+  color: #b91c1c !important;
+  border: 1px solid #fecaca !important;
+  font-weight: 700 !important;
+}
+
+.badge-status-scheduled,
+.badge-status-pending,
+.badge-status-thinking,
+.badge-status-followup,
+.badge-status-waiting {
+  background-color: #fffbeb !important;
+  color: #b45309 !important;
+  border: 1px solid #fde68a !important;
+  font-weight: 700 !important;
+}
+
+.badge-status-navy,
+.badge-status-main {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+  border: 1px solid #1e293b !important;
+  font-weight: 700 !important;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }

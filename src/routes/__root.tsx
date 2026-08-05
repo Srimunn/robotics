@@ -153,14 +153,14 @@ function MainHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-4 border-b bg-background/95 px-4 backdrop-blur shadow-xs">
+      <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-slate-200 bg-white text-slate-900 px-4 shadow-2xs">
         <div className="flex items-center gap-3">
-          <SidebarTrigger />
-          <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="font-semibold text-foreground">Robotics ERP</span>
-            <span>/</span>
-            <span className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 px-2 py-0.5 rounded-full font-semibold text-[10px] border border-emerald-200 dark:border-emerald-800">
-              🟢 MongoDB Atlas Connected (robodb)
+          <SidebarTrigger className="text-slate-700 hover:text-slate-900 hover:bg-slate-100" />
+          <div className="hidden sm:flex items-center gap-2 text-xs text-slate-600">
+            <span className="font-bold text-slate-900 tracking-wide">Robotics ERP</span>
+            <span className="text-slate-300">/</span>
+            <span className="bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full font-semibold text-[10px] border border-slate-200 flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> MongoDB Atlas Connected
             </span>
           </div>
         </div>
@@ -169,13 +169,13 @@ function MainHeader() {
         <div className="flex-1 max-w-md">
           <button
             onClick={() => setSearchOpen(true)}
-            className="w-full flex items-center justify-between text-xs text-muted-foreground bg-muted/40 hover:bg-muted/70 border border-input rounded-lg px-3 py-1.5 transition-colors shadow-2xs cursor-pointer"
+            className="w-full flex items-center justify-between text-xs text-slate-500 bg-slate-100/80 hover:bg-slate-100 border border-slate-200 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-2 truncate">
-              <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <Search className="h-3.5 w-3.5 text-slate-400 shrink-0" />
               <span className="truncate">Search Customer, Project, Enquiry, Phone (Ctrl+K)...</span>
             </div>
-            <kbd className="hidden sm:inline-block text-[10px] font-mono bg-background border px-1.5 py-0.5 rounded shadow-2xs text-muted-foreground">
+            <kbd className="hidden sm:inline-block text-[10px] font-mono bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-400">
               Ctrl + K
             </kbd>
           </button>
@@ -192,44 +192,10 @@ function MainHeader() {
                 resetToCleanDemoMode();
               }
             }}
-            className="text-xs rounded-lg gap-1 border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/40"
+            className="text-xs rounded-lg gap-1 border-rose-200 bg-rose-50/60 text-rose-700 hover:bg-rose-100"
           >
             🧹 Clean Demo Reset
           </Button>
-          {/* Quick Action Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1.5 shadow-xs hover:scale-[1.02] active:scale-[0.98] transition-transform">
-                <Plus className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline font-medium">Quick Action</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 rounded-xl">
-              <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground uppercase">
-                Create & Record
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link to="/enquiries" className="flex items-center gap-2 text-xs">
-                  <PhoneCall className="h-4 w-4 text-blue-600" />
-                  New Customer Enquiry
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link to="/payments" className="flex items-center gap-2 text-xs">
-                  <DollarSign className="h-4 w-4 text-emerald-600" />
-                  Record Payment
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link to="/labours" className="flex items-center gap-2 text-xs">
-                  <Calendar className="h-4 w-4 text-amber-600" />
-                  Log Attendance
-                </Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
           {/* Notifications Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

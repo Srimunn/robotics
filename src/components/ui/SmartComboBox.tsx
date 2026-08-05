@@ -18,6 +18,8 @@ interface SmartComboBoxProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  siteVisitDate?: string;
+  excludeEnquiryId?: string;
 }
 
 export function SmartComboBox({
@@ -27,8 +29,12 @@ export function SmartComboBox({
   placeholder = "Select or type custom...",
   className,
   disabled = false,
+  siteVisitDate,
+  excludeEnquiryId,
 }: SmartComboBoxProps) {
   const {
+    engineers,
+    checkEngineerAvailability,
     getMasterDataByCategory,
     addMasterDataItem,
     updateMasterDataItem,
@@ -39,8 +45,8 @@ export function SmartComboBox({
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [manageModalOpen, setManageModalOpen] = useState(false);
-  const [saveToMasterConfirmOpen, setSaveToMasterConfirmOpen] = useState(false);
-  const [pendingMasterValue, setPendingMasterValue] = useState("");
+  const [quickAddDialogOpen, setQuickAddDialogOpen] = useState(false);
+  const [quickAddInput, setQuickAddInput] = useState("");
 
   // Manage modal internal state
   const [modalSearch, setModalSearch] = useState("");
@@ -64,7 +70,32 @@ export function SmartComboBox({
     setInputValue("");
   };
 
-  // METHOD 2: One-Time Custom Entry (Does NOT save to master list)
+  // METHOD 2: Direct Add to Master & Select
+  const handleDirectAddAndSelectMaster = (valToSave?: string) => {
+    const targetVal = (valToSave !== undefined ? valToSave : inputValue).trim();
+    if (!targetVal) return;
+
+    const existing = allMasterItems.find(
+      (m) => m.value.toLowerCase().trim() === targetVal.toLowerCase().trim()
+    );
+
+    if (existing) {
+      if (!existing.isActive) {
+        toggleMasterDataItemActive(existing.id);
+      }
+      onChange(existing.value);
+      toast.info(`Selected existing ${category}: "${existing.value}"`);
+    } else {
+      addMasterDataItem(category, targetVal);
+      onChange(targetVal);
+      toast.success(`Added "${targetVal}" to ${category} list & selected!`);
+    }
+
+    setOpen(false);
+    setInputValue("");
+  };
+
+  // METHOD 3: One-Time Custom Entry (Does NOT save to master list)
   const handleOneTimeCustomEntry = (customVal?: string) => {
     const targetVal = (customVal !== undefined ? customVal : inputValue).trim();
     if (!targetVal) return;
@@ -72,39 +103,18 @@ export function SmartComboBox({
     onChange(targetVal);
     setOpen(false);
     setInputValue("");
-    toast.success(`Applied one-time value: "${targetVal}" (Stored in current record only)`);
+    toast.success(`Applied one-time value: "${targetVal}"`);
   };
 
-  // METHOD 3: Save to Master List
-  const handlePromptSaveToMaster = (valToSave?: string) => {
-    const targetVal = (valToSave !== undefined ? valToSave : inputValue).trim();
-    if (!targetVal) return;
+  // Quick Add Modal Handler
+  const handleQuickAddSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = quickAddInput.trim();
+    if (!trimmed) return;
 
-    // Case-insensitive duplicate check
-    const isDuplicate = allMasterItems.some(
-      (m) => m.value.toLowerCase().trim() === targetVal.toLowerCase().trim()
-    );
-
-    if (isDuplicate) {
-      toast.error(`"${targetVal}" already exists in Master List for ${category}`);
-      handleSelectExisting(targetVal);
-      return;
-    }
-
-    setPendingMasterValue(targetVal);
-    setSaveToMasterConfirmOpen(true);
-  };
-
-  const handleConfirmSaveToMaster = () => {
-    if (!pendingMasterValue) return;
-
-    addMasterDataItem(category, pendingMasterValue);
-    onChange(pendingMasterValue);
-    setSaveToMasterConfirmOpen(false);
-    setOpen(false);
-    setInputValue("");
-    setPendingMasterValue("");
-    toast.success(`Saved "${pendingMasterValue}" to Master List for ${category}! Available for future projects.`);
+    handleDirectAddAndSelectMaster(trimmed);
+    setQuickAddInput("");
+    setQuickAddDialogOpen(false);
   };
 
   // Manage Modal Handlers
@@ -133,6 +143,10 @@ export function SmartComboBox({
     setEditingItem(null);
   };
 
+  const filteredOptions = options.filter((opt) =>
+    opt.toLowerCase().includes(inputValue.toLowerCase().trim())
+  );
+
   return (
     <div className="flex items-center gap-1 w-full">
       <Popover open={open} onOpenChange={setOpen}>
@@ -154,24 +168,41 @@ export function SmartComboBox({
         </PopoverTrigger>
 
         <PopoverContent className="w-[340px] p-0 shadow-lg rounded-xl border border-border" align="start">
-          <Command className="rounded-xl" shouldFilter={true}>
-            {/* Popover Header with Settings Icon */}
+          <Command className="rounded-xl" shouldFilter={false}>
+            {/* Popover Header with Quick Add & Settings */}
             <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/20">
               <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                 {category} Options
               </span>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => {
-                  setOpen(false);
-                  setManageModalOpen(true);
-                }}
-                title={`Manage Master List for ${category}`}
-                className="h-6 w-6 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 text-muted-foreground hover:text-foreground"
-              >
-                <Settings className="h-3.5 w-3.5" />
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setOpen(false);
+                    setQuickAddInput(inputValue);
+                    setQuickAddDialogOpen(true);
+                  }}
+                  title={`Add new ${category}`}
+                  className="h-6 px-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md gap-1"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Add New</span>
+                </Button>
+
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => {
+                    setOpen(false);
+                    setManageModalOpen(true);
+                  }}
+                  title={`Manage Master List for ${category}`}
+                  className="h-6 w-6 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 text-muted-foreground hover:text-foreground"
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
 
             <CommandInput
@@ -181,63 +212,125 @@ export function SmartComboBox({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && inputValue.trim().length > 0 && !exactMatchExists) {
                   e.preventDefault();
-                  handleOneTimeCustomEntry(inputValue);
+                  handleDirectAddAndSelectMaster(inputValue);
                 }
               }}
               className="h-9 text-xs"
             />
 
-            <CommandList className="max-h-[240px] overflow-y-auto p-1">
-              {options.length === 0 && !inputValue && (
-                <div className="p-3 text-center text-xs text-muted-foreground">
-                  No predefined items. Type above for one-time entry or save to master.
-                </div>
-              )}
-
-              {/* METHOD 1: SELECT EXISTING OPTIONS */}
-              <CommandGroup heading="Existing Master Values">
-                {options.map((opt) => (
-                  <CommandItem
-                    key={opt}
-                    value={opt}
-                    onSelect={() => handleSelectExisting(opt)}
-                    className="text-xs flex items-center justify-between cursor-pointer py-1.5 px-2 rounded-md hover:bg-accent"
-                  >
-                    <span className="truncate font-medium">{opt}</span>
-                    {value === opt && <Check className="h-3.5 w-3.5 text-blue-600 shrink-0 ml-1" />}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-
-              {/* CUSTOM CREATABLE ACTIONS (METHODS 2 & 3) */}
+            <CommandList className="max-h-[260px] overflow-y-auto p-1">
+              {/* ACTION: Direct Add Typed Option if NOT in list */}
               {inputValue.trim().length > 0 && !exactMatchExists && (
-                <div className="p-1 border-t border-border mt-1 space-y-1 bg-slate-50/70 dark:bg-slate-900/50 rounded-lg">
-                  {/* METHOD 2: ONE-TIME CUSTOM ENTRY */}
+                <div className="p-1 border-b border-border mb-1 space-y-1 bg-blue-50/80 dark:bg-blue-950/40 rounded-lg">
+                  <Button
+                    type="button"
+                    onClick={() => handleDirectAddAndSelectMaster(inputValue)}
+                    className="w-full justify-start text-xs bg-blue-600 text-white hover:bg-blue-700 font-semibold gap-1.5 h-8 rounded-md shadow-xs"
+                  >
+                    <Plus className="h-3.5 w-3.5 text-white" />
+                    <span className="truncate">+ Add "<strong>{inputValue}</strong>" to Master List</span>
+                  </Button>
+
                   <Button
                     type="button"
                     variant="ghost"
                     onClick={() => handleOneTimeCustomEntry(inputValue)}
-                    className="w-full justify-start text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 font-medium gap-1.5 h-8 rounded-md"
+                    className="w-full justify-start text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-800 font-medium gap-1.5 h-7 rounded-md"
                   >
                     <Sparkles className="h-3.5 w-3.5 text-amber-500" />
                     <span className="truncate">⚡ Use One-Time: "<strong>{inputValue}</strong>"</span>
                   </Button>
-
-                  {/* METHOD 3: SAVE TO MASTER LIST */}
-                  <Button
-                    type="button"
-                    onClick={() => handlePromptSaveToMaster(inputValue)}
-                    className="w-full justify-start text-xs bg-blue-600 text-white hover:bg-blue-700 font-semibold gap-1.5 h-8 rounded-md shadow-2xs"
-                  >
-                    <Plus className="h-3.5 w-3.5 text-white" />
-                    <span className="truncate">+ Save "<strong>{inputValue}</strong>" to Master List</span>
-                  </Button>
                 </div>
+              )}
+
+              {filteredOptions.length === 0 && !inputValue && (
+                <div className="p-3 text-center text-xs text-muted-foreground">
+                  No predefined items. Type above to add a new option or select one-time.
+                </div>
+              )}
+
+              {filteredOptions.length === 0 && inputValue && exactMatchExists && (
+                <div className="p-3 text-center text-xs text-muted-foreground">
+                  No matching items found.
+                </div>
+              )}
+
+              {/* METHOD 1: SELECT EXISTING OPTIONS */}
+              {filteredOptions.length > 0 && (
+                <CommandGroup heading="Existing Options">
+                  {filteredOptions.map((opt) => {
+                    let isBooked = false;
+                    let bookedReason = "";
+
+                    if (category === "Engineer Names") {
+                      const eng = engineers.find((x) => x.name === opt || x.id === opt);
+                      if (eng) {
+                        const avail = checkEngineerAvailability(eng.id, eng.name, siteVisitDate, excludeEnquiryId);
+                        if (!avail.isAvailable) {
+                          isBooked = true;
+                          bookedReason = avail.currentProject ? `Assigned to ${avail.currentProject.id}` : "Booked for Site Visit";
+                        }
+                      }
+                    }
+
+                    return (
+                      <CommandItem
+                        key={opt}
+                        value={opt}
+                        disabled={isBooked}
+                        onSelect={() => {
+                          if (isBooked) {
+                            toast.error(`Cannot select ${opt}: Engineer is booked (${bookedReason})`);
+                            return;
+                          }
+                          handleSelectExisting(opt);
+                        }}
+                        className={cn(
+                          "text-xs flex items-center justify-between py-1.5 px-2 rounded-md transition-colors",
+                          isBooked
+                            ? "opacity-50 cursor-not-allowed bg-rose-50/50 dark:bg-rose-950/20 text-muted-foreground"
+                            : "cursor-pointer hover:bg-accent"
+                        )}
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <span className={cn("truncate font-medium", isBooked && "line-through text-slate-400")}>{opt}</span>
+                          {category === "Engineer Names" && (
+                            isBooked ? (
+                              <Badge variant="outline" className="text-[9px] bg-rose-50 text-rose-700 border-rose-200 font-bold shrink-0">
+                                🔴 Booked ({bookedReason})
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[9px] bg-emerald-50 text-emerald-700 border-emerald-200 font-bold shrink-0">
+                                🟢 Available
+                              </Badge>
+                            )
+                          )}
+                        </div>
+                        {value === opt && <Check className="h-3.5 w-3.5 text-blue-600 shrink-0 ml-1" />}
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
               )}
             </CommandList>
           </Command>
         </PopoverContent>
       </Popover>
+
+      {/* QUICK INLINE + ADD BUTTON */}
+      <Button
+        size="icon"
+        variant="ghost"
+        disabled={disabled}
+        onClick={() => {
+          setQuickAddInput("");
+          setQuickAddDialogOpen(true);
+        }}
+        title={`Add new option to ${category}`}
+        className="h-9 w-9 rounded-lg border border-input bg-background hover:bg-blue-50 text-blue-600 hover:text-blue-700 shrink-0"
+      >
+        <Plus className="h-4 w-4" />
+      </Button>
 
       {/* QUICK INLINE SETTINGS GEAR BUTTON */}
       <Button
@@ -251,33 +344,36 @@ export function SmartComboBox({
         <Settings className="h-3.5 w-3.5" />
       </Button>
 
-      {/* SAVE TO MASTER CONFIRMATION DIALOG */}
-      <Dialog open={saveToMasterConfirmOpen} onOpenChange={setSaveToMasterConfirmOpen}>
+      {/* QUICK ADD NEW MASTER ITEM MODAL */}
+      <Dialog open={quickAddDialogOpen} onOpenChange={setQuickAddDialogOpen}>
         <DialogContent className="max-w-md rounded-2xl p-6 bg-white dark:bg-card">
           <DialogHeader>
             <DialogTitle className="text-base font-bold flex items-center gap-2 text-foreground">
-              <Plus className="h-5 w-5 text-blue-600" /> Save New Master Value?
+              <Plus className="h-5 w-5 text-blue-600" /> Add New {category}
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Save "<strong className="text-foreground">{pendingMasterValue}</strong>" to the permanent Master List for <strong>{category}</strong>?
+              Type the new {category.toLowerCase()} option below. It will be added to the master list and selected automatically.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="p-3 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-900/50 space-y-1 text-xs">
-            <p className="font-semibold text-blue-900 dark:text-blue-200">What will happen?</p>
-            <p className="text-blue-700 dark:text-blue-300 text-[11px]">
-              This option will immediately become available in future dropdown selections across all enquiries and projects in the ERP.
-            </p>
-          </div>
+          <form onSubmit={handleQuickAddSubmit} className="space-y-4 text-xs">
+            <Input
+              placeholder={`Enter new ${category.toLowerCase()} name...`}
+              value={quickAddInput}
+              onChange={(e) => setQuickAddInput(e.target.value)}
+              autoFocus
+              className="h-9 text-xs rounded-lg"
+            />
 
-          <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setSaveToMasterConfirmOpen(false)}>
-              Cancel
-            </Button>
-            <Button size="sm" onClick={handleConfirmSaveToMaster} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
-              Save to Master List
-            </Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button type="button" variant="outline" size="sm" onClick={() => setQuickAddDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg gap-1 font-semibold">
+                <Plus className="h-4 w-4" /> Add & Select
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
