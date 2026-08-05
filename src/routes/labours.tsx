@@ -283,7 +283,7 @@ function LaboursComponent() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight text-foreground">Labour Management</h1>
-            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400">
               Weekly Wage Engine
             </Badge>
           </div>
@@ -395,7 +395,7 @@ function LaboursComponent() {
                   }}
                   className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all text-center ${
                     labourTypeFilter === "CONTRACT"
-                      ? "bg-purple-600 text-white shadow-xs"
+                      ? "bg-slate-800 text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -445,7 +445,7 @@ function LaboursComponent() {
                         </div>
                         <Badge
                           variant="outline"
-                          className={l.type === "Permanent" ? "bg-blue-50 text-blue-700" : "bg-purple-50 text-purple-700"}
+                          className={l.type === "Permanent" ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-800 border-slate-300"}
                         >
                           {l.type}
                         </Badge>
@@ -484,7 +484,7 @@ function LaboursComponent() {
                           <CardTitle className="text-xl font-extrabold text-foreground">
                             {activeLabour.name}
                           </CardTitle>
-                          <Badge className={activeLabour.type === "Permanent" ? "bg-blue-600 text-white text-xs" : "bg-purple-600 text-white text-xs"}>
+                          <Badge className={activeLabour.type === "Permanent" ? "bg-blue-600 text-white text-xs" : "bg-slate-800 text-white text-xs"}>
                             {activeLabour.type} Labour
                           </Badge>
                           <Badge className="bg-emerald-100 text-emerald-800 text-xs">
@@ -495,9 +495,9 @@ function LaboursComponent() {
                           ID: <strong>{activeLabour.id}</strong> • Mobile: <strong>{activeLabour.phone}</strong>
                         </CardDescription>
                       </div>
-                      <div className="text-left sm:text-right bg-purple-50 p-3 rounded-xl border border-purple-100">
-                        <span className="text-[10px] uppercase font-bold text-purple-900">Default Weekly Wage</span>
-                        <p className="text-xl font-extrabold text-purple-700">₹{(activeLabour.defaultWeeklyWage || 1400).toLocaleString("en-IN")} / week</p>
+                      <div className="text-left sm:text-right bg-emerald-50 p-3 rounded-xl border border-emerald-100">
+                        <span className="text-[10px] uppercase font-bold text-emerald-900">Default Weekly Wage</span>
+                        <p className="text-xl font-extrabold text-emerald-700">₹{(activeLabour.defaultWeeklyWage || 1400).toLocaleString("en-IN")} / week</p>
                       </div>
                     </CardHeader>
 
@@ -511,9 +511,9 @@ function LaboursComponent() {
                             </div>
                           </div>
                         ) : (
-                          <div className="p-3 bg-purple-50 dark:bg-purple-950/40 text-purple-900 dark:text-purple-200 border border-purple-200 dark:border-purple-800 rounded-xl text-xs flex items-center justify-between">
+                          <div className="p-3 bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-200 border border-slate-200 dark:border-slate-800 rounded-xl text-xs flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <Badge className="bg-purple-600 text-white">Contract Worker</Badge>
+                              <Badge className="bg-slate-800 text-white">Contract Worker</Badge>
                               <span className="font-semibold">Project-specific contract worker assigned specifically for particular site contracts.</span>
                             </div>
                           </div>
@@ -531,15 +531,15 @@ function LaboursComponent() {
                             <p className="text-xl font-extrabold text-emerald-700 mt-1">{stats.attendancePct}%</p>
                             <span className="text-[10px] text-emerald-600">{stats.presentCount} Present / {stats.absentCount} Absent</span>
                           </div>
-                          <div className="p-3 bg-purple-50/80 rounded-xl border border-purple-100">
-                            <span className="text-[10px] font-bold uppercase text-purple-800">Weekly Wages Paid</span>
-                            <p className="text-xl font-extrabold text-purple-700 mt-1">₹{stats.paymentsReceived.toLocaleString("en-IN")}</p>
-                            <span className="text-[10px] text-purple-600">Disbursements to date</span>
+                          <div className="p-3 bg-emerald-50/80 rounded-xl border border-emerald-100">
+                            <span className="text-[10px] font-bold uppercase text-emerald-800">Weekly Wages Paid</span>
+                            <p className="text-xl font-extrabold text-emerald-700 mt-1">₹{stats.paymentsReceived.toLocaleString("en-IN")}</p>
+                            <span className="text-[10px] text-emerald-600">Disbursements to date</span>
                           </div>
-                          <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-100">
-                            <span className="text-[10px] font-bold uppercase text-amber-800">Active Site Projects</span>
-                            <p className="text-xl font-extrabold text-amber-700 mt-1">{currentProjectsList.length} Sites</p>
-                            <span className="text-[10px] text-amber-600">Currently active on site</span>
+                          <div className="p-3 bg-blue-50/80 rounded-xl border border-blue-100">
+                            <span className="text-[10px] font-bold uppercase text-blue-800">Active Site Projects</span>
+                            <p className="text-xl font-extrabold text-blue-700 mt-1">{currentProjectsList.length} Sites</p>
+                            <span className="text-[10px] text-blue-600">Currently active on site</span>
                           </div>
                         </div>
 
@@ -573,12 +573,12 @@ function LaboursComponent() {
                                         <div className="flex items-center gap-2">
                                           <span className="font-extrabold text-sm text-blue-600">{p.id}</span>
                                           <span className="font-bold text-foreground">• {p.customerName}</span>
-                                          <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[10px]">{p.status}</Badge>
+                                          <Badge className="bg-blue-100 text-blue-800 border-blue-300 text-[10px]">{p.status}</Badge>
                                         </div>
                                         <p className="text-xs text-muted-foreground mt-0.5">{p.natureOfWork}</p>
                                       </div>
                                       <div className="flex items-center gap-2">
-                                        <Badge className="bg-purple-100 text-purple-800 border-purple-200 font-bold">
+                                        <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 font-bold">
                                           ₹{projWage.toLocaleString("en-IN")}/week
                                         </Badge>
                                         <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-800">
@@ -595,13 +595,13 @@ function LaboursComponent() {
                                         </div>
                                         <div className="text-muted-foreground flex items-center gap-1">
                                           <span>👨‍🔧 Lead Engineer:</span>
-                                          <span className="font-semibold text-purple-700">{p.assignedEngineerName || "Er. Rajesh Kumar"}</span>
+                                          <span className="font-semibold text-blue-700">{p.assignedEngineerName || "Er. Rajesh Kumar"}</span>
                                         </div>
                                       </div>
                                       <div className="space-y-1">
                                         <div className="text-muted-foreground flex items-center gap-1">
                                           <span>📅 Work Committed Date:</span>
-                                          <span className="font-bold text-purple-800">{p.workCommittedDate || "Not Specified"}</span>
+                                          <span className="font-bold text-blue-800">{p.workCommittedDate || "Not Specified"}</span>
                                         </div>
                                         <div className="text-muted-foreground flex items-center gap-1">
                                           <span>⚡ Actual Work Started Date:</span>
@@ -619,8 +619,8 @@ function LaboursComponent() {
                         {/* COMPLETE ALL-TIME PROJECT ASSIGNMENT HISTORY */}
                         <div className="space-y-2">
                           <h4 className="text-xs font-bold uppercase text-muted-foreground flex items-center justify-between border-b pb-2">
-                            <span className="flex items-center gap-1.5 text-purple-700 font-extrabold">
-                              <TrendingUp className="h-4 w-4 text-purple-600" /> Complete Project Assignment History ({recentProjectsList.length})
+                            <span className="flex items-center gap-1.5 text-blue-700 font-extrabold">
+                              <TrendingUp className="h-4 w-4 text-blue-600" /> Complete Project Assignment History ({recentProjectsList.length})
                             </span>
                           </h4>
                           <div className="border rounded-xl overflow-hidden bg-white dark:bg-card">
@@ -656,13 +656,13 @@ function LaboursComponent() {
                                           <div className="font-medium text-foreground">{p.natureOfWork}</div>
                                           <div className="text-[10px] text-muted-foreground">📍 {p.location}</div>
                                         </td>
-                                        <td className="p-2.5 font-bold text-purple-700">₹{projWage.toLocaleString("en-IN")}/wk</td>
+                                        <td className="p-2.5 font-bold text-emerald-700">₹{projWage.toLocaleString("en-IN")}/wk</td>
                                         <td className="p-2.5 text-muted-foreground">{assignment?.assignedDate || p.scheduledDate}</td>
                                         <td className="p-2.5 text-right pr-3">
                                           <Badge
                                             className={`text-[10px] ${
                                               p.status === "Ongoing"
-                                                ? "bg-amber-100 text-amber-800 border-amber-200"
+                                                ? "bg-blue-100 text-blue-800 border-blue-200"
                                                 : p.status === "Completed"
                                                 ? "bg-emerald-100 text-emerald-800 border-emerald-200"
                                                 : "bg-blue-100 text-blue-800 border-blue-200"
@@ -728,7 +728,7 @@ function LaboursComponent() {
                                         <td className="p-2.5 font-bold text-blue-700">{hrs ? `${hrs} hrs` : "0 hrs"}</td>
                                         <td className="p-2.5 font-extrabold text-emerald-700">₹{earnedMoney.toLocaleString("en-IN")}</td>
                                         <td className="p-2.5">
-                                          <Badge className={rec.status === "Present" ? "bg-emerald-100 text-emerald-800 text-[10px]" : "bg-rose-100 text-rose-800 text-[10px]"}>
+                                          <Badge className={rec.status === "Present" ? "bg-emerald-100 text-emerald-800 text-[10px]" : "bg-slate-200 text-slate-800 border-slate-300 text-[10px]"}>
                                             {rec.status}
                                           </Badge>
                                         </td>
@@ -763,8 +763,8 @@ function LaboursComponent() {
                                     status === "Present"
                                       ? "bg-emerald-100 text-emerald-800 border-emerald-300"
                                       : status === "Leave"
-                                      ? "bg-amber-100 text-amber-800 border-amber-300"
-                                      : "bg-rose-100 text-rose-800 border-rose-300"
+                                      ? "bg-blue-100 text-blue-800 border-blue-300"
+                                      : "bg-slate-200 text-slate-800 border-slate-300"
                                   }`}
                                 >
                                   <div>{day}</div>
@@ -830,7 +830,7 @@ function LaboursComponent() {
                         <td className="p-3 font-bold text-blue-600">
                           {rec.projectId ? `${rec.projectId} (${rec.projectName || "Site"})` : "General Site Duty"}
                         </td>
-                        <td className="p-3 font-bold text-purple-700">₹{wage}/wk</td>
+                        <td className="p-3 font-bold text-emerald-700">₹{wage}/wk</td>
                         <td className="p-3 font-mono text-blue-600 font-semibold">{rec.inTime || "—"}</td>
                         <td className="p-3 font-mono text-muted-foreground">{rec.outTime || "—"}</td>
                         <td className="p-3 font-bold text-foreground">
@@ -842,8 +842,8 @@ function LaboursComponent() {
                               rec.status === "Present"
                                 ? "bg-emerald-100 text-emerald-800 border-emerald-300"
                                 : rec.status === "Absent"
-                                ? "bg-rose-100 text-rose-800 border-rose-300"
-                                : "bg-amber-100 text-amber-800 border-amber-300"
+                                ? "bg-slate-200 text-slate-800 border-slate-300"
+                                : "bg-blue-100 text-blue-800 border-blue-300"
                             }`}
                           >
                             {rec.status}
@@ -884,7 +884,7 @@ function LaboursComponent() {
                 size="sm"
                 variant={labourTypeFilter === "CONTRACT" ? "default" : "ghost"}
                 onClick={() => setLabourTypeFilter("CONTRACT")}
-                className={`h-7 text-xs rounded-lg gap-1 ${labourTypeFilter === "CONTRACT" ? "bg-purple-600 hover:bg-purple-700 text-white font-bold" : ""}`}
+                className={`h-7 text-xs rounded-lg gap-1 ${labourTypeFilter === "CONTRACT" ? "bg-slate-800 hover:bg-slate-900 text-white font-bold" : ""}`}
               >
                 Contract ({contractCount})
               </Button>
@@ -920,7 +920,7 @@ function LaboursComponent() {
                       <td className="p-3">
                         <Badge variant="outline" className="text-[10px]">{l.type}</Badge>
                       </td>
-                      <td className="p-3 font-bold text-purple-700">₹{(l.defaultWeeklyWage || 1400).toLocaleString("en-IN")}/wk</td>
+                      <td className="p-3 font-bold text-emerald-700">₹{(l.defaultWeeklyWage || 1400).toLocaleString("en-IN")}/wk</td>
                       <td className="p-3">
                         <Badge className="bg-emerald-100 text-emerald-800 text-[10px]">{l.status}</Badge>
                       </td>
@@ -981,9 +981,9 @@ function LaboursComponent() {
             </div>
 
             {/* SECTION 2: EMPLOYMENT TYPE & WAGES */}
-            <div className="p-4 rounded-xl border border-purple-100 dark:border-purple-900/40 bg-purple-50/40 dark:bg-purple-950/20 space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
-                <DollarSign className="h-4 w-4 text-purple-600" /> Section 2: Employment Type & Wage Setup
+            <div className="p-4 rounded-xl border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-950/20 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                <DollarSign className="h-4 w-4 text-emerald-600" /> Section 2: Employment Type & Wage Setup
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

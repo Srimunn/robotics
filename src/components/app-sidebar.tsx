@@ -80,15 +80,15 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       asChild
                       isActive={isActive}
-                      className={`h-10 rounded-xl font-medium transition-all ${
+                      className={`h-10 rounded-xl font-medium transition-all duration-150 ${
                         isActive
-                          ? "bg-blue-50 text-blue-700 font-bold border-l-4 border-blue-600 dark:bg-blue-950/60 dark:text-blue-300 shadow-2xs"
-                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
+                          ? "bg-blue-100/80 text-blue-950 font-extrabold border-l-4 border-blue-600 dark:bg-blue-900/50 dark:text-blue-100 shadow-xs"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/90 active:bg-blue-100 active:text-blue-950"
                       }`}
                     >
                       <Link to={item.url} className="flex items-center gap-3 px-3">
-                        <item.icon className={`h-4.5 w-4.5 shrink-0 ${isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400 group-hover:text-slate-700"}`} />
-                        <span className="text-[14px] font-semibold">{item.title}</span>
+                        <item.icon className={`h-4.5 w-4.5 shrink-0 ${isActive ? "text-blue-700 dark:text-blue-300" : "text-slate-400 group-hover:text-slate-700"}`} />
+                        <span className="text-[14px] font-bold">{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

@@ -437,14 +437,14 @@ function DashboardComponent() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm transition-all">
+        <Card className="rounded-xl border border-slate-300/80 bg-slate-100/50 dark:bg-slate-900/40 shadow-xs hover:shadow-sm transition-all">
           <CardContent className="p-3.5">
-            <div className="flex items-center justify-between text-muted-foreground mb-1">
+            <div className="flex items-center justify-between text-slate-800 dark:text-slate-200 mb-1">
               <span className="text-[10px] font-bold uppercase tracking-wider">Today's Visits</span>
-              <UserCheck className="h-4 w-4 text-purple-500" />
+              <UserCheck className="h-4 w-4 text-slate-900 dark:text-slate-100" />
             </div>
-            <div className="text-xl font-bold text-purple-600">{todaysSiteVisits.length}</div>
-            <p className="text-[10px] text-purple-600/80">Engineers assigned</p>
+            <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{todaysSiteVisits.length}</div>
+            <p className="text-[10px] text-slate-700 dark:text-slate-300 font-medium">Engineers assigned</p>
           </CardContent>
         </Card>
 
@@ -492,14 +492,14 @@ function DashboardComponent() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm transition-all">
+        <Card className="rounded-xl border border-slate-300/80 bg-slate-100/50 dark:bg-slate-900/40 shadow-xs hover:shadow-sm transition-all">
           <CardContent className="p-3.5">
-            <div className="flex items-center justify-between text-muted-foreground mb-1">
+            <div className="flex items-center justify-between text-slate-800 dark:text-slate-200 mb-1">
               <span className="text-[10px] font-bold uppercase tracking-wider">Contract Staff</span>
-              <HardHat className="h-4 w-4 text-purple-600" />
+              <HardHat className="h-4 w-4 text-slate-900 dark:text-slate-100" />
             </div>
-            <div className="text-xl font-bold text-purple-600">{contractLabourWorkingCount} / {labours.filter(l=>l.type==="Contract").length}</div>
-            <p className="text-[10px] text-muted-foreground">Present today</p>
+            <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{contractLabourWorkingCount} / {labours.filter(l=>l.type==="Contract").length}</div>
+            <p className="text-[10px] text-slate-700 dark:text-slate-300 font-medium">Present today</p>
           </CardContent>
         </Card>
       </div>
@@ -594,32 +594,32 @@ function DashboardComponent() {
             <div className="flex items-center justify-between bg-white dark:bg-card p-4 rounded-xl border border-border shadow-xs">
               <div>
                 <h2 className="text-base font-extrabold tracking-tight text-foreground flex items-center gap-2">
-                  <Wallet className="h-5 w-5 text-emerald-600" /> CEO Financial Cockpit & Accounts Receivable
+                  <Wallet className="h-5 w-5 text-blue-600" /> CEO Financial Cockpit & Accounts Receivable
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Real-time executive financial metrics, milestone collection tracking & customer credit risk distribution.
                 </p>
               </div>
-              <Link to="/payments" className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1">
+              <Link to="/payments" className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1">
                 Open Full Accounts Receivable →
               </Link>
             </div>
 
             {/* 6 Executive KPI Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              <Card className="rounded-xl border border-emerald-200/80 bg-emerald-50/30 dark:bg-emerald-950/20 shadow-xs">
+              <Card className="rounded-xl border border-blue-200/80 bg-blue-50/30 dark:bg-blue-950/20 shadow-xs">
                 <CardContent className="p-3.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Today's Collection</p>
-                  <h3 className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">₹{todaysCollectionVal.toLocaleString("en-IN")}</h3>
-                  <p className="text-[10px] text-emerald-600/80 mt-0.5">Receipts today</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400">Today's Collection</p>
+                  <h3 className="text-lg font-extrabold text-blue-600 dark:text-blue-400 mt-1">₹{todaysCollectionVal.toLocaleString("en-IN")}</h3>
+                  <p className="text-[10px] text-blue-600/80 mt-0.5">Receipts today</p>
                 </CardContent>
               </Card>
 
-              <Card className="rounded-xl border border-rose-200/80 bg-rose-50/30 dark:bg-rose-950/20 shadow-xs">
+              <Card className="rounded-xl border border-slate-300/80 bg-slate-100/50 dark:bg-slate-900/40 shadow-xs">
                 <CardContent className="p-3.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">Outstanding Amount</p>
-                  <h3 className="text-lg font-extrabold text-rose-600 dark:text-rose-400 mt-1">₹{outstandingVal.toLocaleString("en-IN")}</h3>
-                  <p className="text-[10px] text-rose-600/80 mt-0.5">Total uncollected balance</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">Outstanding Amount</p>
+                  <h3 className="text-lg font-extrabold text-slate-900 dark:text-slate-100 mt-1">₹{outstandingVal.toLocaleString("en-IN")}</h3>
+                  <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5">Total uncollected balance</p>
                 </CardContent>
               </Card>
 
@@ -662,7 +662,7 @@ function DashboardComponent() {
               <Card className="rounded-xl border border-border bg-white dark:bg-card shadow-xs">
                 <CardHeader className="p-3.5 border-b">
                   <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                    <TrendingUp className="h-3.5 w-3.5 text-emerald-600" /> Monthly Collections Trend
+                    <TrendingUp className="h-3.5 w-3.5 text-blue-600" /> Monthly Collections Trend
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-3 h-52">
@@ -672,7 +672,7 @@ function DashboardComponent() {
                       <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                       <YAxis tick={{ fontSize: 10 }} tickFormatter={(val) => `₹${(val / 1000).toFixed(0)}k`} />
                       <Tooltip formatter={(val: any) => [`₹${Number(val).toLocaleString("en-IN")}`, "Collections"]} />
-                      <Bar dataKey="amount" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="amount" fill="#2563eb" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -682,7 +682,7 @@ function DashboardComponent() {
               <Card className="rounded-xl border border-border bg-white dark:bg-card shadow-xs">
                 <CardHeader className="p-3.5 border-b">
                   <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                    <ShieldAlert className="h-3.5 w-3.5 text-rose-600" /> Outstanding Credit by Customer
+                    <ShieldAlert className="h-3.5 w-3.5 text-blue-600" /> Outstanding Credit by Customer
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-3 h-52">
@@ -697,7 +697,7 @@ function DashboardComponent() {
                         <XAxis type="number" tick={{ fontSize: 9 }} tickFormatter={(val) => `₹${(val / 1000).toFixed(0)}k`} />
                         <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={90} />
                         <Tooltip formatter={(val: any) => [`₹${Number(val).toLocaleString("en-IN")}`, "Outstanding"]} />
-                        <Bar dataKey="amount" fill="#f43f5e" radius={[0, 4, 4, 0]} />
+                        <Bar dataKey="amount" fill="#0f172a" radius={[0, 4, 4, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   )}
@@ -800,14 +800,14 @@ function DashboardComponent() {
           </Card>
 
           {/* Card 4: Machines Under Repair */}
-          <Card className="rounded-xl border border-blue-200/80 bg-blue-50/30 dark:bg-blue-950/20 shadow-xs">
+          <Card className="rounded-xl border border-slate-300/80 bg-slate-100/50 dark:bg-slate-900/40 shadow-xs">
             <CardContent className="p-3">
-              <div className="flex items-center justify-between text-blue-700 mb-1">
+              <div className="flex items-center justify-between text-slate-800 dark:text-slate-200 mb-1">
                 <span className="text-[10px] font-bold uppercase">Under Repair</span>
-                <AlertTriangle className="h-3.5 w-3.5 text-blue-600" />
+                <AlertTriangle className="h-3.5 w-3.5 text-slate-800 dark:text-slate-200" />
               </div>
-              <div className="text-lg font-extrabold text-blue-700">{kpiMachinesUnderRepair}</div>
-              <p className="text-[9px] text-blue-600 font-medium">Workshop repair</p>
+              <div className="text-lg font-extrabold text-slate-900 dark:text-slate-100">{kpiMachinesUnderRepair}</div>
+              <p className="text-[9px] text-slate-600 dark:text-slate-400 font-medium">Workshop repair</p>
             </CardContent>
           </Card>
 

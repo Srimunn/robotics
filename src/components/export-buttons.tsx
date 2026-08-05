@@ -32,7 +32,7 @@ export function ExportButtons({ rows, filename }: { rows: Row[]; filename: strin
     if (rows.length === 0) return toast.error("Nothing to export");
     const headers = Object.keys(rows[0]);
     const html = `<!doctype html><html><head><title>${filename}</title>
-      <style>body{font-family:system-ui;padding:24px}table{width:100%;border-collapse:collapse}
+      <style>@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');body{font-family:'Plus Jakarta Sans', system-ui, sans-serif;padding:24px}table{width:100%;border-collapse:collapse}
       th,td{border:1px solid #ddd;padding:8px;font-size:12px;text-align:left}
       th{background:#f5f5f5}</style></head><body>
       <h2>${filename}</h2>

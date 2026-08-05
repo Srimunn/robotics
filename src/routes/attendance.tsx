@@ -299,11 +299,11 @@ function AttendancePageComponent() {
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-medium text-purple-600 dark:text-purple-400 uppercase tracking-wider">Overtime Hours</p>
-              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-purple-600 dark:text-purple-400">{totalOvertimeHours} hrs</h3>
+              <p className="text-[11px] font-medium text-slate-900 dark:text-slate-100 uppercase tracking-wider">Overtime Hours</p>
+              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-slate-900 dark:text-slate-100">{totalOvertimeHours} hrs</h3>
               <p className="text-[10px] text-muted-foreground mt-0.5">Logged extra shifts</p>
             </div>
-            <div className="h-9 w-9 rounded-lg bg-purple-50 dark:bg-purple-950/40 grid place-items-center text-purple-600">
+            <div className="h-9 w-9 rounded-lg bg-slate-100 dark:bg-slate-800 grid place-items-center text-slate-900 dark:text-slate-100">
               <Clock className="h-5 w-5" />
             </div>
           </CardContent>

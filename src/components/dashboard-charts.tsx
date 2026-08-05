@@ -94,8 +94,8 @@ export function DashboardCharts() {
               <YAxis fontSize={12} />
               <Tooltip />
               <Legend />
-              <Bar dataKey="Value" fill="#6366f1" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="Payment" fill="#10b981" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="Value" fill="#2563eb" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="Payment" fill="#0f172a" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -112,9 +112,9 @@ export function DashboardCharts() {
               <Line
                 type="monotone"
                 dataKey="income"
-                stroke="#6366f1"
+                stroke="#2563eb"
                 strokeWidth={3}
-                dot={{ r: 4, fill: "#6366f1" }}
+                dot={{ r: 4, fill: "#2563eb" }}
                 activeDot={{ r: 6 }}
               />
             </LineChart>

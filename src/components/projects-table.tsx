@@ -148,7 +148,7 @@ export function ProjectsTable({
 
   const printInvoice = (p: Project) => {
     const html = `<!doctype html><html><head><title>Invoice - ${p.clientName}</title>
-    <style>body{font-family:system-ui;padding:40px;color:#111}
+    <style>@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');body{font-family:'Plus Jakarta Sans', system-ui, sans-serif;padding:40px;color:#111}
     h1{margin:0 0 4px}.muted{color:#666;font-size:14px}
     table{width:100%;border-collapse:collapse;margin-top:24px}
     th,td{padding:10px;border-bottom:1px solid #eee;text-align:left}

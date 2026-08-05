@@ -310,13 +310,13 @@ function PaymentsComponent() {
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider">Accounts Overdue</p>
-              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-amber-600 dark:text-amber-400">
+              <p className="text-[11px] font-medium text-slate-900 dark:text-slate-100 uppercase tracking-wider">Accounts Overdue</p>
+              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-slate-900 dark:text-slate-100">
                 {totalOverdueCount}
               </h3>
               <p className="text-[10px] text-muted-foreground mt-0.5">Overdue milestone accounts</p>
             </div>
-            <div className="h-9 w-9 rounded-lg bg-amber-50 dark:bg-amber-950/40 grid place-items-center text-amber-600">
+            <div className="h-9 w-9 rounded-lg bg-slate-100 dark:bg-slate-800 grid place-items-center text-slate-900 dark:text-slate-100">
               <ShieldAlert className="h-5 w-5" />
             </div>
           </CardContent>
@@ -326,11 +326,11 @@ function PaymentsComponent() {
       {/* Navigation Tabs & Interactive Filters */}
       <Card className="rounded-xl border border-border/80 bg-white dark:bg-card shadow-xs">
         <CardContent className="p-4 space-y-3">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-full sm:w-auto">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl shrink-0">
               <button
                 onClick={() => setActiveTab("RECEIVABLES")}
-                className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                   activeTab === "RECEIVABLES"
                     ? "bg-white dark:bg-card text-emerald-600 shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
@@ -340,7 +340,7 @@ function PaymentsComponent() {
               </button>
               <button
                 onClick={() => setActiveTab("HISTORY")}
-                className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                   activeTab === "HISTORY"
                     ? "bg-white dark:bg-card text-emerald-600 shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
@@ -350,7 +350,7 @@ function PaymentsComponent() {
               </button>
               <button
                 onClick={() => setActiveTab("CUSTOMER")}
-                className={`flex-1 sm:flex-none px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                   activeTab === "CUSTOMER"
                     ? "bg-white dark:bg-card text-emerald-600 shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
@@ -360,8 +360,8 @@ function PaymentsComponent() {
               </button>
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-              <div className="relative w-full sm:w-64">
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full lg:w-auto justify-start sm:justify-end">
+              <div className="relative w-full sm:w-64 min-w-[200px]">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search Customer, Project, Ref #..."
@@ -373,7 +373,7 @@ function PaymentsComponent() {
 
               {/* Customer Filter */}
               <Select value={selectedCustomerFilter} onValueChange={setSelectedCustomerFilter}>
-                <SelectTrigger className="h-9 text-xs w-[160px] rounded-lg">
+                <SelectTrigger className="h-9 text-xs w-[160px] rounded-lg shrink-0">
                   <SelectValue placeholder="Customer: All" />
                 </SelectTrigger>
                 <SelectContent>
@@ -388,8 +388,8 @@ function PaymentsComponent() {
 
           {/* Quick Filter Badges for Accounts Receivable */}
           {activeTab === "RECEIVABLES" && (
-            <div className="flex items-center gap-1.5 overflow-x-auto pt-1 border-t text-xs">
-              <span className="text-muted-foreground font-semibold text-[11px] whitespace-nowrap">Filter Accounts:</span>
+            <div className="flex items-center gap-1.5 overflow-x-auto pt-2 border-t text-xs scrollbar-none">
+              <span className="text-muted-foreground font-semibold text-[11px] whitespace-nowrap mr-1">Filter Accounts:</span>
               {[
                 { id: "ALL", label: "All Projects" },
                 { id: "DUE_TODAY", label: "Due Today" },
@@ -403,7 +403,7 @@ function PaymentsComponent() {
                   variant={creditFilter === f.id ? "default" : "outline"}
                   size="sm"
                   onClick={() => setCreditFilter(f.id)}
-                  className={`h-7 text-[11px] rounded-md ${
+                  className={`h-7 text-[11px] rounded-md whitespace-nowrap shrink-0 ${
                     creditFilter === f.id
                       ? f.id === "OVERDUE"
                         ? "bg-rose-600 hover:bg-rose-700"
@@ -428,15 +428,15 @@ function PaymentsComponent() {
             <Table>
               <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-xs font-bold text-muted-foreground">Customer</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground">Project</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground text-right">Contract Value</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground text-right">Collected (₹)</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground text-right">Outstanding (₹)</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground">Next Due Date</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground text-center">Days Overdue</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground text-center">Payment Status</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground text-right pr-4">Action</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground whitespace-nowrap min-w-[150px]">CUSTOMER</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground whitespace-nowrap min-w-[180px]">PROJECT</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground text-right whitespace-nowrap">CONTRACT VALUE</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground text-right whitespace-nowrap">COLLECTED (₹)</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground text-right whitespace-nowrap">OUTSTANDING (₹)</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground whitespace-nowrap min-w-[130px]">NEXT DUE DATE</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground text-center whitespace-nowrap">DAYS OVERDUE</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground text-center whitespace-nowrap">PAYMENT STATUS</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground text-right pr-4 whitespace-nowrap">ACTION</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -468,56 +468,60 @@ function PaymentsComponent() {
 
                     return (
                       <TableRow key={proj.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/30 transition-colors">
-                        <TableCell>
+                        <TableCell className="whitespace-nowrap">
                           <div className="font-bold text-xs text-foreground flex items-center gap-1">
-                            <User className="h-3 w-3 text-muted-foreground" /> {proj.customerName}
+                            <User className="h-3 w-3 text-muted-foreground shrink-0" /> {proj.customerName}
                           </div>
-                          <div className="text-[11px] text-muted-foreground">📞 {proj.phone} • 📍 {proj.location}</div>
+                          <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                            <span>📞 {proj.phone}</span>
+                            <span>•</span>
+                            <span>📍 {proj.location}</span>
+                          </div>
                         </TableCell>
 
-                        <TableCell>
-                          <div className="font-mono text-xs font-bold text-purple-600 dark:text-purple-400">
+                        <TableCell className="min-w-[180px] max-w-[240px]">
+                          <div className="font-mono text-xs font-bold text-purple-600 dark:text-purple-400 whitespace-nowrap">
                             {proj.id}
                           </div>
-                          <div className="text-[11px] text-muted-foreground max-w-[180px] truncate">{proj.natureOfWork}</div>
+                          <div className="text-[11px] text-muted-foreground truncate" title={proj.natureOfWork}>{proj.natureOfWork}</div>
                         </TableCell>
 
-                        <TableCell className="text-right font-mono text-xs font-semibold text-foreground">
+                        <TableCell className="text-right font-mono text-xs font-semibold text-foreground whitespace-nowrap">
                           ₹{proj.projectValue.toLocaleString("en-IN")}
                         </TableCell>
 
-                        <TableCell className="text-right font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                        <TableCell className="text-right font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                           ₹{proj.receivedAmount.toLocaleString("en-IN")}
                         </TableCell>
 
-                        <TableCell className="text-right font-mono text-xs font-bold text-rose-600 dark:text-rose-400">
+                        <TableCell className="text-right font-mono text-xs font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap">
                           ₹{proj.balanceAmount.toLocaleString("en-IN")}
                         </TableCell>
 
-                        <TableCell className="text-xs font-semibold text-purple-700 dark:text-purple-400">
-                          <div>📅 {nextDue.dueDate}</div>
-                          <div className="text-[10px] text-muted-foreground">{nextDue.stageName}</div>
+                        <TableCell className="text-xs font-semibold text-purple-700 dark:text-purple-400 whitespace-nowrap">
+                          <div className="whitespace-nowrap flex items-center gap-1">📅 {nextDue.dueDate}</div>
+                          <div className="text-[10px] text-muted-foreground truncate max-w-[130px]">{nextDue.stageName}</div>
                         </TableCell>
 
-                        <TableCell className="text-center">
+                        <TableCell className="text-center whitespace-nowrap">
                           {daysOver > 0 ? (
-                            <Badge className="bg-rose-100 text-rose-800 border-rose-200 text-[10px] animate-pulse">
+                            <Badge className="bg-rose-100 text-rose-800 border-rose-200 text-[10px] animate-pulse whitespace-nowrap">
                               {daysOver} days overdue
                             </Badge>
                           ) : proj.balanceAmount <= 0 ? (
-                            <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground whitespace-nowrap">
                               Settled
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="text-[10px] bg-slate-50 text-slate-700">
+                            <Badge variant="outline" className="text-[10px] bg-slate-50 text-slate-700 whitespace-nowrap">
                               On Schedule
                             </Badge>
                           )}
                         </TableCell>
 
-                        <TableCell className="text-center">
+                        <TableCell className="text-center whitespace-nowrap">
                           <Badge
-                            className={`text-[10px] font-bold ${
+                            className={`text-[10px] font-bold whitespace-nowrap ${
                               proj.paymentStatus === "Paid"
                                 ? "bg-emerald-100 text-emerald-800 border-emerald-200"
                                 : proj.paymentStatus === "Partial"
@@ -531,12 +535,12 @@ function PaymentsComponent() {
                           </Badge>
                         </TableCell>
 
-                        <TableCell className="text-right pr-4">
+                        <TableCell className="text-right pr-4 whitespace-nowrap">
                           {proj.balanceAmount > 0 && (
                             <Button
                               size="sm"
                               onClick={() => handleOpenReceivePayment(proj.id, proj.balanceAmount)}
-                              className="h-7 text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg gap-1 shadow-xs"
+                              className="h-7 text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg gap-1 shadow-xs whitespace-nowrap"
                             >
                               <Plus className="h-3 w-3" /> Receive
                             </Button>

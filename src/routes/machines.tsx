@@ -357,11 +357,11 @@ function MachinesPageComponent() {
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider">Under Repair</p>
-              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-amber-600 dark:text-amber-400">{totalRepair}</h3>
+              <p className="text-[11px] font-medium text-slate-900 dark:text-slate-100 uppercase tracking-wider">Under Repair</p>
+              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-slate-900 dark:text-slate-100">{totalRepair}</h3>
               <p className="text-[10px] text-muted-foreground mt-0.5">In maintenance workshop</p>
             </div>
-            <div className="h-9 w-9 rounded-lg bg-amber-50 dark:bg-amber-950/40 grid place-items-center text-amber-600">
+            <div className="h-9 w-9 rounded-lg bg-slate-100 dark:bg-slate-800 grid place-items-center text-slate-900 dark:text-slate-100">
               <Wrench className="h-5 w-5" />
             </div>
           </CardContent>
