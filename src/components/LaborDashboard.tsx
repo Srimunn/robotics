@@ -349,9 +349,14 @@ export function LaborDashboard() {
     }, 100);
   };
 
-  // Action: Clock In / Start Shift Time (Direct without requiring supervisor permission)
+  // Action: Clock In / Start Shift Time (Requires Photo first)
   const handleClockInSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!capturedPhoto) {
+      toast.error("📷 Please capture or upload a check-in photo before starting your shift!");
+      return;
+    }
+
     const targetProjId = selectedProjectId || (assignedProjects.length > 0 ? assignedProjects[0].id : projects[0]?.id || "");
     if (!targetProjId) {
       toast.error("Please select an assigned project to start shift");
@@ -373,8 +378,6 @@ export function LaborDashboard() {
       placeName: "Plot 42, Industrial Park, HITEC City, Hyderabad"
     };
 
-    const activePhoto = capturedPhoto || "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=400&auto=format&fit=crop&q=80";
-
     updateProjectLabourLog(targetProjId, {
       labourId: laborId,
       labourName: laborName,
@@ -386,7 +389,7 @@ export function LaborDashboard() {
       attendance: "Present",
       hoursWorked: 0,
       workDescription: "Checked-in on site & active shift started",
-      inPhotoUrl: activePhoto,
+      inPhotoUrl: capturedPhoto,
       inLocation: activeGps,
       verificationStatus: "Verified",
       isGpsWarning: false
@@ -766,20 +769,26 @@ export function LaborDashboard() {
               {/* Submit Buttons */}
               <Button
                 type="submit"
-                disabled={gpsLoading}
-                className={`w-full h-11 rounded-2xl text-xs font-bold gap-1.5 shadow-md cursor-pointer transition-transform active:scale-98 ${
+                disabled={gpsLoading || (!isClockedIn && !capturedPhoto)}
+                className={`w-full h-11 rounded-2xl text-xs font-extrabold gap-1.5 shadow-md transition-all duration-200 ${
                   isClockedIn 
-                    ? "bg-rose-600 hover:bg-rose-700 shadow-rose-500/10 text-white" 
-                    : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/10 text-white"
+                    ? "bg-rose-600 hover:bg-rose-700 shadow-rose-500/10 text-white cursor-pointer" 
+                    : capturedPhoto
+                    ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20 text-white cursor-pointer"
+                    : "bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed"
                 }`}
               >
                 {isClockedIn ? (
                   <>
                     <HardHat className="h-4.5 w-4.5" /> End Shift & Clock Out
                   </>
-                ) : (
+                ) : capturedPhoto ? (
                   <>
                     <HardHat className="h-4.5 w-4.5" /> Start Shift & Clock In
+                  </>
+                ) : (
+                  <>
+                    <Camera className="h-4.5 w-4.5 text-slate-400" /> Capture / Upload Photo First to Start Shift
                   </>
                 )}
               </Button>
