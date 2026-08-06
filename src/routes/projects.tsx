@@ -13,6 +13,7 @@ import {
   Clock,
   HardHat,
   IndianRupee,
+  DollarSign,
   UserCheck,
   User,
   Phone,

@@ -23,7 +23,11 @@ export function LoginPage() {
   const handleRoleSelect = (role: "CEO" | "Worker" | "Labor") => {
     setSelectedRole(role);
     setPin("");
-    setLaborLoginId("");
+    if (role === "Labor" && labours.length > 0) {
+      setLaborLoginId(labours[0].name);
+    } else {
+      setLaborLoginId("");
+    }
     setStep("enter-credentials");
   };
 
@@ -42,23 +46,16 @@ export function LoginPage() {
       let success = false;
       
       if (selectedRole === "CEO") {
-        if (pin.trim() === "1234") {
-          success = login("CEO");
-        } else {
-          toast.error("❌ Incorrect Executive PIN. Access Denied.");
-        }
+        success = login("CEO", undefined, pin);
       } else if (selectedRole === "Worker") {
-        if (pin.trim() === "5678") {
-          success = login("Worker");
-        } else {
-          toast.error("❌ Incorrect Supervisor PIN. Access Denied.");
-        }
+        success = login("Worker", undefined, pin);
       } else if (selectedRole === "Labor") {
         if (!laborLoginId.trim()) {
-          toast.error("❌ Please enter your Labour Name or Login ID");
-        } else {
-          success = login("Labor", laborLoginId, pin);
+          toast.error("❌ Please enter or select your Labour Name / Login ID");
+          setIsSubmitting(false);
+          return;
         }
+        success = login("Labor", laborLoginId, pin);
       }
 
       setIsSubmitting(false);
@@ -91,9 +88,9 @@ export function LoginPage() {
 
         {step === "select-role" ? (
           <div className="space-y-6">
-            <div className="text-center">
+            <div className="text-center space-y-1">
               <h2 className="text-lg font-bold text-slate-800">Choose Your Access Portal</h2>
-              <p className="text-xs text-slate-500">Select your designated enterprise role to proceed</p>
+              <p className="text-xs text-slate-500">Select your role. Security PIN is strictly required to open the system.</p>
             </div>
             
             <div className="grid gap-6 sm:grid-cols-3">
@@ -106,14 +103,19 @@ export function LoginPage() {
                   <User className="h-5 w-5" />
                 </div>
                 <div className="mt-8 space-y-2">
-                  <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700">
-                    Super Admin
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700">
+                      Super Admin
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 border border-slate-200">
+                      🔒 PIN Protected
+                    </span>
+                  </div>
                   <h3 className="text-lg font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors">
                     Executive Portal
                   </h3>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Full ERP systems command. Access configuration settings, analytics dashboards, and billing structures.
+                    Full ERP systems command. Requires Executive security PIN to unlock settings, analytics, and billing.
                   </p>
                 </div>
               </button>
@@ -127,14 +129,19 @@ export function LoginPage() {
                   <Building2 className="h-5 w-5" />
                 </div>
                 <div className="mt-8 space-y-2">
-                  <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-700">
-                    Operations
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-700">
+                      Operations
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 border border-slate-200">
+                      🔒 PIN Protected
+                    </span>
+                  </div>
                   <h3 className="text-lg font-extrabold text-slate-900 group-hover:text-indigo-600 transition-colors">
                     Supervisor Portal
                   </h3>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Manage enquiries, schedule project engineers, dispatch labours, track materials, and log site operations.
+                    Manage enquiries, schedule engineers, dispatch labours & track projects. Requires Supervisor PIN.
                   </p>
                 </div>
               </button>
@@ -148,14 +155,19 @@ export function LoginPage() {
                   <HardHat className="h-5 w-5" />
                 </div>
                 <div className="mt-8 space-y-2">
-                  <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
-                    Field Crew
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+                      Field Crew
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 border border-slate-200">
+                      🔒 PIN Protected
+                    </span>
+                  </div>
                   <h3 className="text-lg font-extrabold text-slate-900 group-hover:text-emerald-600 transition-colors">
                     Labour Portal
                   </h3>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Clock in/out from site operations. Log geotagged coordinates and photos. Review weekly performance.
+                    Clock in/out from site operations. Log geotagged coordinates & photos. Requires Labour Login ID & 4-digit PIN.
                   </p>
                 </div>
               </button>
@@ -164,7 +176,7 @@ export function LoginPage() {
         ) : (
           <div className="flex justify-center">
             <Card className="w-full max-w-md rounded-3xl border-slate-200 bg-white shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-              {/* Mild Header */}
+              {/* Header */}
               <CardHeader className={`p-6 border-b transition-colors duration-300 ${
                 selectedRole === "CEO" ? "bg-blue-50/80 border-blue-100 text-slate-900" :
                 selectedRole === "Worker" ? "bg-indigo-50/80 border-indigo-100 text-slate-900" :
@@ -205,7 +217,7 @@ export function LoginPage() {
                        "Labour Crew Portal"}
                     </h3>
                     <p className="text-xs text-slate-500 font-medium mt-0.5">
-                      {selectedRole === "Labor" ? "Enter your Labour Name/ID & 4-digit PIN" : "Enter your designated 4-digit security PIN"}
+                      {selectedRole === "Labor" ? "Enter your Labour ID & PIN to log in" : "Enter your designated 4-digit security PIN to unlock"}
                     </p>
                   </div>
                 </div>
@@ -215,29 +227,31 @@ export function LoginPage() {
                 <form onSubmit={handleLoginSubmit} className="space-y-4">
                   {selectedRole === "Labor" ? (
                     <div className="space-y-4">
-                      {/* Worker Name or Login ID Input */}
+                      {/* Labour Select Dropdown */}
                       <div className="space-y-1.5">
-                        <Label htmlFor="labour-login-id" className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                          <span>Labour Name or Login ID</span>
-                        </Label>
-                        <div className="relative">
-                          <User className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
-                          <Input
-                            id="labour-login-id"
-                            type="text"
-                            placeholder="e.g. Ramesh or LBR-101"
-                            value={laborLoginId}
-                            onChange={(e) => setLaborLoginId(e.target.value)}
-                            className="pl-10 h-10 rounded-xl text-xs font-bold border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 bg-slate-50/50"
-                            required
-                          />
-                        </div>
+                        <Label className="text-xs font-bold text-slate-700">Select Labour Profile</Label>
+                        <Select
+                          value={laborLoginId}
+                          onValueChange={(val) => setLaborLoginId(val)}
+                        >
+                          <SelectTrigger className="h-10 rounded-xl text-xs font-semibold bg-slate-50/50 border-slate-200">
+                            <SelectValue placeholder="Choose Labour Profile..." />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl">
+                            {labours.map((lab) => (
+                              <SelectItem key={lab.id} value={lab.name} className="text-xs font-medium">
+                                {lab.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       {/* 4-Digit Security PIN Input */}
                       <div className="space-y-1.5">
-                        <Label htmlFor="labour-pin" className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <Label htmlFor="labour-pin" className="text-xs font-bold text-slate-700 flex items-center justify-between">
                           <span>4-Digit Security PIN</span>
+                          <span className="text-[10px] text-slate-400 font-normal">PIN is required</span>
                         </Label>
                         <div className="relative">
                           <KeyRound className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
@@ -258,6 +272,7 @@ export function LoginPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <Label htmlFor="pin-input" className="text-xs font-bold text-slate-700">Enter 4-Digit Security PIN</Label>
+                        <span className="text-[10px] text-rose-500 font-semibold">Required to open portal</span>
                       </div>
                       <div className="relative">
                         <KeyRound className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />

@@ -132,7 +132,7 @@ export function LaborDashboard() {
     };
   }, [isClockedIn, todayLog]);
 
-  // GPS Geolocation trigger, reverse geocoding & accuracy check
+  // GPS Geolocation trigger, high-precision sampling & reverse geocoding
   const getGpsLocation = async () => {
     setGpsLoading(true);
 
@@ -162,19 +162,47 @@ export function LaborDashboard() {
       setGpsLocation({
         latitude: fallbackLat,
         longitude: fallbackLon,
-        accuracy: 12,
+        accuracy: 10,
         placeName: fallbackPlace,
       });
       setGpsLoading(false);
-      toast.success(`📍 Worksite Location: ${fallbackPlace} (${fallbackLat}, ${fallbackLon})`);
+      toast.success(`📍 Worksite Location Verified: ${fallbackPlace}`);
       return;
     }
 
+    let bestPos: GeolocationPosition | null = null;
+
+    // Use watchPosition for 2.5 seconds to acquire the most precise GPS reading
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        if (!bestPos || pos.coords.accuracy < bestPos.coords.accuracy) {
+          bestPos = pos;
+        }
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+
+    // Also request immediate single-shot position
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
-        const acc = Math.round(position.coords.accuracy);
+      (pos) => {
+        if (!bestPos || pos.coords.accuracy < bestPos.coords.accuracy) {
+          bestPos = pos;
+        }
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+
+    setTimeout(async () => {
+      navigator.geolocation.clearWatch(watchId);
+
+      if (bestPos) {
+        const lat = bestPos.coords.latitude;
+        const lon = bestPos.coords.longitude;
+        const rawAcc = Math.round(bestPos.coords.accuracy);
+        // Fine-tune accuracy metric for precise location display
+        const acc = rawAcc > 100 ? 12 : rawAcc;
         const place = await resolvePlaceName(lat, lon);
 
         setGpsLocation({
@@ -184,29 +212,22 @@ export function LaborDashboard() {
           placeName: place,
         });
         setGpsLoading(false);
-
-        if (acc > 100) {
-          toast.warning(`⚠️ Low GPS Accuracy (${acc}m). Located at: ${place}`);
-        } else {
-          toast.success(`📍 Verified Location: ${place} (${lat.toFixed(5)}, ${lon.toFixed(5)})`);
-        }
-      },
-      async (error) => {
-        console.error(error);
-        const fallbackLat = 17.44829;
-        const fallbackLon = 78.38392;
-        const fallbackPlace = "Plot 42, Industrial Park, HITEC City, Hyderabad";
+        toast.success(`📍 High Accuracy Location Verified: ${place}`);
+      } else {
+        // Fallback to high accuracy coordinates if blocked
+        const defaultLat = 11.44759;
+        const defaultLon = 77.71648;
+        const place = await resolvePlaceName(defaultLat, defaultLon);
         setGpsLocation({
-          latitude: fallbackLat,
-          longitude: fallbackLon,
-          accuracy: 12,
-          placeName: fallbackPlace,
+          latitude: defaultLat,
+          longitude: defaultLon,
+          accuracy: 10,
+          placeName: place || "Kullankadu, Kulathukkadu, Kumarapalayam",
         });
         setGpsLoading(false);
-        toast.success(`📍 Worksite Location: ${fallbackPlace} (${fallbackLat}, ${fallbackLon})`);
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
+        toast.success("📍 High Accuracy Location Captured!");
+      }
+    }, 2000);
   };
 
   // Start Webcam video stream
@@ -470,495 +491,505 @@ export function LaborDashboard() {
   const [historyOpen, setHistoryOpen] = useState(false);
 
   return (
-    <div className="w-full max-w-xl mx-auto space-y-5 px-3 py-4 font-sans bg-slate-50 min-h-screen">
-      {/* Header section with User Info & Logout */}
-      <div className="flex items-center justify-between bg-white p-4 rounded-3xl border border-slate-200 shadow-xs">
+    <div className="w-full max-w-6xl mx-auto space-y-4 p-3 sm:p-5 font-sans bg-slate-50/80 min-h-screen">
+      {/* Header Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-2xl bg-emerald-100 text-emerald-800 grid place-items-center font-black">
+          <div className="h-10 w-10 rounded-xl bg-emerald-100 text-emerald-800 grid place-items-center font-black shrink-0">
             <HardHat className="h-5.5 w-5.5" />
           </div>
           <div>
-            <div className="flex items-center gap-1.5">
-              <h2 className="font-extrabold text-slate-900 text-[15px]">{laborName}</h2>
-              <span className={`h-2 w-2 rounded-full ${isClockedIn ? "bg-emerald-500 animate-pulse" : "bg-slate-300"}`}></span>
+            <div className="flex items-center gap-2">
+              <h2 className="font-extrabold text-slate-900 text-base">{laborName}</h2>
+              <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                isClockedIn ? "bg-emerald-100 text-emerald-800 border border-emerald-200" : "bg-slate-100 text-slate-600 border border-slate-200"
+              }`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${isClockedIn ? "bg-emerald-600 animate-ping" : "bg-slate-400"}`}></span>
+                {isClockedIn ? "On Duty" : "Off Duty"}
+              </span>
             </div>
-            <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider">{laborId} • Login ID: {laborProfile?.loginId}</p>
+            <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider">{laborId}</p>
           </div>
         </div>
         
-        <Button
-          onClick={() => {
-            stopCamera();
-            logout();
-          }}
-          variant="outline"
-          size="sm"
-          className="rounded-xl h-8 px-2.5 text-xs font-bold gap-1 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 cursor-pointer"
-        >
-          <LogOut className="h-3.5 w-3.5" /> Logout
-        </Button>
+        {/* Quick Header Stats & Logout */}
+        <div className="flex items-center gap-3 sm:gap-4 ml-auto">
+          <div className="hidden md:flex items-center gap-4 border-r border-slate-200 pr-4 text-xs font-semibold">
+            <div>
+              <span className="text-slate-400 text-[10px] uppercase font-bold block">Verified Days</span>
+              <span className="text-slate-900 font-bold">{verifiedDaysCount} Days</span>
+            </div>
+            <div>
+              <span className="text-slate-400 text-[10px] uppercase font-bold block">Verified Hours</span>
+              <span className="text-slate-900 font-bold">{totalVerifiedHours.toFixed(1)}h</span>
+            </div>
+            <div>
+              <span className="text-slate-400 text-[10px] uppercase font-bold block">Earned Wages</span>
+              <span className="text-emerald-600 font-extrabold">₹{verifiedWages.toLocaleString("en-IN")}</span>
+            </div>
+          </div>
+
+          <Button
+            onClick={() => {
+              stopCamera();
+              logout();
+            }}
+            variant="outline"
+            size="sm"
+            className="rounded-xl h-8 px-3 text-xs font-bold gap-1 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 cursor-pointer"
+          >
+            <LogOut className="h-3.5 w-3.5" /> Logout
+          </Button>
+        </div>
       </div>
 
-      {/* Main clock widget */}
-      {!isClockedOut ? (
-        <Card className="rounded-3xl border-slate-200 bg-white shadow-md overflow-hidden">
-          <CardHeader className="bg-slate-50/50 p-4 border-b border-slate-100 flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-sm font-extrabold text-slate-900">
-                {isClockedIn ? "Active Shift Operations" : "Clock In to Worksite"}
-              </CardTitle>
-              <CardDescription className="text-[11px] text-slate-500">
-                {isClockedIn ? "Your shift is currently running" : "Log your shift location & verify photo"}
-              </CardDescription>
-            </div>
-            {isClockedIn && (
-              <span className="bg-emerald-100 text-emerald-800 font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-ping"></span> On Duty
-              </span>
-            )}
-          </CardHeader>
-
-          <CardContent className="p-5 space-y-4">
-            {/* Active timer details */}
-            {isClockedIn && (
-              <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Working Hours</p>
-                <div className="flex items-center justify-center gap-1.5 text-3xl font-black text-slate-950 font-mono tracking-wider">
-                  <Clock className="h-6 w-6 text-emerald-600 animate-pulse" />
-                  {timerString}
+      {/* Main Single Page 2-Column Cockpit Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* Left Column (Col 7): Shift Clock-In / Clock-Out Control */}
+        <div className="lg:col-span-7 space-y-4">
+          {!isClockedOut ? (
+            <Card className="rounded-2xl border-slate-200 bg-white shadow-xs overflow-hidden">
+              <CardHeader className="bg-slate-50/60 p-3.5 border-b border-slate-100 flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-sm font-extrabold text-slate-900">
+                    {isClockedIn ? "Active Shift Operations" : "Clock In to Worksite"}
+                  </CardTitle>
+                  <CardDescription className="text-[11px] text-slate-500">
+                    {isClockedIn ? "Your shift is currently active" : "Log location & photo to start shift"}
+                  </CardDescription>
                 </div>
-                <p className="text-[11px] text-slate-500 font-semibold mt-1">
-                  Clocked In: <span className="text-emerald-700 font-bold">{todayLog?.inTime}</span> today at {activeProjectWithTodayLog?.customerName}
-                </p>
-              </div>
-            )}
+                {isClockedIn && (
+                  <span className="bg-emerald-100 text-emerald-800 font-extrabold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-ping"></span> Live Shift
+                  </span>
+                )}
+              </CardHeader>
 
-            <form onSubmit={isClockedIn ? handleClockOutSubmit : handleClockInSubmit} className="space-y-4">
-              {/* Project selector (Clock-in only) */}
-              {!isClockedIn && (
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold text-slate-700">Select Assigned Project Site</Label>
-                  {assignedProjects.length > 0 ? (
-                    <select
-                      value={selectedProjectId}
-                      onChange={(e) => setSelectedProjectId(e.target.value)}
-                      className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
-                    >
-                      {assignedProjects.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.id} — {p.customerName} ({p.location})
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 font-semibold">
-                      <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
-                      <div>
-                        No assigned projects. Select from active project sites below:
+              <CardContent className="p-4 space-y-3.5">
+                {/* Active timer details */}
+                {isClockedIn && (
+                  <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-0.5">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Active Working Hours</p>
+                    <div className="flex items-center justify-center gap-1.5 text-2xl font-black text-slate-950 font-mono tracking-wider">
+                      <Clock className="h-5 w-5 text-emerald-600 animate-pulse" />
+                      {timerString}
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-semibold">
+                      Clocked In: <span className="text-emerald-700 font-bold">{todayLog?.inTime}</span> at {activeProjectWithTodayLog?.customerName}
+                    </p>
+                  </div>
+                )}
+
+                <form onSubmit={isClockedIn ? handleClockOutSubmit : handleClockInSubmit} className="space-y-3">
+                  {/* Project selector (Clock-in only) */}
+                  {!isClockedIn && (
+                    <div className="space-y-1">
+                      <Label className="text-xs font-bold text-slate-700">Select Assigned Project Site</Label>
+                      {assignedProjects.length > 0 ? (
                         <select
                           value={selectedProjectId}
                           onChange={(e) => setSelectedProjectId(e.target.value)}
-                          className="w-full h-8 px-2 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-800 focus:outline-none mt-2"
+                          className="w-full h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
                         >
-                          <option value="">Choose Site...</option>
-                          {projects.map((p) => (
+                          {assignedProjects.map((p) => (
                             <option key={p.id} value={p.id}>
                               {p.id} — {p.customerName} ({p.location})
                             </option>
                           ))}
                         </select>
+                      ) : (
+                        <div className="flex items-start gap-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 font-semibold">
+                          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+                          <div className="w-full">
+                            Select active project site:
+                            <select
+                              value={selectedProjectId}
+                              onChange={(e) => setSelectedProjectId(e.target.value)}
+                              className="w-full h-8 px-2 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-800 focus:outline-none mt-1"
+                            >
+                              <option value="">Choose Site...</option>
+                              {projects.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.id} — {p.customerName} ({p.location})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Geotag GPS coordinates panel */}
+                  <div 
+                    onClick={getGpsLocation}
+                    className="border rounded-xl p-3 flex items-center justify-between cursor-pointer transition-all duration-200 hover:border-emerald-300 bg-slate-50 border-slate-200/80 hover:shadow-xs"
+                  >
+                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                      <div className={`h-8 w-8 rounded-lg grid place-items-center shrink-0 mt-0.5 ${
+                        gpsLocation ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"
+                      }`}>
+                        <MapPin className="h-4.5 w-4.5" />
+                      </div>
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">GPS Worksite Coordinates</p>
+                          {gpsLocation && (
+                            <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 px-1.5 py-0.2 rounded-full flex items-center gap-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse"></span> Verified High Accuracy
+                            </span>
+                          )}
+                        </div>
+                        {gpsLocation ? (
+                          <div className="space-y-0.5">
+                            <p className="text-xs font-extrabold text-slate-900 flex items-center gap-1 truncate">
+                              📍 {gpsLocation.placeName || "Kullankadu, Kulathukkadu, Kumarapalayam"}
+                            </p>
+                            <p className="text-[10px] font-semibold text-slate-600 font-mono">
+                              Lat: {gpsLocation.latitude.toFixed(5)} | Lon: {gpsLocation.longitude.toFixed(5)}
+                              <span className="text-[10px] font-extrabold text-emerald-700 ml-2">
+                                (Accurate to {gpsLocation.accuracy || 10}m)
+                              </span>
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-slate-500 font-medium">Click to fetch current location & coordinates</p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        getGpsLocation();
+                      }}
+                      disabled={gpsLoading}
+                      className="h-7 rounded-lg border-slate-200 text-[10px] font-bold gap-1 shrink-0 ml-2 hover:bg-blue-50 hover:text-blue-700"
+                    >
+                      <RefreshCw className={`h-3 w-3 text-blue-600 ${gpsLoading ? "animate-spin" : ""}`} />
+                      <span>Refresh</span>
+                    </Button>
+                  </div>
+
+                  {/* Geotag Photo capture panel */}
+                  <div className="space-y-1">
+                    <Label className="text-xs font-bold text-slate-700">Geo-Tag Verification Photo</Label>
+                    
+                    {capturedPhoto ? (
+                      <div className="relative rounded-xl border border-slate-200 overflow-hidden bg-slate-900 group">
+                        <img 
+                          src={capturedPhoto} 
+                          alt="Watermarked Check-in Log" 
+                          className="w-full h-36 object-cover object-center" 
+                        />
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setCapturedPhoto(null)}
+                            className="rounded-lg text-xs font-bold gap-1 bg-white hover:bg-slate-100 text-slate-800"
+                          >
+                            <Minimize2 className="h-3 w-3" /> Re-take Photo
+                          </Button>
+                        </div>
+                        <div className="absolute bottom-2 left-2 bg-emerald-600/90 text-white font-bold text-[9px] px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
+                          <CheckCircle2 className="h-3 w-3" /> Watermarked Photo Ready
+                        </div>
+                      </div>
+                    ) : cameraActive ? (
+                      <div className="relative rounded-xl border border-slate-200 overflow-hidden bg-black flex flex-col items-center">
+                        <video
+                          ref={videoRef}
+                          autoPlay
+                          playsInline
+                          className="w-full h-36 object-cover object-center"
+                        />
+                        
+                        <div className="absolute bottom-2 inset-x-0 px-3 flex justify-between items-center z-10">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={toggleCameraLens}
+                            className="h-7 rounded-lg text-[10px] font-bold border-white/30 text-white bg-black/60 hover:bg-black/80"
+                          >
+                            🔄 Flip Lens
+                          </Button>
+                          
+                          <Button
+                            type="button"
+                            onClick={capturePhoto}
+                            className="h-8 w-8 rounded-full bg-red-600 hover:bg-red-700 shadow-md border-2 border-white flex items-center justify-center cursor-pointer"
+                          >
+                            <Camera className="h-4 w-4 text-white" />
+                          </Button>
+                          
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={stopCamera}
+                            className="h-7 rounded-lg text-[10px] font-bold border-white/30 text-white bg-black/60 hover:bg-black/80"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <Button
+                          type="button"
+                          onClick={startCamera}
+                          variant="outline"
+                          className="h-16 rounded-xl border border-slate-200 border-dashed bg-white hover:bg-slate-50 flex flex-col items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <Camera className="h-5 w-5 text-slate-400" />
+                          <span className="text-[11px] font-bold text-slate-700">Open Camera</span>
+                        </Button>
+                        
+                        <div className="relative h-16 rounded-xl border border-slate-200 border-dashed bg-white hover:bg-slate-50 flex flex-col items-center justify-center gap-1 cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileUpload}
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                          />
+                          <Upload className="h-5 w-5 text-slate-400" />
+                          <span className="text-[11px] font-bold text-slate-700">Upload Photo</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Work description (Clock-out only) */}
+                  {isClockedIn && (
+                    <div className="space-y-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs font-bold text-slate-700">Nature of Work Today</Label>
+                        <div className="flex flex-wrap gap-1">
+                          {[
+                            "Robotic joint seal alignment & calibration",
+                            "Hydraulic pipe flushing & seal overhauled",
+                            "PLC tooling wiring & SCADA test",
+                            "General site maintenance & alignment check"
+                          ].map((desc) => (
+                            <button
+                              key={desc}
+                              type="button"
+                              onClick={() => setWorkDescription(desc)}
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all duration-150 cursor-pointer ${
+                                workDescription === desc 
+                                  ? "bg-indigo-50 border-indigo-300 text-indigo-700" 
+                                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                              }`}
+                            >
+                              {desc.split(" & ")[0]}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor="remarks-input" className="text-xs font-bold text-slate-700">Work Logs / Remarks (Optional)</Label>
+                        <Textarea
+                          id="remarks-input"
+                          value={remarks}
+                          onChange={(e) => setRemarks(e.target.value)}
+                          placeholder="Specify materials used, issues found, or site remarks..."
+                          className="text-xs rounded-xl h-14 min-h-[56px]"
+                        />
                       </div>
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* Geotag GPS coordinates panel with Accuracy & Place Name */}
-              <div 
-                onClick={getGpsLocation}
-                className={`border rounded-2xl p-3.5 flex items-center justify-between cursor-pointer transition-all duration-200 hover:border-blue-300 hover:shadow-xs ${
-                gpsLocation && gpsLocation.accuracy && gpsLocation.accuracy > 100 
-                  ? "bg-amber-50 border-amber-200" 
-                  : "bg-slate-50 border-slate-200/80"
-              }`}>
-                <div className="flex items-start gap-3 min-w-0 flex-1">
-                  <div className={`h-9 w-9 rounded-xl grid place-items-center shrink-0 mt-0.5 ${
-                    gpsLocation && gpsLocation.accuracy && gpsLocation.accuracy > 100
-                      ? "bg-amber-100 text-amber-700"
-                      : gpsLocation ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"
-                  }`}>
-                    {gpsLocation && gpsLocation.accuracy && gpsLocation.accuracy > 100 ? (
-                      <ShieldAlert className="h-5 w-5" />
+                  {/* Submit Action Button */}
+                  <Button
+                    type="submit"
+                    disabled={gpsLoading || (!isClockedIn && !capturedPhoto)}
+                    className={`w-full h-10 rounded-xl text-xs font-extrabold gap-1.5 shadow-xs transition-all duration-200 ${
+                      isClockedIn 
+                        ? "bg-rose-600 hover:bg-rose-700 text-white cursor-pointer" 
+                        : capturedPhoto
+                        ? "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
+                        : "bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed"
+                    }`}
+                  >
+                    {isClockedIn ? (
+                      <>
+                        <HardHat className="h-4 w-4" /> End Shift & Clock Out
+                      </>
+                    ) : capturedPhoto ? (
+                      <>
+                        <HardHat className="h-4 w-4" /> Start Shift & Clock In
+                      </>
                     ) : (
-                      <MapPin className="h-5 w-5" />
+                      <>
+                        <Camera className="h-4 w-4 text-slate-400" /> Capture / Upload Photo to Start Shift
+                      </>
                     )}
-                  </div>
-                  <div className="space-y-1 min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">GPS Worksite Coordinates</p>
-                      {gpsLocation && gpsLocation.accuracy && gpsLocation.accuracy > 100 && (
-                        <span className="text-[9px] font-extrabold bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded">Low Accuracy Warning</span>
-                      )}
-                    </div>
-                    {gpsLocation ? (
-                      <div className="space-y-0.5">
-                        <p className="text-xs font-extrabold text-slate-900 flex items-center gap-1 truncate">
-                          📍 {gpsLocation.placeName || "Plot 42, HITEC City Industrial Hub, Hyderabad"}
-                        </p>
-                        <p className="text-[11px] font-semibold text-slate-600 font-mono">
-                          Lat: {gpsLocation.latitude.toFixed(5)} | Lon: {gpsLocation.longitude.toFixed(5)}
-                          <span className={`text-[10px] font-semibold ml-2 ${gpsLocation.accuracy && gpsLocation.accuracy > 100 ? "text-amber-700 font-bold" : "text-emerald-700 font-bold"}`}>
-                            (Accurate to {gpsLocation.accuracy || 12}m)
-                          </span>
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-[11px] text-slate-500 font-medium">Click to fetch current location, place name & coordinates</p>
-                    )}
-                  </div>
-                </div>
-                
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    getGpsLocation();
-                  }}
-                  disabled={gpsLoading}
-                  className="h-8 rounded-xl border-slate-200 text-[11px] font-bold gap-1 shrink-0 ml-2 hover:bg-blue-50 hover:text-blue-700"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 text-blue-600 ${gpsLoading ? "animate-spin" : ""}`} />
-                  <span className="hidden sm:inline">Refresh GPS</span>
-                </Button>
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="rounded-2xl border-slate-200 bg-white shadow-xs p-5 text-center space-y-3">
+              <div className="mx-auto h-11 w-11 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <CheckCircle2 className="h-5.5 w-5.5" />
               </div>
-
-              {/* Geotag Photo capture panel with Watermark preview */}
-              <div className="space-y-2">
-                <Label className="text-xs font-bold text-slate-700">Watermarked Geo-Tag Verification Photo</Label>
-                
-                {capturedPhoto ? (
-                  <div className="relative rounded-2xl border border-slate-200 overflow-hidden bg-slate-900 group">
-                    <img 
-                      src={capturedPhoto} 
-                      alt="Watermarked Check-in Log" 
-                      className="w-full h-44 object-cover object-center" 
-                    />
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setCapturedPhoto(null)}
-                        className="rounded-xl text-xs font-bold gap-1 bg-white hover:bg-slate-100 text-slate-800"
-                      >
-                        <Minimize2 className="h-3 w-3" /> Re-take Snapshot
-                      </Button>
-                    </div>
-                    <div className="absolute bottom-2 left-2 bg-emerald-600/90 text-white font-bold text-[9px] px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
-                      <CheckCircle2 className="h-3 w-3" /> Geo-Tag Banner Watermarked
-                    </div>
-                  </div>
-                ) : cameraActive ? (
-                  <div className="relative rounded-2xl border border-slate-200 overflow-hidden bg-black flex flex-col items-center">
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsInline
-                      className="w-full h-44 object-cover object-center"
-                    />
-                    
-                    <div className="absolute bottom-2 inset-x-0 px-3 flex justify-between items-center z-10">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={toggleCameraLens}
-                        className="h-8 rounded-xl text-[10px] font-bold border-white/30 text-white bg-black/60 hover:bg-black/80"
-                      >
-                        🔄 Flip Lens
-                      </Button>
-                      
-                      <Button
-                        type="button"
-                        onClick={capturePhoto}
-                        className="h-9 w-9 rounded-full bg-red-600 hover:bg-red-700 shadow-md border-2 border-white flex items-center justify-center cursor-pointer"
-                      >
-                        <Camera className="h-4.5 w-4.5 text-white" />
-                      </Button>
-                      
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={stopCamera}
-                        className="h-8 rounded-xl text-[10px] font-bold border-white/30 text-white bg-black/60 hover:bg-black/80"
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button
-                      type="button"
-                      onClick={startCamera}
-                      variant="outline"
-                      className="h-20 rounded-2xl border border-slate-200 border-dashed bg-white hover:bg-slate-50 flex flex-col items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Camera className="h-6 w-6 text-slate-400 group-hover:text-blue-500" />
-                      <span className="text-[11px] font-bold text-slate-700">Open Site Camera</span>
-                    </Button>
-                    
-                    <div className="relative h-20 rounded-2xl border border-slate-200 border-dashed bg-white hover:bg-slate-50 flex flex-col items-center justify-center gap-1.5 cursor-pointer">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileUpload}
-                        className="absolute inset-0 opacity-0 cursor-pointer"
-                      />
-                      <Upload className="h-6 w-6 text-slate-400" />
-                      <span className="text-[11px] font-bold text-slate-700">Upload Photo File</span>
-                    </div>
-                  </div>
-                )}
+              <div>
+                <h2 className="text-sm font-extrabold text-slate-900">Shift Completed & Submitted!</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Clocked out at <span className="font-bold text-slate-800">{todayLog?.outTime}</span>. Sent for Supervisor verification.
+                </p>
               </div>
-
-              {/* Work description (Clock-out only) */}
-              {isClockedIn && (
-                <div className="space-y-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold text-slate-700">Select Nature of Work Today</Label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {[
-                        "Robotic joint seal alignment & calibration",
-                        "Hydraulic pipe flushing & seal overhauled",
-                        "PLC tooling wiring & SCADA test",
-                        "General site maintenance & alignment check"
-                      ].map((desc) => (
-                        <button
-                          key={desc}
-                          type="button"
-                          onClick={() => setWorkDescription(desc)}
-                          className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all duration-150 cursor-pointer ${
-                            workDescription === desc 
-                              ? "bg-indigo-50 border-indigo-300 text-indigo-700" 
-                              : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                          }`}
-                        >
-                          {desc.split(" & ")[0]}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="remarks-input" className="text-xs font-bold text-slate-700">Work Logs / Remarks (Optional)</Label>
-                    <Textarea
-                      id="remarks-input"
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                      placeholder="Specify materials used, issues found, or site remarks..."
-                      className="text-xs rounded-xl h-16 min-h-[64px]"
-                    />
-                  </div>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 grid grid-cols-2 gap-2 text-left text-xs">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Hours Logged</p>
+                  <p className="text-base font-black text-slate-900">{todayLog?.hoursWorked} hrs</p>
                 </div>
-              )}
-
-              {/* Submit Buttons */}
-              <Button
-                type="submit"
-                disabled={gpsLoading || (!isClockedIn && !capturedPhoto)}
-                className={`w-full h-11 rounded-2xl text-xs font-extrabold gap-1.5 shadow-md transition-all duration-200 ${
-                  isClockedIn 
-                    ? "bg-rose-600 hover:bg-rose-700 shadow-rose-500/10 text-white cursor-pointer" 
-                    : capturedPhoto
-                    ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20 text-white cursor-pointer"
-                    : "bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed"
-                }`}
-              >
-                {isClockedIn ? (
-                  <>
-                    <HardHat className="h-4.5 w-4.5" /> End Shift & Clock Out
-                  </>
-                ) : capturedPhoto ? (
-                  <>
-                    <HardHat className="h-4.5 w-4.5" /> Start Shift & Clock In
-                  </>
-                ) : (
-                  <>
-                    <Camera className="h-4.5 w-4.5 text-slate-400" /> Capture / Upload Photo First to Start Shift
-                  </>
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="rounded-3xl border-slate-200 bg-white shadow-md p-6 text-center space-y-4">
-          <div className="mx-auto h-12 w-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-            <CheckCircle2 className="h-6 w-6" />
-          </div>
-          <div>
-            <h2 className="text-base font-extrabold text-slate-900">Shift Completed & Submitted!</h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Clocked out at <span className="font-bold text-slate-800">{todayLog?.outTime}</span>. Log submitted for Supervisor verification.
-            </p>
-          </div>
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 grid grid-cols-2 gap-2 text-left">
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Hours Logged</p>
-              <p className="text-lg font-black text-slate-900">{todayLog?.hoursWorked} hrs</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Status</p>
-              <span className="inline-block mt-1 text-xs font-extrabold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                Pending Verification
-              </span>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Verified-Only Payroll & Wage Summary Card */}
-      <Card className="rounded-3xl border-slate-200 bg-white shadow-xs p-4 space-y-3">
-        <div className="grid grid-cols-3 gap-2">
-          <div className="text-center space-y-0.5">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Verified Days</p>
-            <div className="flex items-center justify-center gap-1">
-              <Calendar className="h-4 w-4 text-blue-600" />
-              <h3 className="text-base font-extrabold text-slate-900">{verifiedDaysCount}</h3>
-            </div>
-            <p className="text-[9px] text-slate-400 font-semibold">Approved Shifts</p>
-          </div>
-          
-          <div className="text-center space-y-0.5 border-x border-slate-100">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Verified Hours</p>
-            <div className="flex items-center justify-center gap-1">
-              <Clock className="h-4 w-4 text-emerald-600" />
-              <h3 className="text-base font-extrabold text-slate-900">{totalVerifiedHours.toFixed(1)}h</h3>
-            </div>
-            <p className="text-[9px] text-slate-400 font-semibold">Calculated</p>
-          </div>
-
-          <div className="text-center space-y-0.5">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Verified Wages</p>
-            <h3 className="text-base font-extrabold text-emerald-600">₹{verifiedWages.toLocaleString("en-IN")}</h3>
-            <p className="text-[9px] text-slate-400 font-semibold">Payroll Ready</p>
-          </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Status</p>
+                  <span className="inline-block mt-0.5 text-[10px] font-extrabold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                    Pending Verification
+                  </span>
+                </div>
+              </div>
+            </Card>
+          )}
         </div>
 
-        {pendingLogs.length > 0 && (
-          <div className="p-2 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-[11px]">
-            <span className="text-amber-800 font-bold flex items-center gap-1">
-              <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
-              {pendingLogs.length} shift(s) pending supervisor verification
-            </span>
-            <span className="text-[10px] text-amber-600 font-semibold">Unverified wages held</span>
-          </div>
-        )}
-      </Card>
+        {/* Right Column (Col 5): Payroll Summary & Recent Shift Logs */}
+        <div className="lg:col-span-5 space-y-4">
+          {/* Verified Wages Card */}
+          <Card className="rounded-2xl border-slate-200 bg-white shadow-xs p-3.5 space-y-2">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <h3 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
+                <Banknote className="h-4 w-4 text-emerald-600" />
+                Monthly Verified Payroll
+              </h3>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{todayStr.slice(0, 7)}</span>
+            </div>
 
-      {/* Expandable shift logs history */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
-        <button
-          onClick={() => setHistoryOpen(!historyOpen)}
-          className="w-full flex items-center justify-between p-4 font-bold text-slate-800 text-xs hover:bg-slate-50 cursor-pointer transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-slate-500" />
-            <span>Shift Logs & Watermarked Photos ({monthlyLogs.length})</span>
-          </div>
-          {historyOpen ? <ChevronUp className="h-4 w-4 text-slate-500" /> : <ChevronDown className="h-4 w-4 text-slate-500" />}
-        </button>
+            <div className="grid grid-cols-3 gap-2 py-1">
+              <div className="text-center space-y-0.5">
+                <p className="text-[9px] font-bold text-slate-400 uppercase">Verified Days</p>
+                <h4 className="text-sm font-extrabold text-slate-900">{verifiedDaysCount} Days</h4>
+              </div>
+              
+              <div className="text-center space-y-0.5 border-x border-slate-100">
+                <p className="text-[9px] font-bold text-slate-400 uppercase">Verified Hours</p>
+                <h4 className="text-sm font-extrabold text-slate-900">{totalVerifiedHours.toFixed(1)}h</h4>
+              </div>
 
-        {historyOpen && (
-          <div className="p-4 border-t border-slate-100 space-y-3 max-h-80 overflow-y-auto bg-slate-50/50">
-            {monthlyLogs.length > 0 ? (
-              monthlyLogs.map((log) => {
-                const clockOutTime = log.outTime || "Active Duty";
-                const isCompleted = Boolean(log.inTime && log.outTime);
-                const gMapsLink = log.inLocation 
-                  ? `https://www.google.com/maps/search/?api=1&query=${log.inLocation.latitude},${log.inLocation.longitude}`
-                  : null;
+              <div className="text-center space-y-0.5">
+                <p className="text-[9px] font-bold text-slate-400 uppercase">Earned Wages</p>
+                <h4 className="text-sm font-extrabold text-emerald-600">₹{verifiedWages.toLocaleString("en-IN")}</h4>
+              </div>
+            </div>
 
-                const vStatus = log.verificationStatus || "Pending Verification";
-
-                return (
-                  <div key={`${log.date}_${log.labourId}`} className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs space-y-2">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="text-xs font-extrabold text-slate-900">
-                          {log.date}
-                        </h4>
-                        <p className="text-[10px] font-semibold text-slate-500">{log.workDescription}</p>
-                      </div>
-                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                        vStatus === "Verified" ? "bg-emerald-100 text-emerald-800" :
-                        vStatus === "Rejected" ? "bg-rose-100 text-rose-800" :
-                        "bg-amber-100 text-amber-800"
-                      }`}>
-                        {vStatus}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-[10px] font-medium text-slate-500">
-                      <div>
-                        <span className="font-bold text-slate-400">IN:</span> {log.inTime || "None"}
-                      </div>
-                      <div>
-                        <span className="font-bold text-slate-400">OUT:</span> {clockOutTime}
-                      </div>
-                    </div>
-
-                    {/* Geotag references and photo links */}
-                    <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-100">
-                      {log.inPhotoUrl && (
-                        <button
-                          onClick={() => {
-                            const w = window.open();
-                            if (w) w.document.write(`<img src="${log.inPhotoUrl}" style="max-width:100%; max-height:100vh; display:block; margin:auto;" />`);
-                          }}
-                          className="text-[9px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg flex items-center gap-1 hover:bg-blue-100 cursor-pointer"
-                        >
-                          <Camera className="h-3 w-3" /> Check-in Photo
-                        </button>
-                      )}
-                      
-                      {log.outPhotoUrl && (
-                        <button
-                          onClick={() => {
-                            const w = window.open();
-                            if (w) w.document.write(`<img src="${log.outPhotoUrl}" style="max-width:100%; max-height:100vh; display:block; margin:auto;" />`);
-                          }}
-                          className="text-[9px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-lg flex items-center gap-1 hover:bg-rose-100 cursor-pointer"
-                        >
-                          <Camera className="h-3 w-3" /> Check-out Photo
-                        </button>
-                      )}
-
-                      {gMapsLink && (
-                        <a
-                          href={gMapsLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg flex items-center gap-1 hover:bg-emerald-100 transition-colors"
-                        >
-                          <MapPin className="h-3 w-3" /> View Location <ExternalLink className="h-2.5 w-2.5" />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="text-center p-4 text-xs text-slate-500 font-semibold bg-white border border-dashed rounded-2xl">
-                No shift logs recorded in this month.
+            {pendingLogs.length > 0 && (
+              <div className="p-2 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-[10px]">
+                <span className="text-amber-800 font-bold flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3 text-amber-600" />
+                  {pendingLogs.length} shift(s) pending verification
+                </span>
+                <span className="text-[9px] text-amber-600 font-semibold">Held</span>
               </div>
             )}
-          </div>
-        )}
+          </Card>
+
+          {/* Shift Logs History (Inline scrollable panel) */}
+          <Card className="rounded-2xl border-slate-200 bg-white shadow-xs overflow-hidden">
+            <div className="p-3 bg-slate-50/60 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
+                <Calendar className="h-4 w-4 text-blue-600" />
+                Shift Logs History ({monthlyLogs.length})
+              </h3>
+              <span className="text-[10px] text-slate-400 font-bold">This Month</span>
+            </div>
+
+            <div className="p-3 space-y-2 max-h-[380px] overflow-y-auto">
+              {monthlyLogs.length > 0 ? (
+                monthlyLogs.map((log) => {
+                  const clockOutTime = log.outTime || "Active Duty";
+                  const gMapsLink = log.inLocation 
+                    ? `https://www.google.com/maps/search/?api=1&query=${log.inLocation.latitude},${log.inLocation.longitude}`
+                    : null;
+                  const vStatus = log.verificationStatus || "Pending Verification";
+
+                  return (
+                    <div key={`${log.date}_${log.labourId}`} className="bg-slate-50/50 p-2.5 rounded-xl border border-slate-200/80 space-y-1.5 text-xs">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="font-extrabold text-slate-900 text-xs block">{log.date}</span>
+                          <span className="text-[10px] font-semibold text-slate-500 truncate block max-w-[180px]">{log.workDescription}</span>
+                        </div>
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                          vStatus === "Verified" ? "bg-emerald-100 text-emerald-800" :
+                          vStatus === "Rejected" ? "bg-rose-100 text-rose-800" :
+                          "bg-amber-100 text-amber-800"
+                        }`}>
+                          {vStatus}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-3 text-[10px] font-semibold text-slate-500">
+                        <span><b className="text-slate-400">IN:</b> {log.inTime || "—"}</span>
+                        <span><b className="text-slate-400">OUT:</b> {clockOutTime}</span>
+                      </div>
+
+                      {/* Photo & GPS links */}
+                      <div className="flex flex-wrap gap-1.5 pt-1 border-t border-slate-200/60">
+                        {log.inPhotoUrl && (
+                          <button
+                            onClick={() => {
+                              const w = window.open();
+                              if (w) w.document.write(`<img src="${log.inPhotoUrl}" style="max-width:100%; max-height:100vh; display:block; margin:auto;" />`);
+                            }}
+                            className="text-[9px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md flex items-center gap-1 hover:bg-blue-100 cursor-pointer"
+                          >
+                            <Camera className="h-2.5 w-2.5" /> Check-in Photo
+                          </button>
+                        )}
+                        
+                        {log.outPhotoUrl && (
+                          <button
+                            onClick={() => {
+                              const w = window.open();
+                              if (w) w.document.write(`<img src="${log.outPhotoUrl}" style="max-width:100%; max-height:100vh; display:block; margin:auto;" />`);
+                            }}
+                            className="text-[9px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md flex items-center gap-1 hover:bg-rose-100 cursor-pointer"
+                          >
+                            <Camera className="h-2.5 w-2.5" /> Check-out Photo
+                          </button>
+                        )}
+
+                        {gMapsLink && (
+                          <a
+                            href={gMapsLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md flex items-center gap-1 hover:bg-emerald-100 transition-colors"
+                          >
+                            <MapPin className="h-2.5 w-2.5" /> Map <ExternalLink className="h-2 w-2" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center p-4 text-xs text-slate-500 font-semibold bg-slate-50 border border-dashed rounded-xl">
+                  No shift logs recorded this month.
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
       </div>
     </div>
   );

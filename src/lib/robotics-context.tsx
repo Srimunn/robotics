@@ -665,28 +665,40 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   }, [currentUser]);
 
   const login = (role: "CEO" | "Worker" | "Labor", loginIdOrId?: string, pin?: string): boolean => {
+    if (!pin || !pin.trim()) {
+      toast.error("❌ Security PIN is required to login!");
+      return false;
+    }
+
+    const trimmedPin = pin.trim();
+
     if (role === "CEO") {
-      setCurrentUser({ role: "CEO", name: "CEO User" });
+      if (trimmedPin !== "1234") {
+        toast.error("❌ Incorrect Executive PIN! Access Denied.");
+        return false;
+      }
+      setCurrentUser({ role: "CEO", name: "CEO Executive" });
       toast.success("Welcome back, CEO!");
       return true;
     }
+
     if (role === "Worker") {
-      setCurrentUser({ role: "Worker", name: "Supervisor User" });
+      if (trimmedPin !== "5678") {
+        toast.error("❌ Incorrect Supervisor PIN! Access Denied.");
+        return false;
+      }
+      setCurrentUser({ role: "Worker", name: "Operations Supervisor" });
       toast.success("Supervisor session initiated");
       return true;
     }
+
     if (role === "Labor") {
       if (!loginIdOrId || !loginIdOrId.trim()) {
-        toast.error("Labour Login ID is required");
-        return false;
-      }
-      if (!pin || !pin.trim()) {
-        toast.error("4-digit PIN is required");
+        toast.error("❌ Labour Name or Login ID is required");
         return false;
       }
 
       const trimmedInput = loginIdOrId.trim().toLowerCase();
-      const trimmedPin = pin.trim();
 
       const lab = labours.find((l) => {
         const idMatch = l.id ? l.id.toLowerCase() === trimmedInput : false;
@@ -699,7 +711,7 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
       });
 
       if (!lab) {
-        toast.error(`❌ Incorrect Labour Name/ID or PIN! Check credentials in Labour Profile.`);
+        toast.error(`❌ Incorrect Labour Name/ID or PIN! Access Denied.`);
         return false;
       }
       setCurrentUser({ role: "Labor", id: lab.id, name: lab.name });
