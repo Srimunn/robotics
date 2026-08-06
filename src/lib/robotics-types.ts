@@ -165,6 +165,12 @@ export interface ProjectLabourAssignment {
   assignedDate: string;
 }
 
+export interface GeoLocation {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+}
+
 export interface ProjectLabourLog {
   labourId: string;
   labourName: string;
@@ -179,6 +185,15 @@ export interface ProjectLabourLog {
   earnedMoney?: number;
   workDescription: string;
   remarks?: string;
+  inPhotoUrl?: string;
+  outPhotoUrl?: string;
+  inLocation?: GeoLocation;
+  outLocation?: GeoLocation;
+  verificationStatus?: "Pending Verification" | "Verified" | "Rejected";
+  verifiedBy?: string;
+  verifiedDate?: string;
+  verificationComments?: string;
+  isGpsWarning?: boolean;
 }
 
 export interface PaymentStageItem {
@@ -377,6 +392,10 @@ export interface Labour {
   status: LabourStatus;
   skills: string[];
   wageHistory?: LabourWageHistory[];
+  loginId: string;
+  pin: string;
+  photoUrl?: string;
+  address?: string;
 }
 
 export interface AttendanceRecord {
@@ -394,6 +413,21 @@ export interface AttendanceRecord {
   workDescription?: string;
   weeklyWage?: number;
   remarks?: string;
+  inPhotoUrl?: string;
+  outPhotoUrl?: string;
+  inLocation?: GeoLocation;
+  outLocation?: GeoLocation;
+  verificationStatus?: "Pending Verification" | "Verified" | "Rejected";
+  verifiedBy?: string;
+  verifiedDate?: string;
+  verificationComments?: string;
+  isGpsWarning?: boolean;
+}
+
+export interface CurrentUser {
+  role: "CEO" | "Worker" | "Labor";
+  id?: string;
+  name: string;
 }
 
 

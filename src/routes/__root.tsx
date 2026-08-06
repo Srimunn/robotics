@@ -15,6 +15,8 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { RoboticsProvider, useRobotics } from "@/lib/robotics-context";
 import { Toaster } from "@/components/ui/sonner";
+import { LoginPage } from "@/components/LoginPage";
+import { LaborDashboard } from "@/components/LaborDashboard";
 import { GlobalSearchModal } from "@/components/global-search-modal";
 import { Search, Plus, Bell, User, CheckCircle2, AlertCircle, PhoneCall, DollarSign, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -128,7 +130,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function MainHeader() {
   const [searchOpen, setSearchOpen] = useState(false);
-  const { enquiries, projects, resetToCleanDemoMode } = useRobotics();
+  const { enquiries, projects, resetToCleanDemoMode, currentUser, logout } = useRobotics();
   const router = useRouter();
 
   useEffect(() => {
@@ -266,22 +268,33 @@ function MainHeader() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="gap-2 rounded-lg px-2 text-xs">
                 <div className="h-6 w-6 rounded-full bg-blue-100 text-blue-700 font-bold grid place-items-center text-[10px]">
-                  AD
+                  {currentUser?.role === "CEO" ? "CEO" : "SP"}
                 </div>
-                <span className="hidden md:inline font-medium text-foreground">Admin User</span>
+                <span className="hidden md:inline font-medium text-foreground">{currentUser?.name || "Admin User"}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 rounded-xl">
               <DropdownMenuLabel>
-                <p className="text-xs font-semibold">Service Admin</p>
-                <p className="text-[10px] text-muted-foreground font-normal">admin@robotics-mgmt.com</p>
+                <p className="text-xs font-semibold">{currentUser?.name || "Service Admin"}</p>
+                <p className="text-[10px] text-muted-foreground font-normal">
+                  {currentUser?.role === "CEO" ? "CEO / Super Admin" : "Supervisor / Staff"}
+                </p>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link to="/settings">System Settings</Link>
-              </DropdownMenuItem>
+              {currentUser?.role === "CEO" && (
+                <DropdownMenuItem asChild>
+                  <Link to="/settings">System Settings</Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem asChild>
                 <Link to="/reports">Export Reports</Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => logout()}
+                className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 font-semibold cursor-pointer"
+              >
+                Log Out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -299,19 +312,35 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <RoboticsProvider>
-        <SidebarProvider>
-          <div className="flex min-h-screen w-full bg-slate-50/50 dark:bg-background">
-            <AppSidebar />
-            <div className="flex min-w-0 flex-1 flex-col">
-              <MainHeader />
-              <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full space-y-6">
-                <Outlet />
-              </main>
-            </div>
-          </div>
-          <Toaster richColors position="top-right" />
-        </SidebarProvider>
+        <RootLayout />
+        <Toaster richColors position="top-right" />
       </RoboticsProvider>
     </QueryClientProvider>
+  );
+}
+
+function RootLayout() {
+  const { currentUser } = useRobotics();
+
+  if (!currentUser) {
+    return <LoginPage />;
+  }
+
+  if (currentUser.role === "Labor") {
+    return <LaborDashboard />;
+  }
+
+  return (
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full bg-slate-50/50 dark:bg-background">
+        <AppSidebar />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <MainHeader />
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full space-y-6">
+            <Outlet />
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
   );
 }

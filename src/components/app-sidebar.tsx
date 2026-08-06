@@ -13,6 +13,7 @@ import {
   BarChart3,
   Settings,
   Bot,
+  LogOut,
 } from "lucide-react";
 import {
   Sidebar,
@@ -26,6 +27,8 @@ import {
   SidebarMenuItem,
   SidebarFooter,
 } from "@/components/ui/sidebar";
+
+import { useRobotics } from "@/lib/robotics-context";
 
 const items = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -43,6 +46,14 @@ const items = [
 
 export function AppSidebar() {
   const currentPath = useRouterState({ select: (r) => r.location.pathname });
+  const { currentUser, logout } = useRobotics();
+
+  const filteredItems = items.filter((item) => {
+    if (currentUser?.role === "Worker" && item.title === "Settings") {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <Sidebar collapsible="icon" className="border-r border-slate-200 bg-white text-slate-900">
@@ -69,7 +80,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent className="mt-1">
             <SidebarMenu className="space-y-1">
-              {items.map((item) => {
+              {filteredItems.map((item) => {
                 const isActive =
                   item.url === "/"
                     ? currentPath === "/"
@@ -99,8 +110,26 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-slate-200 p-3 text-xs text-slate-500 text-center bg-white">
-        <div className="truncate text-[11px] font-semibold text-slate-400">Single Source of Truth ERP</div>
+      <SidebarFooter className="border-t border-slate-200 p-3 bg-white space-y-2">
+        <div className="flex items-center gap-2.5 p-1 text-left">
+          <div className="h-7 w-7 rounded-lg bg-slate-100 text-slate-800 font-bold grid place-items-center text-[10px] border border-slate-200 shrink-0">
+            {currentUser?.role === "CEO" ? "CEO" : "SP"}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold text-slate-900 truncate leading-tight">
+              {currentUser?.name || "Service User"}
+            </p>
+            <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">
+              {currentUser?.role === "CEO" ? "Super Admin" : "Supervisor"}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => logout()}
+          className="w-full flex items-center justify-center gap-1.5 h-8 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 text-[11px] font-bold cursor-pointer transition-colors"
+        >
+          <LogOut className="h-3.5 w-3.5" /> Sign Out Session
+        </button>
       </SidebarFooter>
     </Sidebar>
   );

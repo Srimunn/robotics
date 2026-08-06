@@ -1,0 +1,907 @@
+import { useState, useEffect, useRef } from "react";
+import { useRobotics, calculateHoursFromTimes, calculateEarnedWage } from "@/lib/robotics-context";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  HardHat, 
+  MapPin, 
+  Camera, 
+  Clock, 
+  DollarSign, 
+  LogOut, 
+  Calendar, 
+  CheckCircle2, 
+  AlertCircle, 
+  RefreshCw, 
+  Upload,
+  Minimize2,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  ShieldAlert
+} from "lucide-react";
+import { toast } from "sonner";
+import type { ProjectLabourLog, AttendanceRecord, GeoLocation } from "@/lib/robotics-types";
+
+export function LaborDashboard() {
+  const { currentUser, logout, projects, updateProjectLabourLog, labours } = useRobotics();
+  const laborId = currentUser?.id || "";
+  
+  // Find labor profile
+  const laborProfile = labours.find(l => l.id === laborId);
+  const laborName = laborProfile?.name || currentUser?.name || "Field Crew Member";
+  const defaultWeeklyWage = laborProfile?.defaultWeeklyWage || 1400;
+
+  // Filter projects assigned to this labour
+  const assignedProjects = projects.filter(p => 
+    p.assignedLabourIds.includes(laborId) || 
+    p.labourAssignments?.some(la => la.labourId === laborId)
+  );
+
+  // States
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [gpsLocation, setGpsLocation] = useState<GeoLocation | null>(null);
+  const [gpsLoading, setGpsLoading] = useState(false);
+  
+  // Camera & Image Capture States
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  // Out Time / Clock-out States
+  const [workDescription, setWorkDescription] = useState("On-site engineering assistance");
+  const [remarks, setRemarks] = useState("");
+  
+  // Shift Log details for today
+  const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  
+  // Find if today has log
+  const activeProjectWithTodayLog = projects.find(p => 
+    p.labourLogs.some(log => log.labourId === laborId && log.date === todayStr)
+  );
+  
+  const todayLog = activeProjectWithTodayLog?.labourLogs.find(
+    log => log.labourId === laborId && log.date === todayStr
+  );
+
+  const isClockedIn = todayLog && todayLog.inTime && !todayLog.outTime;
+  const isClockedOut = todayLog && todayLog.inTime && todayLog.outTime;
+  
+  // Active Timer state
+  const [timerString, setTimerString] = useState("00:00:00");
+
+  // Load initially
+  useEffect(() => {
+    getGpsLocation();
+    
+    if (assignedProjects.length > 0) {
+      setSelectedProjectId(assignedProjects[0].id);
+    }
+  }, [laborId]);
+
+  // Clock-in timer calculator
+  useEffect(() => {
+    let intervalId: any;
+    if (isClockedIn && todayLog?.inTime) {
+      const calculateTimer = () => {
+        try {
+          const parseTime = (timeStr: string) => {
+            const parts = timeStr.trim().split(" ");
+            const [hours, minutes] = parts[0].split(":").map(Number);
+            let h = hours;
+            if (parts[1] && parts[1].toUpperCase() === "PM" && h < 12) h += 12;
+            if (parts[1] && parts[1].toUpperCase() === "AM" && h === 12) h = 0;
+            return { hours: h, minutes: minutes || 0 };
+          };
+
+          const clockInDetails = parseTime(todayLog.inTime || "");
+          const now = new Date();
+          const clockInTime = new Date();
+          clockInTime.setHours(clockInDetails.hours);
+          clockInTime.setMinutes(clockInDetails.minutes);
+          clockInTime.setSeconds(0);
+
+          let diffMs = now.getTime() - clockInTime.getTime();
+          if (diffMs < 0) {
+            diffMs += 24 * 60 * 60 * 1000;
+          }
+
+          const hrs = Math.floor(diffMs / (1000 * 60 * 60));
+          const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+          const secs = Math.floor((diffMs % (1000 * 60)) / 1000);
+
+          const pad = (num: number) => String(num).padStart(2, "0");
+          setTimerString(`${pad(hrs)}:${pad(mins)}:${pad(secs)}`);
+        } catch {
+          setTimerString("00:00:00");
+        }
+      };
+
+      calculateTimer();
+      intervalId = setInterval(calculateTimer, 1000);
+    } else {
+      setTimerString("00:00:00");
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [isClockedIn, todayLog]);
+
+  // GPS Geolocation trigger & accuracy check
+  const getGpsLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation is not supported by your browser");
+      return;
+    }
+
+    setGpsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const acc = Math.round(position.coords.accuracy);
+        setGpsLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: acc
+        });
+        setGpsLoading(false);
+
+        if (acc > 100) {
+          toast.warning(`⚠️ GPS Accuracy is low (${acc}m > 100m). Please move to an open area. Attendance will require supervisor verification.`);
+        } else {
+          toast.success(`GPS Verified (${acc}m accuracy)`);
+        }
+      },
+      (error) => {
+        console.error(error);
+        setGpsLoading(false);
+        toast.warning("Could not fetch GPS. Supervisor verification will be required.");
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
+
+  // Start Webcam video stream
+  const startCamera = async () => {
+    setCapturedPhoto(null);
+    setCameraActive(true);
+    
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: facingMode }
+      });
+      
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error("Camera access failed", err);
+      toast.error("Webcam unavailable. Please use file upload instead.");
+      setCameraActive(false);
+    }
+  };
+
+  // Close webcam stream
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    setCameraActive(false);
+  };
+
+  // Canvas Watermark Overlay Generator
+  const generateWatermarkedImage = (
+    source: HTMLVideoElement | HTMLImageElement,
+    tagType: "CLOCK IN" | "CLOCK OUT",
+    projName: string
+  ): string => {
+    const canvas = document.createElement("canvas");
+    const width = source instanceof HTMLVideoElement ? source.videoWidth || 640 : source.width || 640;
+    const height = source instanceof HTMLVideoElement ? source.videoHeight || 480 : source.height || 480;
+
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return "";
+
+    // 1. Draw raw snapshot frame
+    ctx.drawImage(source, 0, 0, width, height);
+
+    // 2. Draw dark semi-transparent banner at bottom
+    const bannerHeight = Math.max(85, height * 0.25);
+    const bannerY = height - bannerHeight;
+
+    ctx.fillStyle = "rgba(15, 23, 42, 0.85)"; // slate-900 transparent
+    ctx.fillRect(0, bannerY, width, bannerHeight);
+
+    // Top accent border
+    ctx.fillStyle = tagType === "CLOCK IN" ? "#10b981" : "#f43f5e";
+    ctx.fillRect(0, bannerY, width, 4);
+
+    // 3. Draw Watermark Text
+    const padding = 14;
+    const fontSize = Math.max(11, Math.round(width * 0.025));
+    ctx.font = `bold ${fontSize}px sans-serif`;
+
+    const now = new Date();
+    const timeStr = `${now.toISOString().slice(0, 10)} ${now.toLocaleTimeString("en-US", { hour12: true })}`;
+    const gpsStr = gpsLocation
+      ? `GPS: ${gpsLocation.latitude.toFixed(5)}, ${gpsLocation.longitude.toFixed(5)} (Acc: ${gpsLocation.accuracy}m)`
+      : "GPS: Not Available";
+
+    let y = bannerY + fontSize + 8;
+    ctx.fillStyle = tagType === "CLOCK IN" ? "#34d399" : "#fb7185";
+    ctx.fillText(`ROBOTICS ERP — GEO-TAGGED ${tagType}`, padding, y);
+
+    ctx.fillStyle = "#ffffff";
+    y += fontSize + 4;
+    ctx.fillText(`Labour: ${laborName} (${laborId})`, padding, y);
+
+    y += fontSize + 4;
+    ctx.fillText(`Project: ${projName}`, padding, y);
+
+    y += fontSize + 4;
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillText(`Time: ${timeStr} | ${gpsStr}`, padding, y);
+
+    return canvas.toDataURL("image/jpeg", 0.85);
+  };
+
+  // Capture Photo & apply Watermark
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    if (!video || !streamRef.current) return;
+
+    try {
+      const activeProjName = projects.find(p => p.id === (isClockedIn ? activeProjectWithTodayLog?.id : selectedProjectId))?.customerName || "Site Project";
+      const tagType = isClockedIn ? "CLOCK OUT" : "CLOCK IN";
+      const watermarkedDataUrl = generateWatermarkedImage(video, tagType, activeProjName);
+      
+      setCapturedPhoto(watermarkedDataUrl);
+      stopCamera();
+      toast.success("Geo-tagged verification photo captured!");
+    } catch (e) {
+      toast.error("Failed to capture photo");
+    }
+  };
+
+  // Fallback upload with watermark
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const img = new Image();
+        img.onload = () => {
+          const activeProjName = projects.find(p => p.id === (isClockedIn ? activeProjectWithTodayLog?.id : selectedProjectId))?.customerName || "Site Project";
+          const tagType = isClockedIn ? "CLOCK OUT" : "CLOCK IN";
+          const watermarked = generateWatermarkedImage(img, tagType, activeProjName);
+          setCapturedPhoto(watermarked);
+          toast.success("Photo uploaded with Geo-Tag Watermark!");
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Toggle Camera lens
+  const toggleCameraLens = () => {
+    const nextMode = facingMode === "user" ? "environment" : "user";
+    setFacingMode(nextMode);
+    setTimeout(() => {
+      startCamera();
+    }, 100);
+  };
+
+  // Action: Clock In
+  const handleClockInSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProjectId) {
+      toast.error("Please select an assigned project");
+      return;
+    }
+    if (!capturedPhoto) {
+      toast.error("Please capture or upload a check-in photo");
+      return;
+    }
+    if (!gpsLocation) {
+      toast.error("GPS location required to clock in.");
+      return;
+    }
+
+    const isLowAccuracy = gpsLocation.accuracy ? gpsLocation.accuracy > 100 : false;
+    const currentFormattedTime = new Date().toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
+    });
+
+    const weeklyWage = laborProfile?.defaultWeeklyWage || 1400;
+
+    updateProjectLabourLog(selectedProjectId, {
+      labourId: laborId,
+      labourName: laborName,
+      labourType: laborProfile?.type || "Permanent",
+      weeklyWage: weeklyWage,
+      date: todayStr,
+      inTime: currentFormattedTime,
+      outTime: "",
+      attendance: "Present",
+      hoursWorked: 0,
+      workDescription: "Checked-in on site",
+      inPhotoUrl: capturedPhoto,
+      inLocation: gpsLocation,
+      verificationStatus: "Pending Verification",
+      isGpsWarning: isLowAccuracy
+    });
+
+    setCapturedPhoto(null);
+    stopCamera();
+    
+    if (isLowAccuracy) {
+      toast.warning(`Clocked in! Note: GPS accuracy (${gpsLocation.accuracy}m) is low. Sent for Supervisor verification.`);
+    } else {
+      toast.success(`Clocked in at ${currentFormattedTime}! Sent for verification.`);
+    }
+  };
+
+  // Action: Clock Out
+  const handleClockOutSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!todayLog) {
+      toast.error("Invalid Shift record");
+      return;
+    }
+    if (!capturedPhoto) {
+      toast.error("Please capture a check-out photo");
+      return;
+    }
+    if (!gpsLocation) {
+      toast.error("GPS location required to clock out.");
+      return;
+    }
+
+    const isLowAccuracy = gpsLocation.accuracy ? gpsLocation.accuracy > 100 : false;
+    const currentFormattedTime = new Date().toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
+    });
+
+    const projectOfTodayLog = activeProjectWithTodayLog?.id || selectedProjectId;
+
+    updateProjectLabourLog(projectOfTodayLog, {
+      ...todayLog,
+      outTime: currentFormattedTime,
+      workDescription: workDescription.trim(),
+      remarks: remarks.trim(),
+      outPhotoUrl: capturedPhoto,
+      outLocation: gpsLocation,
+      verificationStatus: "Pending Verification",
+      isGpsWarning: isLowAccuracy
+    });
+
+    setCapturedPhoto(null);
+    stopCamera();
+    toast.success(`Clocked out at ${currentFormattedTime}! Sent for verification.`);
+  };
+
+  // Monthly statistics calculations - ONLY VERIFIED SHIFTS COUNT FOR WAGES
+  const monthlyLogs = projects.flatMap(p => 
+    p.labourLogs.filter(log => log.labourId === laborId && log.date.startsWith(todayStr.slice(0, 7)))
+  );
+
+  const verifiedLogs = monthlyLogs.filter(l => l.verificationStatus === "Verified");
+  const pendingLogs = monthlyLogs.filter(l => !l.verificationStatus || l.verificationStatus === "Pending Verification");
+
+  const verifiedDaysCount = verifiedLogs.filter(log => log.inTime).length;
+  
+  const totalVerifiedHours = verifiedLogs.reduce((acc, log) => {
+    if (log.hoursWorked) return acc + log.hoursWorked;
+    if (log.inTime && log.outTime) {
+      return acc + calculateHoursFromTimes(log.inTime, log.outTime);
+    }
+    return acc;
+  }, 0);
+
+  const verifiedWages = verifiedLogs.reduce((acc, log) => {
+    if (log.earnedMoney) return acc + log.earnedMoney;
+    const hours = log.hoursWorked || (log.inTime && log.outTime ? calculateHoursFromTimes(log.inTime, log.outTime) : 0);
+    return acc + calculateEarnedWage(log.weeklyWage || defaultWeeklyWage, hours);
+  }, 0);
+
+  // Toggle log history drawer
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  return (
+    <div className="w-full max-w-xl mx-auto space-y-5 px-3 py-4 font-sans bg-slate-50 min-h-screen">
+      {/* Header section with User Info & Logout */}
+      <div className="flex items-center justify-between bg-white p-4 rounded-3xl border border-slate-200 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-2xl bg-emerald-100 text-emerald-800 grid place-items-center font-black">
+            <HardHat className="h-5.5 w-5.5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <h2 className="font-extrabold text-slate-900 text-[15px]">{laborName}</h2>
+              <span className={`h-2 w-2 rounded-full ${isClockedIn ? "bg-emerald-500 animate-pulse" : "bg-slate-300"}`}></span>
+            </div>
+            <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider">{laborId} • Login ID: {laborProfile?.loginId}</p>
+          </div>
+        </div>
+        
+        <Button
+          onClick={() => {
+            stopCamera();
+            logout();
+          }}
+          variant="outline"
+          size="sm"
+          className="rounded-xl h-8 px-2.5 text-xs font-bold gap-1 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 cursor-pointer"
+        >
+          <LogOut className="h-3.5 w-3.5" /> Logout
+        </Button>
+      </div>
+
+      {/* Main clock widget */}
+      {!isClockedOut ? (
+        <Card className="rounded-3xl border-slate-200 bg-white shadow-md overflow-hidden">
+          <CardHeader className="bg-slate-50/50 p-4 border-b border-slate-100 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-sm font-extrabold text-slate-900">
+                {isClockedIn ? "Active Shift Operations" : "Clock In to Worksite"}
+              </CardTitle>
+              <CardDescription className="text-[11px] text-slate-500">
+                {isClockedIn ? "Your shift is currently running" : "Log your shift location & verify photo"}
+              </CardDescription>
+            </div>
+            {isClockedIn && (
+              <span className="bg-emerald-100 text-emerald-800 font-bold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-ping"></span> On Duty
+              </span>
+            )}
+          </CardHeader>
+
+          <CardContent className="p-5 space-y-4">
+            {/* Active timer details */}
+            {isClockedIn && (
+              <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Working Hours</p>
+                <div className="flex items-center justify-center gap-1.5 text-3xl font-black text-slate-950 font-mono tracking-wider">
+                  <Clock className="h-6 w-6 text-emerald-600 animate-pulse" />
+                  {timerString}
+                </div>
+                <p className="text-[11px] text-slate-500 font-semibold mt-1">
+                  Clocked In: <span className="text-emerald-700 font-bold">{todayLog?.inTime}</span> today at {activeProjectWithTodayLog?.customerName}
+                </p>
+              </div>
+            )}
+
+            <form onSubmit={isClockedIn ? handleClockOutSubmit : handleClockInSubmit} className="space-y-4">
+              {/* Project selector (Clock-in only) */}
+              {!isClockedIn && (
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-700">Select Assigned Project Site</Label>
+                  {assignedProjects.length > 0 ? (
+                    <select
+                      value={selectedProjectId}
+                      onChange={(e) => setSelectedProjectId(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
+                    >
+                      {assignedProjects.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.id} — {p.customerName} ({p.location})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 font-semibold">
+                      <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+                      <div>
+                        No assigned projects. Select from active project sites below:
+                        <select
+                          value={selectedProjectId}
+                          onChange={(e) => setSelectedProjectId(e.target.value)}
+                          className="w-full h-8 px-2 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-800 focus:outline-none mt-2"
+                        >
+                          <option value="">Choose Site...</option>
+                          {projects.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.id} — {p.customerName} ({p.location})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Geotag GPS coordinates panel with Accuracy validation */}
+              <div className={`border rounded-2xl p-3 flex items-center justify-between ${
+                gpsLocation && gpsLocation.accuracy && gpsLocation.accuracy > 100 
+                  ? "bg-amber-50 border-amber-200" 
+                  : "bg-slate-50 border-slate-200/60"
+              }`}>
+                <div className="flex items-center gap-2.5">
+                  <div className={`h-8 w-8 rounded-lg grid place-items-center ${
+                    gpsLocation && gpsLocation.accuracy && gpsLocation.accuracy > 100
+                      ? "bg-amber-100 text-amber-700"
+                      : gpsLocation ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-400"
+                  }`}>
+                    {gpsLocation && gpsLocation.accuracy && gpsLocation.accuracy > 100 ? (
+                      <ShieldAlert className="h-4.5 w-4.5" />
+                    ) : (
+                      <MapPin className="h-4.5 w-4.5" />
+                    )}
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">GPS Worksite Coordinates</p>
+                      {gpsLocation && gpsLocation.accuracy && gpsLocation.accuracy > 100 && (
+                        <span className="text-[9px] font-extrabold bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded">Low Accuracy Warning</span>
+                      )}
+                    </div>
+                    {gpsLocation ? (
+                      <p className="text-[11px] font-bold text-slate-800">
+                        {gpsLocation.latitude.toFixed(5)}, {gpsLocation.longitude.toFixed(5)} 
+                        <span className={`text-[10px] font-semibold ml-1.5 ${gpsLocation.accuracy > 100 ? "text-amber-700 font-bold" : "text-slate-400"}`}>
+                          (Accurate to {gpsLocation.accuracy}m)
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-slate-500 font-medium">Location not verified yet</p>
+                    )}
+                  </div>
+                </div>
+                
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={getGpsLocation}
+                  disabled={gpsLoading}
+                  className="h-8 w-8 rounded-lg hover:bg-slate-200 cursor-pointer"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 text-blue-600 ${gpsLoading ? "animate-spin" : ""}`} />
+                </Button>
+              </div>
+
+              {/* Geotag Photo capture panel with Watermark preview */}
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-slate-700">Watermarked Geo-Tag Verification Photo</Label>
+                
+                {capturedPhoto ? (
+                  <div className="relative rounded-2xl border border-slate-200 overflow-hidden bg-slate-900 group">
+                    <img 
+                      src={capturedPhoto} 
+                      alt="Watermarked Check-in Log" 
+                      className="w-full h-44 object-cover object-center" 
+                    />
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setCapturedPhoto(null)}
+                        className="rounded-xl text-xs font-bold gap-1 bg-white hover:bg-slate-100 text-slate-800"
+                      >
+                        <Minimize2 className="h-3 w-3" /> Re-take Snapshot
+                      </Button>
+                    </div>
+                    <div className="absolute bottom-2 left-2 bg-emerald-600/90 text-white font-bold text-[9px] px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                      <CheckCircle2 className="h-3 w-3" /> Geo-Tag Banner Watermarked
+                    </div>
+                  </div>
+                ) : cameraActive ? (
+                  <div className="relative rounded-2xl border border-slate-200 overflow-hidden bg-black flex flex-col items-center">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      className="w-full h-44 object-cover object-center"
+                    />
+                    
+                    <div className="absolute bottom-2 inset-x-0 px-3 flex justify-between items-center z-10">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={toggleCameraLens}
+                        className="h-8 rounded-xl text-[10px] font-bold border-white/30 text-white bg-black/60 hover:bg-black/80"
+                      >
+                        🔄 Flip Lens
+                      </Button>
+                      
+                      <Button
+                        type="button"
+                        onClick={capturePhoto}
+                        className="h-9 w-9 rounded-full bg-red-600 hover:bg-red-700 shadow-md border-2 border-white flex items-center justify-center cursor-pointer"
+                      >
+                        <Camera className="h-4.5 w-4.5 text-white" />
+                      </Button>
+                      
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={stopCamera}
+                        className="h-8 rounded-xl text-[10px] font-bold border-white/30 text-white bg-black/60 hover:bg-black/80"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      type="button"
+                      onClick={startCamera}
+                      variant="outline"
+                      className="h-20 rounded-2xl border border-slate-200 border-dashed bg-white hover:bg-slate-50 flex flex-col items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Camera className="h-6 w-6 text-slate-400 group-hover:text-blue-500" />
+                      <span className="text-[11px] font-bold text-slate-700">Open Site Camera</span>
+                    </Button>
+                    
+                    <div className="relative h-20 rounded-2xl border border-slate-200 border-dashed bg-white hover:bg-slate-50 flex flex-col items-center justify-center gap-1.5 cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                      />
+                      <Upload className="h-6 w-6 text-slate-400" />
+                      <span className="text-[11px] font-bold text-slate-700">Upload Photo File</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Work description (Clock-out only) */}
+              {isClockedIn && (
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-slate-700">Select Nature of Work Today</Label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        "Robotic joint seal alignment & calibration",
+                        "Hydraulic pipe flushing & seal overhauled",
+                        "PLC tooling wiring & SCADA test",
+                        "General site maintenance & alignment check"
+                      ].map((desc) => (
+                        <button
+                          key={desc}
+                          type="button"
+                          onClick={() => setWorkDescription(desc)}
+                          className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all duration-150 cursor-pointer ${
+                            workDescription === desc 
+                              ? "bg-indigo-50 border-indigo-300 text-indigo-700" 
+                              : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                          }`}
+                        >
+                          {desc.split(" & ")[0]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="remarks-input" className="text-xs font-bold text-slate-700">Work Logs / Remarks (Optional)</Label>
+                    <Textarea
+                      id="remarks-input"
+                      value={remarks}
+                      onChange={(e) => setRemarks(e.target.value)}
+                      placeholder="Specify materials used, issues found, or site remarks..."
+                      className="text-xs rounded-xl h-16 min-h-[64px]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Submit Buttons */}
+              <Button
+                type="submit"
+                disabled={gpsLoading || (!isClockedIn && !selectedProjectId)}
+                className={`w-full h-11 rounded-2xl text-xs font-bold gap-1.5 shadow-md cursor-pointer transition-transform active:scale-98 ${
+                  isClockedIn 
+                    ? "bg-rose-600 hover:bg-rose-700 shadow-rose-500/10 text-white" 
+                    : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/10 text-white"
+                }`}
+              >
+                {isClockedIn ? (
+                  <>
+                    <HardHat className="h-4.5 w-4.5" /> End Shift & Clock Out
+                  </>
+                ) : (
+                  <>
+                    <HardHat className="h-4.5 w-4.5" /> Start Shift & Clock In
+                  </>
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="rounded-3xl border-slate-200 bg-white shadow-md p-6 text-center space-y-4">
+          <div className="mx-auto h-12 w-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <CheckCircle2 className="h-6 w-6" />
+          </div>
+          <div>
+            <h2 className="text-base font-extrabold text-slate-900">Shift Completed & Submitted!</h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Clocked out at <span className="font-bold text-slate-800">{todayLog?.outTime}</span>. Log submitted for Supervisor verification.
+            </p>
+          </div>
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 grid grid-cols-2 gap-2 text-left">
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Hours Logged</p>
+              <p className="text-lg font-black text-slate-900">{todayLog?.hoursWorked} hrs</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Status</p>
+              <span className="inline-block mt-1 text-xs font-extrabold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                Pending Verification
+              </span>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Verified-Only Payroll & Wage Summary Card */}
+      <Card className="rounded-3xl border-slate-200 bg-white shadow-xs p-4 space-y-3">
+        <div className="grid grid-cols-3 gap-2">
+          <div className="text-center space-y-0.5">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Verified Days</p>
+            <div className="flex items-center justify-center gap-1">
+              <Calendar className="h-4 w-4 text-blue-600" />
+              <h3 className="text-base font-extrabold text-slate-900">{verifiedDaysCount}</h3>
+            </div>
+            <p className="text-[9px] text-slate-400 font-semibold">Approved Shifts</p>
+          </div>
+          
+          <div className="text-center space-y-0.5 border-x border-slate-100">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Verified Hours</p>
+            <div className="flex items-center justify-center gap-1">
+              <Clock className="h-4 w-4 text-emerald-600" />
+              <h3 className="text-base font-extrabold text-slate-900">{totalVerifiedHours.toFixed(1)}h</h3>
+            </div>
+            <p className="text-[9px] text-slate-400 font-semibold">Calculated</p>
+          </div>
+
+          <div className="text-center space-y-0.5">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Verified Wages</p>
+            <div className="flex items-center justify-center gap-1">
+              <DollarSign className="h-4 w-4 text-emerald-600" />
+              <h3 className="text-base font-extrabold text-emerald-600">₹{verifiedWages.toLocaleString("en-IN")}</h3>
+            </div>
+            <p className="text-[9px] text-slate-400 font-semibold">Payroll Ready</p>
+          </div>
+        </div>
+
+        {pendingLogs.length > 0 && (
+          <div className="p-2 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-[11px]">
+            <span className="text-amber-800 font-bold flex items-center gap-1">
+              <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
+              {pendingLogs.length} shift(s) pending supervisor verification
+            </span>
+            <span className="text-[10px] text-amber-600 font-semibold">Unverified wages held</span>
+          </div>
+        )}
+      </Card>
+
+      {/* Expandable shift logs history */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
+        <button
+          onClick={() => setHistoryOpen(!historyOpen)}
+          className="w-full flex items-center justify-between p-4 font-bold text-slate-800 text-xs hover:bg-slate-50 cursor-pointer transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-slate-500" />
+            <span>Shift Logs & Watermarked Photos ({monthlyLogs.length})</span>
+          </div>
+          {historyOpen ? <ChevronUp className="h-4 w-4 text-slate-500" /> : <ChevronDown className="h-4 w-4 text-slate-500" />}
+        </button>
+
+        {historyOpen && (
+          <div className="p-4 border-t border-slate-100 space-y-3 max-h-80 overflow-y-auto bg-slate-50/50">
+            {monthlyLogs.length > 0 ? (
+              monthlyLogs.map((log) => {
+                const clockOutTime = log.outTime || "Active Duty";
+                const isCompleted = Boolean(log.inTime && log.outTime);
+                const gMapsLink = log.inLocation 
+                  ? `https://www.google.com/maps/search/?api=1&query=${log.inLocation.latitude},${log.inLocation.longitude}`
+                  : null;
+
+                const vStatus = log.verificationStatus || "Pending Verification";
+
+                return (
+                  <div key={`${log.date}_${log.labourId}`} className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs space-y-2">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="text-xs font-extrabold text-slate-900">
+                          {log.date}
+                        </h4>
+                        <p className="text-[10px] font-semibold text-slate-500">{log.workDescription}</p>
+                      </div>
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                        vStatus === "Verified" ? "bg-emerald-100 text-emerald-800" :
+                        vStatus === "Rejected" ? "bg-rose-100 text-rose-800" :
+                        "bg-amber-100 text-amber-800"
+                      }`}>
+                        {vStatus}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[10px] font-medium text-slate-500">
+                      <div>
+                        <span className="font-bold text-slate-400">IN:</span> {log.inTime || "None"}
+                      </div>
+                      <div>
+                        <span className="font-bold text-slate-400">OUT:</span> {clockOutTime}
+                      </div>
+                    </div>
+
+                    {/* Geotag references and photo links */}
+                    <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-100">
+                      {log.inPhotoUrl && (
+                        <button
+                          onClick={() => {
+                            const w = window.open();
+                            if (w) w.document.write(`<img src="${log.inPhotoUrl}" style="max-width:100%; max-height:100vh; display:block; margin:auto;" />`);
+                          }}
+                          className="text-[9px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg flex items-center gap-1 hover:bg-blue-100 cursor-pointer"
+                        >
+                          <Camera className="h-3 w-3" /> Check-in Photo
+                        </button>
+                      )}
+                      
+                      {log.outPhotoUrl && (
+                        <button
+                          onClick={() => {
+                            const w = window.open();
+                            if (w) w.document.write(`<img src="${log.outPhotoUrl}" style="max-width:100%; max-height:100vh; display:block; margin:auto;" />`);
+                          }}
+                          className="text-[9px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-lg flex items-center gap-1 hover:bg-rose-100 cursor-pointer"
+                        >
+                          <Camera className="h-3 w-3" /> Check-out Photo
+                        </button>
+                      )}
+
+                      {gMapsLink && (
+                        <a
+                          href={gMapsLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg flex items-center gap-1 hover:bg-emerald-100 transition-colors"
+                        >
+                          <MapPin className="h-3 w-3" /> View Location <ExternalLink className="h-2.5 w-2.5" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center p-4 text-xs text-slate-500 font-semibold bg-white border border-dashed rounded-2xl">
+                No shift logs recorded in this month.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

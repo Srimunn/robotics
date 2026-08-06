@@ -14,6 +14,7 @@ import type {
   PaymentStageStatus,
   PaymentStageItem,
   AttendanceStatus,
+  CurrentUser,
   ProjectActivity,
   ProjectLabourLog,
   ProjectLabourAssignment,
@@ -246,6 +247,8 @@ const initialLabours: Labour[] = [
   {
     id: "LBR-101",
     name: "Ramesh Chandra",
+    loginId: "Ramesh",
+    pin: "4827",
     phone: "9840998877",
     type: "Permanent",
     defaultWeeklyWage: 1400,
@@ -258,6 +261,8 @@ const initialLabours: Labour[] = [
   {
     id: "LBR-102",
     name: "Suresh Kumar",
+    loginId: "Suresh",
+    pin: "5912",
     phone: "9876543210",
     type: "Permanent",
     defaultWeeklyWage: 1600,
@@ -268,6 +273,8 @@ const initialLabours: Labour[] = [
   {
     id: "LBR-201",
     name: "Ganesh M.",
+    loginId: "Ganesh",
+    pin: "3140",
     phone: "9123456789",
     type: "Contract",
     defaultWeeklyWage: 1800,
@@ -280,6 +287,8 @@ const initialLabours: Labour[] = [
   {
     id: "LBR-202",
     name: "Selvam K.",
+    loginId: "Selvam",
+    pin: "7820",
     phone: "9988776655",
     type: "Contract",
     defaultWeeklyWage: 2200,
@@ -358,6 +367,10 @@ const generateInitialAttendance = (): Record<string, AttendanceRecord> => {
 };
 
 type RoboticsContextType = {
+  currentUser: CurrentUser | null;
+  login: (role: "CEO" | "Worker" | "Labor", loginIdOrId?: string, pin?: string) => boolean;
+  logout: () => void;
+  verifyAttendanceRecord: (attendanceId: string, status: "Verified" | "Rejected", verifierName: string, comments?: string) => void;
   enquiries: Enquiry[];
   projects: Project[];
   labours: Labour[];
@@ -468,6 +481,16 @@ type RoboticsContextType = {
 const RoboticsContext = createContext<RoboticsContextType | null>(null);
 
 export function RoboticsProvider({ children }: { children: ReactNode }) {
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const stored = localStorage.getItem(`${STORAGE_KEY}_current_user`);
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [engineers, setEngineers] = useState<Engineer[]>(() => {
     if (typeof window === "undefined") return initialEngineers;
     try {
@@ -628,6 +651,130 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
       console.error("Failed to save state to localStorage", e);
     }
   }, [masterData, enquiries, projects, labours, payments, attendance, settings, machines, materials, machineIssues, materialIssues, stockAuditLogs, engineers, documents]);
+
+  useEffect(() => {
+    try {
+      if (currentUser) {
+        localStorage.setItem(`${STORAGE_KEY}_current_user`, JSON.stringify(currentUser));
+      } else {
+        localStorage.removeItem(`${STORAGE_KEY}_current_user`);
+      }
+    } catch (e) {
+      console.error("Failed to save currentUser to localStorage", e);
+    }
+  }, [currentUser]);
+
+  const login = (role: "CEO" | "Worker" | "Labor", loginIdOrId?: string, pin?: string): boolean => {
+    if (role === "CEO") {
+      setCurrentUser({ role: "CEO", name: "CEO User" });
+      toast.success("Welcome back, CEO!");
+      return true;
+    }
+    if (role === "Worker") {
+      setCurrentUser({ role: "Worker", name: "Supervisor User" });
+      toast.success("Supervisor session initiated");
+      return true;
+    }
+    if (role === "Labor") {
+      if (!loginIdOrId || !loginIdOrId.trim()) {
+        toast.error("Labour Login ID is required");
+        return false;
+      }
+      if (!pin || !pin.trim()) {
+        toast.error("4-digit PIN is required");
+        return false;
+      }
+
+      const trimmedInput = loginIdOrId.trim().toLowerCase();
+      const trimmedPin = pin.trim();
+
+      const lab = labours.find(
+        (l) =>
+          (l.loginId.toLowerCase() === trimmedInput || l.id.toLowerCase() === trimmedInput || l.name.toLowerCase() === trimmedInput) &&
+          l.pin === trimmedPin
+      );
+
+      if (!lab) {
+        toast.error(`❌ Invalid Login ID or PIN! Check credentials in Labour Profile.`);
+        return false;
+      }
+      setCurrentUser({ role: "Labor", id: lab.id, name: lab.name });
+      toast.success(`Welcome, ${lab.name}!`);
+      return true;
+    }
+    return false;
+  };
+
+  const logout = () => {
+    setCurrentUser(null);
+    toast.info("Logged out successfully");
+  };
+
+  const verifyAttendanceRecord = (
+    attendanceId: string,
+    status: "Verified" | "Rejected",
+    verifierName: string,
+    comments?: string
+  ) => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    setAttendance((prev) => {
+      const existing = prev[attendanceId];
+      if (!existing) return prev;
+      return {
+        ...prev,
+        [attendanceId]: {
+          ...existing,
+          verificationStatus: status,
+          verifiedBy: verifierName,
+          verifiedDate: todayStr,
+          verificationComments: comments || "",
+        },
+      };
+    });
+
+    setProjects((prev) =>
+      prev.map((p) => {
+        let modified = false;
+        const newLogs = p.labourLogs.map((log) => {
+          if (`${log.labourId}_${log.date}` === attendanceId) {
+            modified = true;
+            return {
+              ...log,
+              verificationStatus: status,
+              verifiedBy: verifierName,
+              verifiedDate: todayStr,
+              verificationComments: comments || "",
+            };
+          }
+          return log;
+        });
+
+        if (!modified) return p;
+
+        return {
+          ...p,
+          labourLogs: newLogs,
+          activities: [
+            {
+              id: `ACT-${Math.random().toString(36).slice(2, 6)}`,
+              timestamp: new Date().toISOString().slice(0, 16).replace("T", " "),
+              event: `Attendance ${status}`,
+              actor: verifierName,
+              details: `Marked ${attendanceId} as ${status}. ${comments ? `Note: ${comments}` : ""}`,
+            },
+            ...p.activities,
+          ],
+        };
+      })
+    );
+
+    if (status === "Verified") {
+      toast.success(`Attendance Verified by ${verifierName}! Wages sync enabled.`);
+    } else {
+      toast.error(`Attendance Rejected by ${verifierName}.`);
+    }
+  };
 
   // Engineer Actions & Conflict Checking
   const addEngineer = (data: Omit<Engineer, "id">) => {
@@ -1298,11 +1445,15 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
     const autoEarned = calculateEarnedWage(log.weeklyWage || 1400, autoHours);
     const nowStr = new Date().toISOString().slice(0, 16).replace("T", " ");
 
+    const autoVerification: "Pending Verification" | "Verified" | "Rejected" =
+      log.verificationStatus || "Pending Verification";
+
     const updatedLog: ProjectLabourLog = {
       ...log,
       attendance: autoAttendance,
       hoursWorked: autoHours,
       earnedMoney: autoEarned,
+      verificationStatus: autoVerification,
     };
 
     setProjects((prev) =>
@@ -1322,7 +1473,7 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
           timestamp: nowStr,
           event: "Attendance Logged",
           actor: "Site Supervisor",
-          details: `Logged ${log.labourName} (${log.inTime || "None"} to ${log.outTime || "None"}) -> Attendance: ${autoAttendance} (${autoHours} hrs | ₹${autoEarned.toLocaleString("en-IN")})`,
+          details: `Logged ${log.labourName} (${log.inTime || "None"} to ${log.outTime || "None"}) -> Attendance: ${autoAttendance} (${autoHours} hrs | ₹${autoEarned.toLocaleString("en-IN")}) [${autoVerification}]`,
         };
 
         return {
@@ -1353,20 +1504,39 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
         earnedMoney: autoEarned,
         workDescription: log.workDescription,
         weeklyWage: log.weeklyWage,
+        inPhotoUrl: log.inPhotoUrl,
+        outPhotoUrl: log.outPhotoUrl,
+        inLocation: log.inLocation,
+        outLocation: log.outLocation,
+        verificationStatus: autoVerification,
+        verifiedBy: log.verifiedBy,
+        verifiedDate: log.verifiedDate,
+        verificationComments: log.verificationComments,
+        isGpsWarning: log.isGpsWarning,
       },
     }));
 
     toast.success(
-      `Logged ${log.labourName}! ${autoHours} hrs worked • Earned Wages: ₹${autoEarned.toLocaleString("en-IN")}`
+      `Logged ${log.labourName}! ${autoHours} hrs worked • Earned Wages: ₹${autoEarned.toLocaleString("en-IN")} (${autoVerification})`
     );
   };
 
   const addLabour = (l: Omit<Labour, "id">) => {
     const nextNum = labours.length + 1;
     const autoId = `LBR-${String(nextNum).padStart(3, "0")}`;
-    const newL: Labour = { ...l, id: autoId, wageHistory: [] };
+    const cleanFirstName = (l.name || "Labour").trim().split(" ")[0].replace(/[^a-zA-Z0-9]/g, "");
+    const generatedLoginId = l.loginId && l.loginId.trim() ? l.loginId.trim() : cleanFirstName || autoId;
+    const generatedPin = l.pin && l.pin.trim() ? l.pin.trim() : String(Math.floor(1000 + Math.random() * 9000));
+
+    const newL: Labour = {
+      ...l,
+      id: autoId,
+      loginId: generatedLoginId,
+      pin: generatedPin,
+      wageHistory: [],
+    };
     setLabours((prev) => [...prev, newL]);
-    toast.success(`Labour ${newL.name} (${autoId}) added`);
+    toast.success(`Labour ${newL.name} (${autoId}) added! Login ID: ${generatedLoginId} | PIN: ${generatedPin}`);
     return newL;
   };
 
@@ -2140,6 +2310,10 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   return (
     <RoboticsContext.Provider
       value={{
+        currentUser,
+        login,
+        logout,
+        verifyAttendanceRecord,
         enquiries,
         projects,
         labours,

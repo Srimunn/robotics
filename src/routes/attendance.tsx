@@ -16,6 +16,9 @@ import {
   FileSpreadsheet,
   Layers,
   Calendar,
+  Camera,
+  MapPin,
+  ExternalLink,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -51,7 +54,7 @@ export const Route = createFileRoute("/attendance")({
 });
 
 function AttendancePageComponent() {
-  const { labours, attendance, projects, updateProjectLabourLog } = useRobotics();
+  const { labours, attendance, projects, updateProjectLabourLog, verifyAttendanceRecord, currentUser } = useRobotics();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -116,13 +119,22 @@ function AttendancePageComponent() {
         earnedMoney: lg.earnedMoney,
         workDescription: lg.workDescription,
         weeklyWage: lg.weeklyWage,
+        inPhotoUrl: lg.inPhotoUrl,
+        outPhotoUrl: lg.outPhotoUrl,
+        inLocation: lg.inLocation,
+        outLocation: lg.outLocation,
+        verificationStatus: lg.verificationStatus || "Pending Verification",
+        verifiedBy: lg.verifiedBy,
+        verifiedDate: lg.verifiedDate,
+        verificationComments: lg.verificationComments,
+        isGpsWarning: lg.isGpsWarning,
       }))
     );
 
     const map = new Map<string, AttendanceRecord>();
     [...centralLogs, ...projLogs].forEach((item) => {
       const existing = map.get(item.id);
-      if (!existing || (item.hoursWorked && item.hoursWorked > 0)) {
+      if (!existing || (item.hoursWorked && item.hoursWorked > 0) || item.verificationStatus === "Verified") {
         map.set(item.id, item);
       }
     });
@@ -551,31 +563,108 @@ function AttendancePageComponent() {
                       <TableHead className="text-[11px] font-bold text-center">In Time</TableHead>
                       <TableHead className="text-[11px] font-bold text-center">Out Time</TableHead>
                       <TableHead className="text-[11px] font-bold text-center">Status</TableHead>
+                      <TableHead className="text-[11px] font-bold">Verification Status & Actions</TableHead>
+                      <TableHead className="text-[11px] font-bold">Geotag Verification</TableHead>
                       <TableHead className="text-[11px] font-bold">Work Notes</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {activeLabourDetail.logs.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-6 text-xs text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-6 text-xs text-muted-foreground">
                           No daily logs recorded for this labour in selected period.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      activeLabourDetail.logs.map((log, idx) => (
-                        <TableRow key={idx} className="text-xs">
-                          <TableCell className="font-mono text-muted-foreground">{log.date}</TableCell>
-                          <TableCell className="font-bold text-purple-700">{log.projectId || "Project Site"}</TableCell>
-                          <TableCell className="text-center font-mono text-blue-600 font-semibold">{log.inTime || "—"}</TableCell>
-                          <TableCell className="text-center font-mono text-slate-500">{log.outTime || "—"}</TableCell>
-                          <TableCell className="text-center">
-                            <Badge className="text-[10px] bg-emerald-100 text-emerald-800 border-emerald-200">
-                              {log.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground truncate max-w-xs">{log.workDescription || "On site"}</TableCell>
-                        </TableRow>
-                      ))
+                      activeLabourDetail.logs.map((log, idx) => {
+                        const vStatus = log.verificationStatus || "Pending Verification";
+                        return (
+                          <TableRow key={idx} className="text-xs">
+                            <TableCell className="font-mono text-muted-foreground">{log.date}</TableCell>
+                            <TableCell className="font-bold text-purple-700">{log.projectId || "Project Site"}</TableCell>
+                            <TableCell className="text-center font-mono text-blue-600 font-semibold">{log.inTime || "—"}</TableCell>
+                            <TableCell className="text-center font-mono text-slate-500">{log.outTime || "—"}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge className="text-[10px] bg-emerald-100 text-emerald-800 border-emerald-200">
+                                {log.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="space-y-1">
+                                <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                                  vStatus === "Verified" ? "bg-emerald-100 text-emerald-800 border border-emerald-300" :
+                                  vStatus === "Rejected" ? "bg-rose-100 text-rose-800 border border-rose-300" :
+                                  "bg-amber-100 text-amber-800 border border-amber-300"
+                                }`}>
+                                  {vStatus === "Verified" ? `✓ Verified by ${log.verifiedBy || "Manager"}` : vStatus === "Rejected" ? `✕ Rejected` : `⏳ Pending Verification`}
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  {vStatus !== "Verified" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => verifyAttendanceRecord(log.id, "Verified", currentUser?.name || "Supervisor")}
+                                      className="text-[9px] font-bold px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer"
+                                    >
+                                      Approve
+                                    </button>
+                                  )}
+                                  {vStatus !== "Rejected" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => verifyAttendanceRecord(log.id, "Rejected", currentUser?.name || "Supervisor")}
+                                      className="text-[9px] font-bold px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded cursor-pointer"
+                                    >
+                                      Reject
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5">
+                                {log.inPhotoUrl && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const w = window.open();
+                                      if (w) w.document.write(`<img src="${log.inPhotoUrl}" style="max-width:100%; max-height:100vh; display:block; margin:auto;" />`);
+                                    }}
+                                    title="View Watermarked Check-In Photo"
+                                    className="h-5 w-5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center cursor-pointer border border-blue-200"
+                                  >
+                                    <Camera className="h-3 w-3" />
+                                  </button>
+                                )}
+                                {log.outPhotoUrl && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const w = window.open();
+                                      if (w) w.document.write(`<img src="${log.outPhotoUrl}" style="max-width:100%; max-height:100vh; display:block; margin:auto;" />`);
+                                    }}
+                                    title="View Watermarked Check-Out Photo"
+                                    className="h-5 w-5 rounded bg-rose-50 text-rose-600 hover:bg-rose-100 flex items-center justify-center cursor-pointer border border-rose-200"
+                                  >
+                                    <Camera className="h-3 w-3" />
+                                  </button>
+                                )}
+                                {log.inLocation && (
+                                  <a
+                                    href={`https://www.google.com/maps/search/?api=1&query=${log.inLocation.latitude},${log.inLocation.longitude}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="View Location on Google Maps"
+                                    className="h-5 w-5 rounded bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center border border-emerald-200"
+                                  >
+                                    <MapPin className="h-3 w-3" />
+                                  </a>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground truncate max-w-xs">{log.workDescription || "On site"}</TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>

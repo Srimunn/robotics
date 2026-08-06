@@ -121,7 +121,7 @@ function LaboursComponent() {
   const labours = robotics?.labours || [];
   const attendance = robotics?.attendance || {};
   const projects = robotics?.projects || [];
-  const { addLabour, updateLabour, deleteLabour, checkLabourAvailability, addMasterDataItem, updateProjectLabourLog } = robotics;
+  const { addLabour, updateLabour, deleteLabour, checkLabourAvailability, addMasterDataItem, updateProjectLabourLog, verifyAttendanceRecord, currentUser } = robotics;
 
   const [activeTab, setActiveTab] = useState<"PROFILE" | "ATTENDANCE" | "MASTER">("PROFILE");
   const [labourTypeFilter, setLabourTypeFilter] = useState<"PERMANENT" | "CONTRACT" | "ALL">("ALL");
@@ -518,6 +518,35 @@ function LaboursComponent() {
                             </div>
                           </div>
                         )}
+
+                        {/* PORTAL LOGIN CREDENTIALS CARD */}
+                        <div className="p-3.5 bg-purple-50 dark:bg-purple-950/40 text-purple-950 dark:text-purple-200 border border-purple-200 dark:border-purple-800 rounded-xl text-xs flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <Badge className="bg-purple-600 text-white font-bold text-[10px]">Portal Credentials</Badge>
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">
+                              Labour ID: <strong className="text-purple-700 dark:text-purple-300">{activeLabour.id}</strong>
+                            </span>
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">
+                              Login ID: <code className="bg-white dark:bg-purple-900/80 px-2 py-0.5 rounded border border-purple-300 font-extrabold text-purple-700 dark:text-purple-300 text-xs">{activeLabour.loginId || activeLabour.name.split(" ")[0]}</code>
+                            </span>
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">
+                              Generated PIN: <code className="bg-white dark:bg-purple-900/80 px-2 py-0.5 rounded border border-purple-300 font-extrabold text-purple-700 dark:text-purple-300 text-xs">{activeLabour.pin || "4827"}</code>
+                            </span>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const text = `Robotics ERP Labour Portal Credentials\nLabour Name: ${activeLabour.name}\nLabour ID: ${activeLabour.id}\nLogin ID: ${activeLabour.loginId || activeLabour.name.split(" ")[0]}\nPIN: ${activeLabour.pin || "4827"}`;
+                              navigator.clipboard.writeText(text);
+                              toast.success(`Copied login credentials for ${activeLabour.name}`);
+                            }}
+                            className="h-8 text-[11px] font-bold text-purple-700 border-purple-300 hover:bg-purple-100 cursor-pointer rounded-lg gap-1"
+                          >
+                            📋 Copy Credentials
+                          </Button>
+                        </div>
 
                         {/* 4 KPI METRIC CARDS */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
