@@ -44,7 +44,7 @@ export const Route = createFileRoute("/reports")({
 });
 
 function ReportsComponent() {
-  const { enquiries, projects, payments, labours, attendance, customers } = useRobotics();
+  const { enquiries, projects, payments, labours, attendance, customers, machines, machineIssues } = useRobotics();
 
   const [activeReport, setActiveReport] = useState<
     "REVENUE" | "PROJECTS" | "PENDING" | "ENQUIRIES" | "ATTENDANCE" | "NATURE" | "CUSTOMER" | "REFERRALS"
@@ -428,6 +428,86 @@ function ReportsComponent() {
     toast.success(`Exported ${filename}.csv successfully!`);
   };
 
+  // Export Printable PDF Helper
+  const handleExportPDF = (reportTitle: string, headers: string[], rows: (string | number)[][]) => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      toast.error("Please allow popups to download PDF report");
+      return;
+    }
+
+    const tableHeaders = headers
+      .map(
+        (h) =>
+          `<th style="padding:8px 10px; border:1px solid #cbd5e1; background:#f1f5f9; text-align:left; font-size:10px; font-weight:bold; color:#1e293b; text-transform:uppercase;">${h}</th>`
+      )
+      .join("");
+
+    const tableRows = rows
+      .map(
+        (r) =>
+          `<tr>${r
+            .map(
+              (cell) =>
+                `<td style="padding:6px 10px; border:1px solid #e2e8f0; font-size:10px; color:#334155;">${cell ?? "N/A"}</td>`
+            )
+            .join("")}</tr>`
+      )
+      .join("");
+
+    const now = new Date().toLocaleDateString("en-IN", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${reportTitle}</title>
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; color: #0f172a; margin: 0; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-bottom: 16px; }
+            .logo { font-size: 18px; font-weight: 900; color: #1e3a8a; }
+            .subtitle { font-size: 11px; color: #64748b; margin-top: 2px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+            .footer { margin-top: 20px; text-align: right; font-size: 10px; color: #94a3b8; }
+            @media print {
+              body { padding: 0; }
+              @page { size: A4 landscape; margin: 10mm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div class="logo">ROBOTICS ERP — EXECUTIVE REPORT</div>
+              <div class="subtitle">${reportTitle} • Generated on ${now}</div>
+            </div>
+            <div style="text-align: right; font-size: 10px; font-weight: bold; color: #2563eb;">
+              OFFICIAL BUSINESS REPORT
+            </div>
+          </div>
+          <table>
+            <thead><tr>${tableHeaders}</tr></thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+          <div class="footer">
+            Generated via Robotics ERP System
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    toast.success(`Generated PDF View for ${reportTitle}`);
+  };
+
   const handlePrintPDF = () => {
     window.print();
   };
@@ -459,7 +539,6 @@ function ReportsComponent() {
           { id: "ATTENDANCE", label: "Attendance & Payroll", icon: Calendar },
           { id: "NATURE", label: "Work Report", icon: Wrench },
           { id: "CUSTOMER", label: "Customer Ledger", icon: Users },
-          { id: "REFERRALS", label: "Referral Tracking & Analytics", icon: BarChart3 },
         ].map((tab) => (
           <Button
             key={tab.id}
@@ -514,6 +593,31 @@ function ReportsComponent() {
                   className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
                 >
                   <Download className="h-3.5 w-3.5" /> Download Filtered Excel ({filteredRevenueReport.length})
+                </Button>
+
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const statusLabel = revenuePaymentStatusFilter === "ALL" ? "All_Payments" : revenuePaymentStatusFilter;
+                    const dateLabel = revenueStartDateFilter || revenueEndDateFilter ? ` (${revenueStartDateFilter} to ${revenueEndDateFilter})` : "";
+                    handleExportPDF(
+                      `Custom Revenue & Billing Summary Report - ${statusLabel}${dateLabel}`,
+                      ["Project ID", "Customer Name", "Work Description", "Scheduled Date", "Contract Value (₹)", "Received (₹)", "Balance Due (₹)", "Status"],
+                      filteredRevenueReport.map((p) => [
+                        p.id,
+                        p.customerName,
+                        p.natureOfWork || "N/A",
+                        p.scheduledDate || "N/A",
+                        `₹${(p.projectValue || 0).toLocaleString("en-IN")}`,
+                        `₹${(p.receivedAmount || 0).toLocaleString("en-IN")}`,
+                        `₹${(p.balanceAmount || 0).toLocaleString("en-IN")}`,
+                        p.paymentStatus || "Unpaid",
+                      ])
+                    );
+                  }}
+                  className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
+                >
+                  <FileText className="h-3.5 w-3.5" /> Download PDF Report
                 </Button>
               </div>
             </div>
@@ -712,6 +816,32 @@ function ReportsComponent() {
                   className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
                 >
                   <Download className="h-3.5 w-3.5" /> Download Filtered Excel ({filteredProjectsReport.length})
+                </Button>
+
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const statusLabel = projectStatusFilter === "ALL" ? "All_Statuses" : projectStatusFilter;
+                    const dateLabel = startDateFilter || endDateFilter ? ` (${startDateFilter} to ${endDateFilter})` : "";
+                    handleExportPDF(
+                      `Custom Projects Deployment Report - ${statusLabel}${dateLabel}`,
+                      ["Project ID", "Customer Name", "Work Description", "Lead Engineer", "Scheduled Date", "Location", "Contract Value (₹)", "Payment Status", "Status"],
+                      filteredProjectsReport.map((p) => [
+                        p.id,
+                        p.customerName,
+                        p.natureOfWork,
+                        p.assignedEngineerName || "Er. Rajesh Kumar",
+                        p.scheduledDate || "N/A",
+                        p.location || "N/A",
+                        `₹${(p.projectValue || 0).toLocaleString("en-IN")}`,
+                        p.paymentStatus,
+                        p.status,
+                      ])
+                    );
+                  }}
+                  className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
+                >
+                  <FileText className="h-3.5 w-3.5" /> Download PDF Report
                 </Button>
               </div>
             </div>
@@ -914,6 +1044,32 @@ function ReportsComponent() {
                 >
                   <Download className="h-3.5 w-3.5" /> Download Filtered Excel ({filteredPendingReport.length})
                 </Button>
+
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const statusLabel = pendingPaymentStatusFilter === "ALL" ? "All_Pending" : pendingPaymentStatusFilter;
+                    const dateLabel = pendingStartDateFilter || pendingEndDateFilter ? ` (${pendingStartDateFilter} to ${pendingEndDateFilter})` : "";
+                    handleExportPDF(
+                      `Custom Pending Receivables & Collections Report - ${statusLabel}${dateLabel}`,
+                      ["Project ID", "Customer Name", "Contact Phone", "Work Description", "Scheduled / Due Date", "Contract Value (₹)", "Received (₹)", "Outstanding Due (₹)", "Status"],
+                      filteredPendingReport.map((p) => [
+                        p.id,
+                        p.customerName,
+                        p.phone || "N/A",
+                        p.natureOfWork || "N/A",
+                        p.scheduledDate || "N/A",
+                        `₹${(p.projectValue || 0).toLocaleString("en-IN")}`,
+                        `₹${(p.receivedAmount || 0).toLocaleString("en-IN")}`,
+                        `₹${(p.balanceAmount || 0).toLocaleString("en-IN")}`,
+                        p.paymentStatus || "Unpaid",
+                      ])
+                    );
+                  }}
+                  className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
+                >
+                  <FileText className="h-3.5 w-3.5" /> Download PDF Report
+                </Button>
               </div>
             </div>
 
@@ -1112,6 +1268,32 @@ function ReportsComponent() {
                   className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
                 >
                   <Download className="h-3.5 w-3.5" /> Download Filtered Excel ({filteredEnquiriesReport.length})
+                </Button>
+
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const decLabel = enquiryDecisionFilter === "ALL" ? "All_Decisions" : enquiryDecisionFilter;
+                    const dateLabel = enquiryStartDateFilter || enquiryEndDateFilter ? ` (${enquiryStartDateFilter} to ${enquiryEndDateFilter})` : "";
+                    handleExportPDF(
+                      `Custom Enquiries & Quotations Funnel Report - ${decLabel}${dateLabel}`,
+                      ["Enquiry ID", "Customer Name", "Phone", "Leakage / Need", "Quotation (₹)", "Lead Source", "Referred By", "Date", "Customer Decision"],
+                      filteredEnquiriesReport.map((e) => [
+                        e.id,
+                        e.customerName,
+                        e.phone || "N/A",
+                        e.leakageType || "N/A",
+                        `₹${(e.quotationAmount || 0).toLocaleString("en-IN")}`,
+                        e.leadSource || "N/A",
+                        e.referredBy || "N/A",
+                        e.createdAt?.slice(0, 10) || "N/A",
+                        e.customerDecision || "Follow Up",
+                      ])
+                    );
+                  }}
+                  className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
+                >
+                  <FileText className="h-3.5 w-3.5" /> Download PDF Report
                 </Button>
               </div>
             </div>
@@ -1343,6 +1525,56 @@ function ReportsComponent() {
                   className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
                 >
                   <Download className="h-3.5 w-3.5" /> Download Filtered Excel
+                </Button>
+
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const memberObj = labours.find((l) => l.id === attMemberFilter);
+                    const memberLabel = memberObj ? memberObj.name : "All Staff Members";
+                    const dateLabel = attStartDateFilter || attEndDateFilter ? ` (${attStartDateFilter} to ${attEndDateFilter})` : "";
+
+                    if (attMemberFilter !== "ALL") {
+                      const logsToExport = allProjectLogs.filter((log) => {
+                        if (log.labourId !== attMemberFilter) return false;
+                        if (attStartDateFilter && log.date < attStartDateFilter) return false;
+                        if (attEndDateFilter && log.date > attEndDateFilter) return false;
+                        return true;
+                      });
+
+                      handleExportPDF(
+                        `Attendance & Timesheet Report - ${memberLabel}${dateLabel}`,
+                        ["Date", "Labour Name", "Project / Customer", "Work Done Description", "In - Out Time", "Hours Logged", "Earned Wage (₹)", "Verification"],
+                        logsToExport.map((log) => [
+                          log.date,
+                          log.labourName,
+                          log.customerName || "N/A",
+                          log.workDescription || "On-site servicing",
+                          `${log.inTime || "N/A"} - ${log.outTime || "N/A"}`,
+                          `${log.hoursWorked || 0}h`,
+                          `₹${Math.round(log.earnedMoney || 0).toLocaleString("en-IN")}`,
+                          log.verificationStatus || "Verified",
+                        ])
+                      );
+                    } else {
+                      handleExportPDF(
+                        `Staff Payroll & Attendance Summary Report - ${memberLabel}${dateLabel}`,
+                        ["Labour ID", "Labour Name", "Labour Type", "Weekly Wage Rate (₹)", "Present Days", "Total Hours Worked", "Earned Payroll (₹)"],
+                        filteredLaboursSummary.map((item) => [
+                          item.labour.id,
+                          item.labour.name,
+                          item.labour.type,
+                          `₹${item.weeklyRate.toLocaleString("en-IN")}`,
+                          item.presentDays,
+                          `${item.totalHours.toFixed(1)}h`,
+                          `₹${Math.round(item.earnedWages).toLocaleString("en-IN")}`,
+                        ])
+                      );
+                    }
+                  }}
+                  className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
+                >
+                  <FileText className="h-3.5 w-3.5" /> Download PDF Report
                 </Button>
               </div>
             </div>
@@ -1600,7 +1832,7 @@ function ReportsComponent() {
                     const catLabel = workCategoryFilter === "ALL" ? "All_Categories" : workCategoryFilter.replace(/\s+/g, "_");
                     const dateLabel = workStartDateFilter || workEndDateFilter ? `_${workStartDateFilter}_to_${workEndDateFilter}` : "";
                     handleExportCSV(
-                      `Projects_Work_Report_Till_Date_${catLabel}${dateLabel}`,
+                      `Projects_Work_Summary_Till_Date_${catLabel}${dateLabel}`,
                       ["Project ID", "Customer Name", "Work Category", "Lead Engineer", "Location", "Latest Shift Date", "Total Shifts", "Total Hours Logged", "Latest Work Summary Till Date", "Status"],
                       filteredWorkProjects.map((item) => [
                         item.projectId,
@@ -1618,7 +1850,97 @@ function ReportsComponent() {
                   }}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
                 >
-                  <Download className="h-3.5 w-3.5" /> Download Work Projects Summary ({filteredWorkProjects.length})
+                  <Download className="h-3.5 w-3.5" /> Download Projects Summary ({filteredWorkProjects.length})
+                </Button>
+
+                <Button
+                  onClick={() => {
+                    const catLabel = workCategoryFilter === "ALL" ? "All_Categories" : workCategoryFilter.replace(/\s+/g, "_");
+                    const dateLabel = workStartDateFilter || workEndDateFilter ? `_${workStartDateFilter}_to_${workEndDateFilter}` : "";
+                    const allTimelineLogs = filteredWorkProjects.flatMap((proj) =>
+                      proj.logs.length > 0
+                        ? proj.logs.map((log: any) => [
+                            log.date,
+                            proj.projectId,
+                            proj.customerName,
+                            proj.workCategory,
+                            proj.engineerName,
+                            log.labourName || "Staff Member",
+                            log.workDescription || "On-site operations",
+                            log.inTime || "09:00 AM",
+                            log.outTime || "17:00 PM",
+                            log.hoursWorked || 8,
+                            log.verificationStatus || "Verified",
+                            proj.location,
+                          ])
+                        : [[
+                            proj.latestDate,
+                            proj.projectId,
+                            proj.customerName,
+                            proj.workCategory,
+                            proj.engineerName,
+                            "Unassigned",
+                            proj.latestWorkSummary,
+                            "N/A",
+                            "N/A",
+                            0,
+                            proj.status,
+                            proj.location,
+                          ]]
+                    );
+
+                    handleExportCSV(
+                      `Detailed_Work_Timeline_Logs_${catLabel}${dateLabel}`,
+                      ["Shift Date", "Project ID", "Customer Name", "Work Category", "Lead Engineer", "Staff On Duty", "Work Done Description", "In Time", "Out Time", "Hours Worked", "Verification", "Location"],
+                      allTimelineLogs
+                    );
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
+                >
+                  <Download className="h-3.5 w-3.5" /> Download Detailed Work Timeline Logs (CSV)
+                </Button>
+
+                <Button
+                  onClick={() => {
+                    const catLabel = workCategoryFilter === "ALL" ? "All_Categories" : workCategoryFilter;
+                    const dateLabel = workStartDateFilter || workEndDateFilter ? ` (${workStartDateFilter} to ${workEndDateFilter})` : "";
+                    const allTimelineLogs = filteredWorkProjects.flatMap((proj) =>
+                      proj.logs.length > 0
+                        ? proj.logs.map((log: any) => [
+                            log.date,
+                            proj.projectId,
+                            proj.customerName,
+                            proj.workCategory,
+                            proj.engineerName,
+                            log.labourName || "Staff Member",
+                            log.workDescription || "On-site operations",
+                            `${log.inTime || "09:00"} - ${log.outTime || "17:00"}`,
+                            `${log.hoursWorked || 8}h`,
+                            log.verificationStatus || "Verified",
+                          ])
+                        : [[
+                            proj.latestDate,
+                            proj.projectId,
+                            proj.customerName,
+                            proj.workCategory,
+                            proj.engineerName,
+                            "Unassigned",
+                            proj.latestWorkSummary,
+                            "N/A",
+                            "0h",
+                            proj.status,
+                          ]]
+                    );
+
+                    handleExportPDF(
+                      `Detailed Work Timeline & Execution Report - ${catLabel}${dateLabel}`,
+                      ["Shift Date", "Project ID", "Customer Name", "Work Category", "Lead Engineer", "Staff On Duty", "Work Done Description", "In - Out Time", "Hours", "Status"],
+                      allTimelineLogs
+                    );
+                  }}
+                  className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
+                >
+                  <FileText className="h-3.5 w-3.5" /> Download PDF Report
                 </Button>
               </div>
             </div>
@@ -1841,6 +2163,32 @@ function ReportsComponent() {
                   className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
                 >
                   <Download className="h-3.5 w-3.5" /> Download Customer Ledger Excel ({filteredCustomerLedgers.length})
+                </Button>
+
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const statusLabel = custLedgerStatusFilter === "ALL" ? "All_Clients" : custLedgerStatusFilter;
+                    const dateLabel = custStartDateFilter || custEndDateFilter ? ` (${custStartDateFilter} to ${custEndDateFilter})` : "";
+                    handleExportPDF(
+                      `Customer Account Ledger & Lifetime Statements - ${statusLabel}${dateLabel}`,
+                      ["Customer ID", "Customer Name", "Contact Phone", "Location", "Projects", "Lifetime Value (₹)", "Cash Received (₹)", "Outstanding Due (₹)", "Status"],
+                      filteredCustomerLedgers.map((item) => [
+                        item.customer.id,
+                        item.customer.name,
+                        item.customer.phone || "N/A",
+                        item.customer.location || "N/A",
+                        item.projectCount,
+                        `₹${item.totalVal.toLocaleString("en-IN")}`,
+                        `₹${item.totalRec.toLocaleString("en-IN")}`,
+                        `₹${item.balanceDue.toLocaleString("en-IN")}`,
+                        item.balanceDue > 0 ? "Outstanding Due" : "Settled",
+                      ])
+                    );
+                  }}
+                  className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
+                >
+                  <FileText className="h-3.5 w-3.5" /> Download PDF Report
                 </Button>
               </div>
             </div>
@@ -2453,6 +2801,58 @@ function ReportsComponent() {
                   </div>
                 </div>
 
+                {/* Machinery & Equipment Deployed Section */}
+                {(() => {
+                  const projMachines = machineIssues.filter((mi) => mi.projectId === selectedWorkProject.projectId);
+                  return (
+                    <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-muted/20 border border-slate-200 dark:border-border">
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
+                        <Wrench className="h-3.5 w-3.5 text-indigo-600" /> Allocated Machinery & Tooling Equipment ({projMachines.length})
+                      </h4>
+                      {projMachines.length === 0 ? (
+                        <p className="text-[11px] text-muted-foreground italic">
+                          Standard robotics servicing kit & high-pressure pump active on site.
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {projMachines.map((mi) => (
+                            <span key={mi.id} className="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200 flex items-center gap-1">
+                              ⚙️ {mi.machineName} ({mi.issueDate})
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Assigned Field Crew Section */}
+                {(() => {
+                  const assignedCrew = labours.filter((l) =>
+                    selectedWorkProject.projectObj?.assignedLabourIds?.includes(l.id)
+                  );
+                  return (
+                    <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-muted/20 border border-slate-200 dark:border-border">
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-400 flex items-center gap-1.5">
+                        <Users className="h-3.5 w-3.5 text-purple-600" /> Assigned Labour Crew ({assignedCrew.length})
+                      </h4>
+                      {assignedCrew.length === 0 ? (
+                        <p className="text-[11px] text-muted-foreground italic">
+                          Field technicians assigned per shift schedule.
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {assignedCrew.map((lab) => (
+                            <span key={lab.id} className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-purple-50 text-purple-800 border border-purple-200 flex items-center gap-1">
+                              👷 {lab.name} ({lab.type} • ₹{lab.defaultWeeklyWage}/wk)
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {/* Chronological Work History Table */}
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold text-foreground flex items-center justify-between">
@@ -2460,7 +2860,7 @@ function ReportsComponent() {
                     <span className="text-[11px] font-normal text-muted-foreground">📍 Location: {selectedWorkProject.location}</span>
                   </h4>
 
-                  <div className="overflow-x-auto rounded-xl border border-border max-h-72">
+                  <div className="overflow-x-auto rounded-xl border border-border max-h-64">
                     <table className="w-full text-left text-xs">
                       <thead className="bg-muted/40 text-muted-foreground border-b font-medium sticky top-0 bg-white dark:bg-card">
                         <tr>
@@ -2505,7 +2905,7 @@ function ReportsComponent() {
                 </div>
               </div>
 
-              <DialogFooter className="pt-4 border-t flex items-center justify-between gap-2">
+              <DialogFooter className="pt-4 border-t flex flex-wrap items-center justify-between gap-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -2514,42 +2914,73 @@ function ReportsComponent() {
                 >
                   Close
                 </Button>
-                <Button
-                  onClick={() => {
-                    handleExportCSV(
-                      `Project_Work_History_${selectedWorkProject.projectId}_Till_Date`,
-                      ["Project ID", "Customer Name", "Work Category", "Shift Date", "Staff On Duty", "Work Done Description", "In Time", "Out Time", "Hours Worked", "Verification"],
-                      selectedWorkProject.logs.length > 0
-                        ? selectedWorkProject.logs.map((log: any) => [
-                            selectedWorkProject.projectId,
-                            selectedWorkProject.customerName,
-                            selectedWorkProject.workCategory,
-                            log.date,
-                            log.labourName || "Staff Member",
-                            log.workDescription || "On-site operations",
-                            log.inTime || "09:00",
-                            log.outTime || "17:00",
-                            log.hoursWorked || 8,
-                            log.verificationStatus || "Verified",
-                          ])
-                        : [[
-                            selectedWorkProject.projectId,
-                            selectedWorkProject.customerName,
-                            selectedWorkProject.workCategory,
-                            selectedWorkProject.latestDate,
-                            "Unassigned",
-                            selectedWorkProject.latestWorkSummary,
-                            "N/A",
-                            "N/A",
-                            0,
-                            selectedWorkProject.status,
-                          ]]
-                    );
-                  }}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold gap-1.5 shadow-md px-4"
-                >
-                  <Download className="h-3.5 w-3.5" /> Download Project History (CSV)
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => {
+                      handleExportCSV(
+                        `Project_Work_History_${selectedWorkProject.projectId}_Till_Date`,
+                        ["Project ID", "Customer Name", "Work Category", "Shift Date", "Staff On Duty", "Work Done Description", "In Time", "Out Time", "Hours Worked", "Verification"],
+                        selectedWorkProject.logs.length > 0
+                          ? selectedWorkProject.logs.map((log: any) => [
+                              selectedWorkProject.projectId,
+                              selectedWorkProject.customerName,
+                              selectedWorkProject.workCategory,
+                              log.date,
+                              log.labourName || "Staff Member",
+                              log.workDescription || "On-site operations",
+                              log.inTime || "09:00",
+                              log.outTime || "17:00",
+                              log.hoursWorked || 8,
+                              log.verificationStatus || "Verified",
+                            ])
+                          : [[
+                              selectedWorkProject.projectId,
+                              selectedWorkProject.customerName,
+                              selectedWorkProject.workCategory,
+                              selectedWorkProject.latestDate,
+                              "Unassigned",
+                              selectedWorkProject.latestWorkSummary,
+                              "N/A",
+                              "N/A",
+                              0,
+                              selectedWorkProject.status,
+                            ]]
+                      );
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold gap-1.5 shadow-md px-3.5"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Download Excel (CSV)
+                  </Button>
+
+                  <Button
+                    onClick={() => {
+                      handleExportPDF(
+                        `Project Work History & Shift Logs - ${selectedWorkProject.projectId} (${selectedWorkProject.customerName})`,
+                        ["Shift Date", "Staff On Duty", "Work Done Description", "In - Out Time", "Hours Logged", "Verification Status"],
+                        selectedWorkProject.logs.length > 0
+                          ? selectedWorkProject.logs.map((log: any) => [
+                              log.date,
+                              log.labourName || "Staff Member",
+                              log.workDescription || "On-site operations",
+                              `${log.inTime || "09:00"} - ${log.outTime || "17:00"}`,
+                              `${log.hoursWorked || 8}h`,
+                              log.verificationStatus || "Verified",
+                            ])
+                          : [[
+                              selectedWorkProject.latestDate,
+                              "Unassigned",
+                              selectedWorkProject.latestWorkSummary,
+                              "N/A",
+                              "0h",
+                              selectedWorkProject.status,
+                            ]]
+                      );
+                    }}
+                    className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold gap-1.5 shadow-md px-3.5"
+                  >
+                    <FileText className="h-3.5 w-3.5" /> Download PDF Report
+                  </Button>
+                </div>
               </DialogFooter>
             </>
           )}

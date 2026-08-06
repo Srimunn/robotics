@@ -71,17 +71,27 @@ export function LaborDashboard() {
   const isClockedIn = todayLog && todayLog.inTime && !todayLog.outTime;
   const isClockedOut = todayLog && todayLog.inTime && todayLog.outTime;
   
+  // Auto-detect assigned or active project
+  const autoAssignedProject =
+    assignedProjects[0] ||
+    projects.find((p) => p.status === "Ongoing" || p.status === "Scheduled") ||
+    projects[0];
+
+  const activeProjectObj =
+    projects.find((p) => p.id === (isClockedIn ? activeProjectWithTodayLog?.id : selectedProjectId)) ||
+    autoAssignedProject;
+
   // Active Timer state
   const [timerString, setTimerString] = useState("00:00:00");
 
   // Load initially
   useEffect(() => {
     getGpsLocation();
-    
-    if (assignedProjects.length > 0) {
-      setSelectedProjectId(assignedProjects[0].id);
+
+    if (autoAssignedProject) {
+      setSelectedProjectId(autoAssignedProject.id);
     }
-  }, [laborId]);
+  }, [laborId, projects]);
 
   // Clock-in timer calculator
   useEffect(() => {
@@ -491,41 +501,25 @@ export function LaborDashboard() {
   const [historyOpen, setHistoryOpen] = useState(false);
 
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-4 p-3 sm:p-5 font-sans bg-slate-50/80 min-h-screen">
-      {/* Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-emerald-100 text-emerald-800 grid place-items-center font-black shrink-0">
-            <HardHat className="h-5.5 w-5.5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-extrabold text-slate-900 text-base">{laborName}</h2>
-              <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                isClockedIn ? "bg-emerald-100 text-emerald-800 border border-emerald-200" : "bg-slate-100 text-slate-600 border border-slate-200"
-              }`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${isClockedIn ? "bg-emerald-600 animate-ping" : "bg-slate-400"}`}></span>
-                {isClockedIn ? "On Duty" : "Off Duty"}
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider">{laborId}</p>
-          </div>
-        </div>
-        
-        {/* Quick Header Stats & Logout */}
-        <div className="flex items-center gap-3 sm:gap-4 ml-auto">
-          <div className="hidden md:flex items-center gap-4 border-r border-slate-200 pr-4 text-xs font-semibold">
-            <div>
-              <span className="text-slate-400 text-[10px] uppercase font-bold block">Verified Days</span>
-              <span className="text-slate-900 font-bold">{verifiedDaysCount} Days</span>
+    <div className="w-full max-w-md mx-auto space-y-3 p-3 font-sans bg-slate-100/90 min-h-screen pb-10">
+      {/* Mobile App Top Header Bar */}
+      <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="h-10 w-10 rounded-xl bg-emerald-100 text-emerald-800 grid place-items-center font-black shrink-0 border border-emerald-200">
+              <HardHat className="h-5.5 w-5.5" />
             </div>
             <div>
-              <span className="text-slate-400 text-[10px] uppercase font-bold block">Verified Hours</span>
-              <span className="text-slate-900 font-bold">{totalVerifiedHours.toFixed(1)}h</span>
-            </div>
-            <div>
-              <span className="text-slate-400 text-[10px] uppercase font-bold block">Earned Wages</span>
-              <span className="text-emerald-600 font-extrabold">₹{verifiedWages.toLocaleString("en-IN")}</span>
+              <div className="flex items-center gap-1.5">
+                <h2 className="font-extrabold text-slate-900 text-sm leading-tight">{laborName}</h2>
+                <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                  isClockedIn ? "bg-emerald-100 text-emerald-800 border border-emerald-200" : "bg-slate-100 text-slate-600 border border-slate-200"
+                }`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${isClockedIn ? "bg-emerald-600 animate-ping" : "bg-slate-400"}`}></span>
+                  {isClockedIn ? "On Duty" : "Off Duty"}
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mt-0.5">{laborId}</p>
             </div>
           </div>
 
@@ -536,142 +530,151 @@ export function LaborDashboard() {
             }}
             variant="outline"
             size="sm"
-            className="rounded-xl h-8 px-3 text-xs font-bold gap-1 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 cursor-pointer"
+            className="rounded-xl h-8 px-2.5 text-[11px] font-bold gap-1 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 cursor-pointer shrink-0"
           >
             <LogOut className="h-3.5 w-3.5" /> Logout
           </Button>
         </div>
+
+        {/* Mobile App Quick Monthly Payroll Stats Bar */}
+        <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100 text-center">
+          <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+            <span className="text-slate-400 text-[9px] uppercase font-bold block">Verified Days</span>
+            <span className="text-slate-900 text-xs font-black">{verifiedDaysCount} Days</span>
+          </div>
+          <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+            <span className="text-slate-400 text-[9px] uppercase font-bold block">Verified Hours</span>
+            <span className="text-slate-900 text-xs font-black">{totalVerifiedHours.toFixed(1)}h</span>
+          </div>
+          <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+            <span className="text-slate-400 text-[9px] uppercase font-bold block">Earned Wages</span>
+            <span className="text-emerald-600 text-xs font-black">₹{verifiedWages.toLocaleString("en-IN")}</span>
+          </div>
+        </div>
       </div>
 
-      {/* Main Single Page 2-Column Cockpit Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Left Column (Col 7): Shift Clock-In / Clock-Out Control */}
-        <div className="lg:col-span-7 space-y-4">
-          {!isClockedOut ? (
-            <Card className="rounded-2xl border-slate-200 bg-white shadow-xs overflow-hidden">
-              <CardHeader className="bg-slate-50/60 p-3.5 border-b border-slate-100 flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="text-sm font-extrabold text-slate-900">
-                    {isClockedIn ? "Active Shift Operations" : "Clock In to Worksite"}
-                  </CardTitle>
-                  <CardDescription className="text-[11px] text-slate-500">
-                    {isClockedIn ? "Your shift is currently active" : "Log location & photo to start shift"}
-                  </CardDescription>
-                </div>
-                {isClockedIn && (
-                  <span className="bg-emerald-100 text-emerald-800 font-extrabold text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-ping"></span> Live Shift
-                  </span>
-                )}
-              </CardHeader>
+      {/* Shift Operation Card (Mobile App Primary Feed) */}
+      <div className="space-y-3">
+        {!isClockedOut ? (
+          <Card className="rounded-2xl border-slate-200/90 bg-white shadow-xs overflow-hidden">
+            <CardHeader className="bg-slate-50/70 p-3.5 border-b border-slate-100 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-xs font-extrabold text-slate-900">
+                  {isClockedIn ? "Active Shift Operations" : "Clock In to Worksite"}
+                </CardTitle>
+                <CardDescription className="text-[10px] text-slate-500">
+                  {isClockedIn ? "Your shift is currently active" : "Verify site & photo to start shift"}
+                </CardDescription>
+              </div>
+              {isClockedIn && (
+                <span className="bg-emerald-100 text-emerald-800 font-extrabold text-[9px] px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-ping"></span> Live Shift
+                </span>
+              )}
+            </CardHeader>
 
-              <CardContent className="p-4 space-y-3.5">
-                {/* Active timer details */}
-                {isClockedIn && (
-                  <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-0.5">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Active Working Hours</p>
-                    <div className="flex items-center justify-center gap-1.5 text-2xl font-black text-slate-950 font-mono tracking-wider">
-                      <Clock className="h-5 w-5 text-emerald-600 animate-pulse" />
-                      {timerString}
+            <CardContent className="p-3.5 space-y-3">
+              {/* Active timer details */}
+              {isClockedIn && (
+                <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-0.5">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Active Working Hours</p>
+                  <div className="flex items-center justify-center gap-1.5 text-2xl font-black text-slate-950 font-mono tracking-wider">
+                    <Clock className="h-5 w-5 text-emerald-600 animate-pulse" />
+                    {timerString}
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-semibold">
+                    Clocked In: <span className="text-emerald-700 font-bold">{todayLog?.inTime}</span> at {activeProjectWithTodayLog?.customerName}
+                  </p>
+                </div>
+              )}
+
+              <form onSubmit={isClockedIn ? handleClockOutSubmit : handleClockInSubmit} className="space-y-3">
+                {/* AUTO-ASSIGNED ACTIVE PROJECT SITE (LOCKED CARD, NO MANUAL SELECT) */}
+                {!isClockedIn && (
+                  <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200/80 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-800 flex items-center gap-1">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" /> Assigned Active Worksite
+                      </span>
+                      <span className="text-[9px] font-extrabold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full border border-blue-200">
+                        Auto-Assigned
+                      </span>
                     </div>
-                    <p className="text-[10px] text-slate-500 font-semibold">
-                      Clocked In: <span className="text-emerald-700 font-bold">{todayLog?.inTime}</span> at {activeProjectWithTodayLog?.customerName}
-                    </p>
+                    <div className="pt-0.5">
+                      <p className="text-xs font-extrabold text-slate-900">
+                        {activeProjectObj?.customerName || "Robotics Servicing Worksite"}
+                      </p>
+                      <p className="text-[10px] font-semibold text-slate-600 mt-0.5 flex items-center gap-1">
+                        <span>{activeProjectObj?.id || "PRJ-101"}</span>
+                        <span>•</span>
+                        <span>{activeProjectObj?.natureOfWork || "Site Operations"}</span>
+                        <span>•</span>
+                        <span className="text-blue-700 font-bold">📍 {activeProjectObj?.location || "Kullankadu Site"}</span>
+                      </p>
+                    </div>
                   </div>
                 )}
 
-                <form onSubmit={isClockedIn ? handleClockOutSubmit : handleClockInSubmit} className="space-y-3">
-                  {/* Project selector (Clock-in only) */}
-                  {!isClockedIn && (
-                    <div className="space-y-1">
-                      <Label className="text-xs font-bold text-slate-700">Select Assigned Project Site</Label>
-                      {assignedProjects.length > 0 ? (
-                        <select
-                          value={selectedProjectId}
-                          onChange={(e) => setSelectedProjectId(e.target.value)}
-                          className="w-full h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
-                        >
-                          {assignedProjects.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.id} — {p.customerName} ({p.location})
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <div className="flex items-start gap-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 font-semibold">
-                          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
-                          <div className="w-full">
-                            Select active project site:
-                            <select
-                              value={selectedProjectId}
-                              onChange={(e) => setSelectedProjectId(e.target.value)}
-                              className="w-full h-8 px-2 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-800 focus:outline-none mt-1"
-                            >
-                              <option value="">Choose Site...</option>
-                              {projects.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  {p.id} — {p.customerName} ({p.location})
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                  {/* GPS Worksite Location Card */}
+                  <div className="p-3.5 rounded-2xl border border-slate-200/90 bg-slate-50/80 shadow-2xs space-y-2.5">
+                    {/* Header Row: Title + Badge + Refresh Button */}
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className={`h-7 w-7 rounded-lg grid place-items-center shrink-0 ${
+                          gpsLocation ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"
+                        }`}>
+                          <MapPin className="h-4 w-4" />
                         </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Geotag GPS coordinates panel */}
-                  <div 
-                    onClick={getGpsLocation}
-                    className="border rounded-xl p-3 flex items-center justify-between cursor-pointer transition-all duration-200 hover:border-emerald-300 bg-slate-50 border-slate-200/80 hover:shadow-xs"
-                  >
-                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                      <div className={`h-8 w-8 rounded-lg grid place-items-center shrink-0 mt-0.5 ${
-                        gpsLocation ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"
-                      }`}>
-                        <MapPin className="h-4.5 w-4.5" />
-                      </div>
-                      <div className="space-y-0.5 min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">GPS Worksite Coordinates</p>
+                        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                          <p className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wider">GPS Worksite Coordinates</p>
                           {gpsLocation && (
-                            <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 px-1.5 py-0.2 rounded-full flex items-center gap-1">
+                            <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.2 rounded-full flex items-center gap-1 whitespace-nowrap">
                               <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse"></span> Verified High Accuracy
                             </span>
                           )}
                         </div>
-                        {gpsLocation ? (
-                          <div className="space-y-0.5">
-                            <p className="text-xs font-extrabold text-slate-900 flex items-center gap-1 truncate">
-                              📍 {gpsLocation.placeName || "Kullankadu, Kulathukkadu, Kumarapalayam"}
-                            </p>
-                            <p className="text-[10px] font-semibold text-slate-600 font-mono">
-                              Lat: {gpsLocation.latitude.toFixed(5)} | Lon: {gpsLocation.longitude.toFixed(5)}
-                              <span className="text-[10px] font-extrabold text-emerald-700 ml-2">
-                                (Accurate to {gpsLocation.accuracy || 10}m)
-                              </span>
-                            </p>
-                          </div>
-                        ) : (
-                          <p className="text-[11px] text-slate-500 font-medium">Click to fetch current location & coordinates</p>
-                        )}
                       </div>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          getGpsLocation();
+                        }}
+                        disabled={gpsLoading}
+                        className="h-7 px-2.5 rounded-xl border-slate-200 bg-white text-slate-700 text-[10px] font-bold gap-1 shrink-0 hover:bg-blue-50 hover:text-blue-700 cursor-pointer shadow-2xs"
+                      >
+                        <RefreshCw className={`h-3 w-3 text-blue-600 ${gpsLoading ? "animate-spin" : ""}`} />
+                        <span>Refresh</span>
+                      </Button>
                     </div>
-                    
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        getGpsLocation();
-                      }}
-                      disabled={gpsLoading}
-                      className="h-7 rounded-lg border-slate-200 text-[10px] font-bold gap-1 shrink-0 ml-2 hover:bg-blue-50 hover:text-blue-700"
-                    >
-                      <RefreshCw className={`h-3 w-3 text-blue-600 ${gpsLoading ? "animate-spin" : ""}`} />
-                      <span>Refresh</span>
-                    </Button>
+
+                    {/* Address & Lat/Lon Details Container */}
+                    {gpsLocation ? (
+                      <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 space-y-1.5">
+                        <div className="flex items-start gap-1.5">
+                          <span className="text-xs shrink-0 mt-0.5">📍</span>
+                          <p className="text-xs font-extrabold text-slate-900 leading-snug break-words">
+                            {gpsLocation.placeName || "Kullankadu, Kulathukkadu, Kumarapalayam"}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-between flex-wrap gap-1 text-[10px] font-mono text-slate-600 pt-1.5 border-t border-slate-100">
+                          <span>
+                            Lat: <b className="text-slate-800 font-bold">{gpsLocation.latitude.toFixed(5)}</b> | Lon: <b className="text-slate-800 font-bold">{gpsLocation.longitude.toFixed(5)}</b>
+                          </span>
+                          <span className="font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200/60 whitespace-nowrap">
+                            Accurate to {gpsLocation.accuracy || 10}m
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-slate-500 font-medium bg-white p-2.5 rounded-xl border border-slate-200">
+                        Click Refresh to detect current GPS worksite coordinates
+                      </p>
+                    )}
                   </div>
 
                   {/* Geotag Photo capture panel */}
@@ -810,25 +813,25 @@ export function LaborDashboard() {
                   <Button
                     type="submit"
                     disabled={gpsLoading || (!isClockedIn && !capturedPhoto)}
-                    className={`w-full h-10 rounded-xl text-xs font-extrabold gap-1.5 shadow-xs transition-all duration-200 ${
+                    className={`w-full h-12 rounded-2xl text-xs font-extrabold gap-1.5 shadow-md transition-all duration-200 ${
                       isClockedIn 
-                        ? "bg-rose-600 hover:bg-rose-700 text-white cursor-pointer" 
+                        ? "bg-rose-600 hover:bg-rose-700 text-white cursor-pointer active:scale-98" 
                         : capturedPhoto
-                        ? "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
+                        ? "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-98"
                         : "bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed"
                     }`}
                   >
                     {isClockedIn ? (
                       <>
-                        <HardHat className="h-4 w-4" /> End Shift & Clock Out
+                        <HardHat className="h-4.5 w-4.5" /> End Shift & Clock Out
                       </>
                     ) : capturedPhoto ? (
                       <>
-                        <HardHat className="h-4 w-4" /> Start Shift & Clock In
+                        <HardHat className="h-4.5 w-4.5" /> Start Shift & Clock In
                       </>
                     ) : (
                       <>
-                        <Camera className="h-4 w-4 text-slate-400" /> Capture / Upload Photo to Start Shift
+                        <Camera className="h-4.5 w-4.5 text-slate-400" /> Capture / Upload Photo to Start Shift
                       </>
                     )}
                   </Button>
@@ -860,47 +863,8 @@ export function LaborDashboard() {
               </div>
             </Card>
           )}
-        </div>
 
-        {/* Right Column (Col 5): Payroll Summary & Recent Shift Logs */}
-        <div className="lg:col-span-5 space-y-4">
-          {/* Verified Wages Card */}
-          <Card className="rounded-2xl border-slate-200 bg-white shadow-xs p-3.5 space-y-2">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <h3 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
-                <Banknote className="h-4 w-4 text-emerald-600" />
-                Monthly Verified Payroll
-              </h3>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{todayStr.slice(0, 7)}</span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 py-1">
-              <div className="text-center space-y-0.5">
-                <p className="text-[9px] font-bold text-slate-400 uppercase">Verified Days</p>
-                <h4 className="text-sm font-extrabold text-slate-900">{verifiedDaysCount} Days</h4>
-              </div>
-              
-              <div className="text-center space-y-0.5 border-x border-slate-100">
-                <p className="text-[9px] font-bold text-slate-400 uppercase">Verified Hours</p>
-                <h4 className="text-sm font-extrabold text-slate-900">{totalVerifiedHours.toFixed(1)}h</h4>
-              </div>
-
-              <div className="text-center space-y-0.5">
-                <p className="text-[9px] font-bold text-slate-400 uppercase">Earned Wages</p>
-                <h4 className="text-sm font-extrabold text-emerald-600">₹{verifiedWages.toLocaleString("en-IN")}</h4>
-              </div>
-            </div>
-
-            {pendingLogs.length > 0 && (
-              <div className="p-2 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-[10px]">
-                <span className="text-amber-800 font-bold flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3 text-amber-600" />
-                  {pendingLogs.length} shift(s) pending verification
-                </span>
-                <span className="text-[9px] text-amber-600 font-semibold">Held</span>
-              </div>
-            )}
-          </Card>
+          {/* Shift Logs History (Mobile Card Feed) */}
 
           {/* Shift Logs History (Inline scrollable panel) */}
           <Card className="rounded-2xl border-slate-200 bg-white shadow-xs overflow-hidden">
@@ -991,6 +955,5 @@ export function LaborDashboard() {
           </Card>
         </div>
       </div>
-    </div>
   );
 }

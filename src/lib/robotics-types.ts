@@ -254,6 +254,8 @@ export interface Project {
   receivedAmount: number;
   balanceAmount: number;
   paymentStatus: PaymentStatus;
+  beforeWorkPhotoUrl?: string;
+  afterWorkPhotoUrl?: string;
   internalNotes: string;
   createdAt: string;
   statusHistory: {

@@ -238,17 +238,247 @@ function DashboardComponent() {
     return rec && rec.status === "Present";
   }).length;
 
-  // Chronological Activity Timeline
-  const recentActivitiesTimeline = [
-    { time: "09:00 AM", event: "Engineer Suresh assigned to Raja Construction", type: "assignment" },
-    { time: "09:30 AM", event: "Quotation QT-AEROTECH-2026.pdf uploaded", type: "quotation" },
-    { time: "10:15 AM", event: "Customer Approved Project PRJ-2026-001", type: "approval" },
-    { time: "10:45 AM", event: "Project PRJ-2026-001 Work Started on site", type: "started" },
-    { time: "11:00 AM", event: "Rajesh Kumar (Permanent Labour) checked in (In Time: 09:00 AM)", type: "checkin" },
-    { time: "11:05 AM", event: "Arunachalam S. (Contract Labour) checked in (In Time: 09:00 AM)", type: "checkin" },
-    { time: "02:30 PM", event: "₹1,00,000 Payment Received (Ref: NEFT-HDFC982347192)", type: "payment" },
-    { time: "04:50 PM", event: "Site Inspection Completed for ENQ-2026-001", type: "completed" },
-  ];
+  // Helper to convert time string (e.g. "05:30 PM", "11:49 AM", "09:00 AM") to 24-hour minutes for strict chronological sorting
+  const parseTimeToMinutes = (timeStr: string) => {
+    if (!timeStr) return 0;
+    try {
+      const parts = timeStr.trim().split(" ");
+      const [hStr, mStr] = parts[0].split(":");
+      let h = parseInt(hStr, 10);
+      const m = parseInt(mStr || "0", 10);
+      if (parts[1]) {
+        const mer = parts[1].toUpperCase();
+        if (mer === "PM" && h < 12) h += 12;
+        if (mer === "AM" && h === 12) h = 0;
+      }
+      return h * 60 + m;
+    } catch {
+      return 0;
+    }
+  };
+
+  // State for Timeline Category Quick Filter
+  const [timelineCategoryFilter, setTimelineCategoryFilter] = useState<"ALL" | "SHIFTS" | "PROJECTS" | "PAYMENTS" | "EQUIPMENT">("ALL");
+
+  // Dynamic Live Recent Activity Timeline (Tracks status changes to Ongoing, machines added, labour shifts, site visits & payments)
+  const recentActivitiesTimeline = (() => {
+    const events: Array<{
+      id: string;
+      time: string;
+      date: string;
+      title: string;
+      subtitle: string;
+      category: "SHIFTS" | "PROJECTS" | "PAYMENTS" | "EQUIPMENT";
+      type: "checkin" | "payment" | "assignment" | "started" | "completed" | "machine" | "material" | "update";
+      badgeText: string;
+      badgeColor: string;
+      projectObj?: Project;
+      enquiryObj?: Enquiry;
+    }> = [];
+
+    const realTodayStr = new Date().toISOString().slice(0, 10);
+    const uniqueKeys = new Set<string>();
+
+    const pushUnique = (evt: typeof events[0]) => {
+      const key = `${evt.title}_${evt.time}_${evt.date}`;
+      if (!uniqueKeys.has(key)) {
+        uniqueKeys.add(key);
+        events.push(evt);
+      }
+    };
+
+    // 1. SHIFT LOGS & LABOUR CHECK-INS (FROM ALL PROJECTS)
+    projects.forEach((proj) => {
+      (proj.labourLogs || []).forEach((log) => {
+        pushUnique({
+          id: `log_${log.labourId}_${log.date}_${log.inTime}`,
+          time: log.inTime || "09:00 AM",
+          date: log.date || realTodayStr,
+          title: `${log.labourName} checked in on ${proj.customerName} (${proj.id})`,
+          subtitle: log.workDescription || "On-site robotic servicing check-in",
+          category: "SHIFTS",
+          type: "checkin",
+          badgeText: log.outTime ? "Shift Completed" : "Live Duty On-Site",
+          badgeColor: log.outTime
+            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+            : "bg-blue-50 text-blue-700 border-blue-200 font-bold",
+          projectObj: proj,
+        });
+      });
+
+      // 2. PROJECT ACTIVITIES & AUDIT LOGS
+      (proj.activities || []).forEach((act) => {
+        pushUnique({
+          id: `act_${act.id}`,
+          time: act.timestamp?.slice(11, 16) || "10:00 AM",
+          date: act.timestamp?.slice(0, 10) || realTodayStr,
+          title: `${act.event} on ${proj.customerName} (${proj.id})`,
+          subtitle: `${act.details || "Project update logged"} • By ${act.actor || "Engineer"}`,
+          category: "PROJECTS",
+          type: "update",
+          badgeText: "Project Activity",
+          badgeColor: "bg-blue-50 text-blue-800 border-blue-200 font-bold",
+          projectObj: proj,
+        });
+      });
+
+      // 3. PROJECT STATUS TRANSITIONS & HISTORY
+      (proj.statusHistory || []).forEach((sh, idx) => {
+        pushUnique({
+          id: `sh_${proj.id}_${idx}`,
+          time: sh.updatedAt?.slice(11, 16) || "09:00 AM",
+          date: sh.updatedAt?.slice(0, 10) || realTodayStr,
+          title: `Project ${proj.id} (${proj.customerName}) status changed to ${sh.status.toUpperCase()}`,
+          subtitle: `Updated by ${sh.updatedBy || "Supervisor"} • Nature of Work: ${proj.natureOfWork}`,
+          category: "PROJECTS",
+          type: sh.status === "Completed" ? "completed" : sh.status === "Ongoing" ? "started" : "update",
+          badgeText: `Status: ${sh.status}`,
+          badgeColor: sh.status === "Completed"
+            ? "bg-emerald-50 text-emerald-800 border-emerald-200 font-extrabold"
+            : sh.status === "Ongoing"
+            ? "bg-amber-50 text-amber-800 border-amber-200 font-bold"
+            : "bg-blue-50 text-blue-800 border-blue-200 font-bold",
+          projectObj: proj,
+        });
+      });
+
+      // Current Project status fallback
+      if (proj.status === "Ongoing") {
+        pushUnique({
+          id: `status_ongoing_${proj.id}`,
+          time: "09:00 AM",
+          date: proj.actualWorkStartedDate || proj.scheduledDate || realTodayStr,
+          title: `Project ${proj.id} (${proj.customerName}) status set to ONGOING`,
+          subtitle: `Nature of Work: ${proj.natureOfWork} • Location: ${proj.location}`,
+          category: "PROJECTS",
+          type: "started",
+          badgeText: "Ongoing Work",
+          badgeColor: "bg-amber-50 text-amber-800 border-amber-200 font-bold",
+          projectObj: proj,
+        });
+      } else if (proj.status === "Completed") {
+        pushUnique({
+          id: `status_completed_${proj.id}`,
+          time: "05:30 PM",
+          date: proj.scheduledDate || realTodayStr,
+          title: `Project ${proj.id} (${proj.customerName}) marked COMPLETED`,
+          subtitle: `Contract Value: ₹${proj.projectValue.toLocaleString("en-IN")} • Lead Engineer: ${proj.assignedEngineerName || "Er. Rajesh Kumar"}`,
+          category: "PROJECTS",
+          type: "completed",
+          badgeText: "Project Completed",
+          badgeColor: "bg-emerald-50 text-emerald-800 border-emerald-200 font-extrabold",
+          projectObj: proj,
+        });
+      }
+
+      // 4. CREW / WORKER ASSIGNMENTS TO PROJECTS
+      (proj.labourAssignments || []).forEach((la) => {
+        pushUnique({
+          id: `la_${proj.id}_${la.labourId}`,
+          time: "08:30 AM",
+          date: la.assignedDate || realTodayStr,
+          title: `Worker ${la.labourName} (${la.labourType}) assigned to ${proj.customerName} (${proj.id})`,
+          subtitle: `Weekly Wage: ₹${la.weeklyWage} • Site Location: ${proj.location}`,
+          category: "SHIFTS",
+          type: "assignment",
+          badgeText: "Worker Assigned",
+          badgeColor: "bg-purple-50 text-purple-700 border-purple-200 font-bold",
+          projectObj: proj,
+        });
+      });
+
+      // 5. PAYMENT MILESTONE STAGES
+      (proj.paymentStages || []).forEach((stg) => {
+        pushUnique({
+          id: `stg_${stg.id}`,
+          time: "02:30 PM",
+          date: stg.paidDate || stg.dueDate || realTodayStr,
+          title: `Milestone Stage (${stg.stageName}): ₹${stg.amount.toLocaleString("en-IN")} for ${proj.customerName} (${proj.id})`,
+          subtitle: `Stage Status: ${stg.status} • Reference: ${stg.referenceNumber || "Bank Transfer"}`,
+          category: "PAYMENTS",
+          type: "payment",
+          badgeText: `Milestone: ${stg.status}`,
+          badgeColor: stg.status === "Paid"
+            ? "bg-emerald-50 text-emerald-800 border-emerald-200 font-black"
+            : "bg-amber-50 text-amber-800 border-amber-200 font-bold",
+          projectObj: proj,
+        });
+      });
+    });
+
+    // 3. MACHINES & EQUIPMENT ALLOCATED
+    machineIssues.forEach((mi) => {
+      const proj = projects.find((p) => p.id === mi.projectId);
+      pushUnique({
+        id: `mi_${mi.id}`,
+        time: "10:15 AM",
+        date: mi.issueDate || realTodayStr,
+        title: `Machine Added: ${mi.machineName}`,
+        subtitle: `Issued to ${mi.issuedTo || "Site Crew"} for Project ${mi.projectId} (${proj?.customerName || "Site"})`,
+        category: "EQUIPMENT",
+        type: "machine",
+        badgeText: "Machine Added",
+        badgeColor: "bg-indigo-50 text-indigo-800 border-indigo-200 font-bold",
+        projectObj: proj,
+      });
+    });
+
+    machines.forEach((m) => {
+      if (m.issuedQuantity > 0) {
+        const linkedProj = projects.find((p) => p.natureOfWork?.toLowerCase().includes(m.category.toLowerCase()) || p.id === m.assignedProjectId);
+        pushUnique({
+          id: `m_${m.id}`,
+          time: "10:30 AM",
+          date: realTodayStr,
+          title: `Equipment Deployed: ${m.name}`,
+          subtitle: `${m.category} active on site (${m.issuedQuantity} unit(s) in service)`,
+          category: "EQUIPMENT",
+          type: "machine",
+          badgeText: "Active Equipment",
+          badgeColor: "bg-purple-50 text-purple-800 border-purple-200 font-bold",
+          projectObj: linkedProj,
+        });
+      }
+    });
+
+    // 4. PAYMENTS RECEIVED
+    payments.forEach((pay) => {
+      const proj = projects.find((p) => p.id === pay.projectId);
+      pushUnique({
+        id: `pay_${pay.id}`,
+        time: "02:30 PM",
+        date: pay.paymentDate || realTodayStr,
+        title: `Payment Received: ₹${pay.amount.toLocaleString("en-IN")} for ${proj ? proj.customerName : pay.projectId}`,
+        subtitle: `Payment Mode: ${pay.mode} • Ref Number: ${pay.referenceNumber}`,
+        category: "PAYMENTS",
+        type: "payment",
+        badgeText: `₹${pay.amount.toLocaleString("en-IN")}`,
+        badgeColor: "bg-emerald-50 text-emerald-800 border-emerald-200 font-black",
+        projectObj: proj,
+      });
+    });
+
+    // 5. ENQUIRIES & SITE VISITS
+    enquiries.forEach((enq) => {
+      if (enq.assignedEngineerName) {
+        pushUnique({
+          id: `enq_${enq.id}`,
+          time: "09:00 AM",
+          date: enq.enquiryDate || realTodayStr,
+          title: `Engineer ${enq.assignedEngineerName} assigned for site visit`,
+          subtitle: `Customer: ${enq.customerName} • Location: ${enq.location}`,
+          category: "PROJECTS",
+          type: "assignment",
+          badgeText: enq.siteVisitStatus || "Assigned",
+          badgeColor: "bg-purple-50 text-purple-800 border-purple-200 font-bold",
+          enquiryObj: enq,
+        });
+      }
+    });
+
+    // Sort strictly by 24-hour time descending (e.g. 05:30 PM at top, 02:30 PM, 11:49 AM, 10:42 AM, 09:15 AM, 09:00 AM, 08:30 AM)
+    return events.sort((a, b) => parseTimeToMinutes(b.time) - parseTimeToMinutes(a.time));
+  })();
 
   // Quick Action Handlers
   const handleCreateEnquirySubmit = (e: React.FormEvent) => {
@@ -1259,36 +1489,122 @@ function DashboardComponent() {
             </div>
 
             {/* -------------------------------------------------------------------
-                BOTTOM SECTION: RECENT ACTIVITY TIMELINE
+                BOTTOM SECTION: RECENT ACTIVITY TIMELINE (SUPERVISOR LIVE FEED)
                 ------------------------------------------------------------------- */}
-            <Card className="rounded-xl border border-border bg-white shadow-xs">
-              <CardHeader className="p-4 border-b bg-slate-50/60 flex flex-row items-center justify-between">
+            <Card className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+              <CardHeader className="p-4 border-b bg-slate-50/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                    <Activity className="h-4 w-4 text-blue-600" /> Live Recent Activity Timeline
+                  <CardTitle className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                    <Activity className="h-4.5 w-4.5 text-blue-600 animate-pulse" /> Live Recent Activity Timeline
                   </CardTitle>
-                  <CardDescription className="text-[11px]">
-                    Chronological audit of today's site events, check-ins, & payment receipts
+                  <CardDescription className="text-xs text-slate-500 mt-0.5">
+                    Real-time audit log of shift check-ins, status updates, machinery allocations & payment receipts
                   </CardDescription>
                 </div>
-                <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200">
-                  Real-time Feed
-                </Badge>
-              </CardHeader>
-              <CardContent className="p-4">
-                <div className="relative border-l-2 border-slate-200 ml-3 space-y-4 text-xs">
-                  {recentActivitiesTimeline.map((item, idx) => (
-                    <div key={idx} className="relative pl-6 group">
-                      <div className="absolute -left-[9px] top-1 h-4 w-4 rounded-full bg-white border-2 border-blue-600 group-hover:scale-110 transition-transform" />
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-800">{item.event}</span>
-                        <span className="text-[11px] font-semibold text-muted-foreground bg-slate-100 px-2 py-0.5 rounded">
-                          {item.time}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-800 border-emerald-200 font-extrabold px-2.5 py-1 flex items-center gap-1.5 shadow-2xs">
+                    <span className="h-2 w-2 rounded-full bg-emerald-600 animate-ping"></span> Live Real-time Feed ({recentActivitiesTimeline.length})
+                  </Badge>
                 </div>
+              </CardHeader>
+
+              {/* Category Filter Pills Bar */}
+              <div className="bg-slate-50/50 p-2.5 px-4 border-b border-slate-100 flex items-center gap-1.5 overflow-x-auto">
+                {[
+                  { id: "ALL", label: "All Activity", count: recentActivitiesTimeline.length },
+                  { id: "SHIFTS", label: "Shifts & Attendance", count: recentActivitiesTimeline.filter(e => e.category === "SHIFTS").length },
+                  { id: "PROJECTS", label: "Project Status", count: recentActivitiesTimeline.filter(e => e.category === "PROJECTS").length },
+                  { id: "PAYMENTS", label: "Payments", count: recentActivitiesTimeline.filter(e => e.category === "PAYMENTS").length },
+                  { id: "EQUIPMENT", label: "Equipment", count: recentActivitiesTimeline.filter(e => e.category === "EQUIPMENT").length },
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setTimelineCategoryFilter(cat.id as any)}
+                    className={`text-[11px] font-bold px-3 py-1 rounded-xl transition-all duration-150 whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                      timelineCategoryFilter === cat.id
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span>{cat.label}</span>
+                    <span className={`text-[9px] px-1.5 py-0.2 rounded-full ${
+                      timelineCategoryFilter === cat.id ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                    }`}>
+                      {cat.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <CardContent className="p-3.5">
+                {(() => {
+                  const filteredTimelineEvents = timelineCategoryFilter === "ALL"
+                    ? recentActivitiesTimeline
+                    : recentActivitiesTimeline.filter(e => e.category === timelineCategoryFilter);
+
+                  if (filteredTimelineEvents.length === 0) {
+                    return (
+                      <div className="p-8 text-center text-xs text-slate-500 font-semibold bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                        No activity logs logged under this category today.
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
+                      {filteredTimelineEvents.map((item) => (
+                        <div
+                          key={item.id}
+                          onClick={() => {
+                            if (item.projectObj) {
+                              setActiveProjectModal(item.projectObj);
+                            } else if (item.enquiryObj) {
+                              setActiveSiteVisitEnquiry(item.enquiryObj);
+                            }
+                          }}
+                          className={`group flex items-center justify-between p-3 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50/90 transition-all ${
+                            item.projectObj || item.enquiryObj ? "hover:border-blue-300 hover:shadow-2xs cursor-pointer" : ""
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className={`h-8 w-8 rounded-xl grid place-items-center shrink-0 border text-sm font-extrabold shadow-2xs ${
+                              item.type === "checkin" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                              item.type === "payment" ? "bg-emerald-100 text-emerald-900 border-emerald-300" :
+                              item.type === "completed" ? "bg-blue-50 text-blue-700 border-blue-200" :
+                              item.type === "machine" ? "bg-indigo-50 text-indigo-700 border-indigo-200" :
+                              "bg-amber-50 text-amber-800 border-amber-200"
+                            }`}>
+                              {item.type === "checkin" ? "👷" : item.type === "payment" ? "💰" : item.type === "machine" ? "⚙️" : item.type === "completed" ? "✅" : "🚀"}
+                            </div>
+
+                            <div className="min-w-0 space-y-0.5 flex-1 pr-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="font-extrabold text-slate-900 text-xs truncate leading-snug">{item.title}</h4>
+                                <span className={`text-[9px] font-extrabold px-2 py-0.2 rounded-full border ${item.badgeColor}`}>
+                                  {item.badgeText}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 font-semibold truncate">{item.subtitle}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0 ml-2">
+                            <span className="text-[10px] font-extrabold text-slate-700 font-mono bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                              {item.time}
+                            </span>
+                            {(item.projectObj || item.enquiryObj) && (
+                              <span className="text-[10px] font-bold text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity hidden sm:inline-flex items-center gap-0.5">
+                                View ↗
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           </div>

@@ -44,6 +44,8 @@ import {
   ShieldAlert,
   AlertTriangle,
   Save,
+  Camera,
+  Upload,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -523,7 +525,7 @@ function ProjectsComponent() {
         <CardHeader className="p-4 border-b flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-sm font-semibold">Active Enterprise Projects ({filteredProjects.length})</CardTitle>
-            <CardDescription className="text-xs">Click row to open full 9-Section Enterprise Project Cockpit</CardDescription>
+            <CardDescription className="text-xs">Click row to open full 10-Section Enterprise Project Cockpit</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -1379,7 +1381,7 @@ function ProjectsComponent() {
                 </CardContent>
               </Card>
 
-              {/* SECTION 10: ACTIVITY TIMELINE */}
+              {/* SECTION 8: ACTIVITY TIMELINE */}
               <Card className="rounded-xl border border-border">
                 <CardHeader className="p-3 border-b bg-muted/20">
                   <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
@@ -1425,6 +1427,158 @@ function ProjectsComponent() {
                   >
                     <FileDown className="h-3.5 w-3.5" /> Download PDF
                   </Button>
+                </CardContent>
+              </Card>
+
+              {/* SECTION 10: BEFORE & AFTER WORK SITE PHOTOS (2 PICTURES UPLOAD) */}
+              <Card className="rounded-xl border border-slate-200 shadow-xs bg-white dark:bg-card">
+                <CardHeader className="p-3.5 border-b bg-slate-50/70 dark:bg-slate-900/50 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      <Camera className="h-4 w-4 text-blue-600" /> Section 10: Site Inspection Photos (Uploading 2 Pictures — Before & After Work)
+                    </CardTitle>
+                    <CardDescription className="text-xs mt-0.5 text-slate-500">
+                      Upload pre-servicing initial condition photo & post-servicing completion verification photo.
+                    </CardDescription>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* 1. BEFORE WORK PHOTO CONTAINER */}
+                    <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/40 dark:bg-amber-950/20 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
+                          📷 1. Before Work Photo (Initial Condition)
+                        </span>
+                        {activeProject.beforeWorkPhotoUrl && (
+                          <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[9px] font-bold">Uploaded</Badge>
+                        )}
+                      </div>
+
+                      {activeProject.beforeWorkPhotoUrl ? (
+                        <div className="relative group rounded-lg overflow-hidden border border-amber-300 bg-white shadow-2xs">
+                          <img
+                            src={activeProject.beforeWorkPhotoUrl}
+                            alt="Before Work Condition"
+                            className="w-full h-44 object-cover cursor-pointer hover:scale-105 transition-transform"
+                            onClick={() => {
+                              const w = window.open("", "_blank");
+                              if (w) w.document.write(`<img src="${activeProject.beforeWorkPhotoUrl}" style="max-width:100%; max-height:100vh; display:block; margin:auto;" />`);
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                updateProject(activeProject.id, { beforeWorkPhotoUrl: "" });
+                                setActiveProject({ ...activeProject, beforeWorkPhotoUrl: "" });
+                                toast.success("Before Work photo removed");
+                              }}
+                              className="h-7 text-xs gap-1 font-bold"
+                            >
+                              <Trash2 className="h-3 w-3" /> Remove Photo
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="border-2 border-dashed border-amber-300 dark:border-amber-700/60 rounded-xl p-6 text-center space-y-2 bg-white dark:bg-card">
+                          <Camera className="h-8 w-8 text-amber-500 mx-auto" />
+                          <p className="text-xs font-bold text-amber-900 dark:text-amber-200">No Before Work Photo Uploaded</p>
+                          <p className="text-[10px] text-muted-foreground">Upload initial site damage or pre-servicing condition image.</p>
+                          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold cursor-pointer shadow-2xs transition-all">
+                            <Upload className="h-3.5 w-3.5" /> Upload Before Photo
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (evt) => {
+                                    const dataUrl = evt.target?.result as string;
+                                    updateProject(activeProject.id, { beforeWorkPhotoUrl: dataUrl });
+                                    setActiveProject({ ...activeProject, beforeWorkPhotoUrl: dataUrl });
+                                    toast.success("Before Work Photo uploaded successfully!");
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 2. AFTER WORK PHOTO CONTAINER */}
+                    <div className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/40 dark:bg-emerald-950/20 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
+                          📸 2. After Work Photo (Completed Finish)
+                        </span>
+                        {activeProject.afterWorkPhotoUrl && (
+                          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[9px] font-bold">Uploaded</Badge>
+                        )}
+                      </div>
+
+                      {activeProject.afterWorkPhotoUrl ? (
+                        <div className="relative group rounded-lg overflow-hidden border border-emerald-300 bg-white shadow-2xs">
+                          <img
+                            src={activeProject.afterWorkPhotoUrl}
+                            alt="After Work Finish"
+                            className="w-full h-44 object-cover cursor-pointer hover:scale-105 transition-transform"
+                            onClick={() => {
+                              const w = window.open("", "_blank");
+                              if (w) w.document.write(`<img src="${activeProject.afterWorkPhotoUrl}" style="max-width:100%; max-height:100vh; display:block; margin:auto;" />`);
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                updateProject(activeProject.id, { afterWorkPhotoUrl: "" });
+                                setActiveProject({ ...activeProject, afterWorkPhotoUrl: "" });
+                                toast.success("After Work photo removed");
+                              }}
+                              className="h-7 text-xs gap-1 font-bold"
+                            >
+                              <Trash2 className="h-3 w-3" /> Remove Photo
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="border-2 border-dashed border-emerald-300 dark:border-emerald-700/60 rounded-xl p-6 text-center space-y-2 bg-white dark:bg-card">
+                          <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto" />
+                          <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">No After Work Photo Uploaded</p>
+                          <p className="text-[10px] text-muted-foreground">Upload post-servicing completed work verification image.</p>
+                          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer shadow-2xs transition-all">
+                            <Upload className="h-3.5 w-3.5" /> Upload After Photo
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (evt) => {
+                                    const dataUrl = evt.target?.result as string;
+                                    updateProject(activeProject.id, { afterWorkPhotoUrl: dataUrl });
+                                    setActiveProject({ ...activeProject, afterWorkPhotoUrl: dataUrl });
+                                    toast.success("After Work Photo uploaded successfully!");
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>
