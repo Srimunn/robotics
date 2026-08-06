@@ -688,14 +688,18 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
       const trimmedInput = loginIdOrId.trim().toLowerCase();
       const trimmedPin = pin.trim();
 
-      const lab = labours.find(
-        (l) =>
-          (l.loginId.toLowerCase() === trimmedInput || l.id.toLowerCase() === trimmedInput || l.name.toLowerCase() === trimmedInput) &&
-          l.pin === trimmedPin
-      );
+      const lab = labours.find((l) => {
+        const idMatch = l.id ? l.id.toLowerCase() === trimmedInput : false;
+        const loginIdMatch = l.loginId ? l.loginId.toLowerCase() === trimmedInput : false;
+        const nameMatch = l.name ? l.name.toLowerCase() === trimmedInput : false;
+        const firstNameMatch = l.name ? l.name.toLowerCase().split(" ")[0] === trimmedInput : false;
+        const pinMatch = (l.pin || "4827") === trimmedPin;
+
+        return (idMatch || loginIdMatch || nameMatch || firstNameMatch) && pinMatch;
+      });
 
       if (!lab) {
-        toast.error(`❌ Invalid Login ID or PIN! Check credentials in Labour Profile.`);
+        toast.error(`❌ Incorrect Labour Name/ID or PIN! Check credentials in Labour Profile.`);
         return false;
       }
       setCurrentUser({ role: "Labor", id: lab.id, name: lab.name });

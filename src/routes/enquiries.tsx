@@ -146,6 +146,10 @@ function EnquiriesComponent() {
       toast.error("❌ Phone Number must be at least 10 digits");
       return;
     }
+    if (cleanPhone.length > 10) {
+      toast.error("❌ Mobile Number cannot exceed 10 digits");
+      return;
+    }
     if (!createData.location.trim()) {
       toast.error("❌ Location is required");
       return;
@@ -979,8 +983,15 @@ function EnquiriesComponent() {
                     placeholder="e.g. 9876543210"
                     value={createData.phone}
                     onChange={(e) => setCreateData({ ...createData, phone: e.target.value })}
-                    className="h-9 text-xs rounded-xl bg-background"
+                    className={`h-9 text-xs rounded-xl bg-background ${
+                      createData.phone.replace(/\D/g, "").length > 10 ? "border-red-500 focus-visible:ring-red-500" : ""
+                    }`}
                   />
+                  {createData.phone.replace(/\D/g, "").length > 10 && (
+                    <p className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-1">
+                      ⚠️ Mobile number cannot exceed 10 digits ({createData.phone.replace(/\D/g, "").length}/10 digits)
+                    </p>
+                  )}
                 </div>
               </div>
 

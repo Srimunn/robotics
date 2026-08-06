@@ -18,7 +18,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { LoginPage } from "@/components/LoginPage";
 import { LaborDashboard } from "@/components/LaborDashboard";
 import { GlobalSearchModal } from "@/components/global-search-modal";
-import { Search, Plus, Bell, User, CheckCircle2, AlertCircle, PhoneCall, DollarSign, Calendar } from "lucide-react";
+import { Search, Plus, Bell, User, CheckCircle2, AlertCircle, PhoneCall, Banknote, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -238,7 +238,7 @@ function MainHeader() {
                     to="/payments"
                     className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-accent text-xs transition-colors"
                   >
-                    <DollarSign className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                    <Banknote className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
                     <div>
                       <p className="font-semibold text-foreground">
                         {pendingPaymentsProjects} Project(s) Pending Collection

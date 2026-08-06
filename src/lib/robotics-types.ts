@@ -169,6 +169,7 @@ export interface GeoLocation {
   latitude: number;
   longitude: number;
   accuracy?: number;
+  placeName?: string;
 }
 
 export interface ProjectLabourLog {

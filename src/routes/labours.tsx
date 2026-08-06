@@ -175,6 +175,8 @@ function LaboursComponent() {
   const [labourFormData, setLabourFormData] = useState({
     name: "",
     phone: "",
+    loginId: "",
+    pin: "",
     type: "Permanent" as LabourType,
     defaultWeeklyWage: 1400,
     status: "Available" as any,
@@ -191,10 +193,16 @@ function LaboursComponent() {
       toast.error("❌ Phone Number must be at least 10 digits");
       return;
     }
+    if (cleanPhone.length > 10) {
+      toast.error("❌ Mobile Number cannot exceed 10 digits");
+      return;
+    }
 
     const newL = addLabour({
       name: labourFormData.name,
       phone: labourFormData.phone,
+      loginId: labourFormData.loginId.trim() || undefined,
+      pin: labourFormData.pin.trim() || undefined,
       type: labourFormData.type,
       defaultWeeklyWage: labourFormData.defaultWeeklyWage,
       status: labourFormData.status,
@@ -202,8 +210,16 @@ function LaboursComponent() {
       wageHistory: [],
     });
     setSelectedLabourProfile(newL);
-    toast.success("✅ Labour Profile Created Successfully");
     setAddOpen(false);
+    setLabourFormData({
+      name: "",
+      phone: "",
+      loginId: "",
+      pin: "",
+      type: "Permanent",
+      defaultWeeklyWage: 1400,
+      status: "Available",
+    });
   };
 
   const daysInMonth = 28;
@@ -432,23 +448,41 @@ function LaboursComponent() {
                     <div
                       key={l.id}
                       onClick={() => setSelectedLabourProfile(l)}
-                      className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                      className={`p-3 rounded-xl border cursor-pointer transition-all duration-200 ${
                         isSelected
-                          ? "bg-blue-50 border-blue-300 dark:bg-blue-950/40 shadow-xs"
-                          : "hover:bg-accent/50"
+                          ? "bg-blue-50/90 border-blue-400 dark:bg-blue-950/60 shadow-xs"
+                          : "bg-white dark:bg-card border-slate-200/80 hover:bg-slate-50 dark:hover:bg-slate-900"
                       }`}
                     >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-bold text-foreground">{l.name}</p>
-                          <p className="text-[11px] text-muted-foreground">📞 {l.phone} • {l.id}</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`h-8 w-8 rounded-lg grid place-items-center font-bold text-xs shrink-0 ${
+                            l.type === "Permanent" ? "bg-blue-100 text-blue-800" : "bg-slate-200 text-slate-800"
+                          }`}>
+                            👷
+                          </div>
+                          <div className="min-w-0 space-y-0.5">
+                            <p className="font-extrabold text-xs text-foreground truncate">{l.name}</p>
+                            <p className="text-[10px] text-muted-foreground font-medium truncate">
+                              ID: <span className="font-mono font-semibold">{l.id}</span> • 📞 {l.phone}
+                            </p>
+                          </div>
                         </div>
-                        <Badge
-                          variant="outline"
-                          className={l.type === "Permanent" ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-800 border-slate-300"}
-                        >
-                          {l.type}
-                        </Badge>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          <Badge
+                            variant="outline"
+                            className={`text-[9px] font-extrabold ${
+                              l.type === "Permanent" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-slate-100 text-slate-800 border-slate-300"
+                            }`}
+                          >
+                            {l.type}
+                          </Badge>
+                          <span className={`text-[9px] font-bold ${
+                            l.status === "Assigned" ? "text-emerald-700" : "text-amber-700"
+                          }`}>
+                            ● {l.status}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -519,10 +553,10 @@ function LaboursComponent() {
                           </div>
                         )}
 
-                        {/* PORTAL LOGIN CREDENTIALS CARD */}
-                        <div className="p-3.5 bg-purple-50 dark:bg-purple-950/40 text-purple-950 dark:text-purple-200 border border-purple-200 dark:border-purple-800 rounded-xl text-xs flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+                        {/* STRUCTURED BLOCK 1: PORTAL LOGIN CREDENTIALS */}
+                        <div className="p-3.5 bg-purple-50/80 dark:bg-purple-950/40 text-purple-950 dark:text-purple-200 border border-purple-200 dark:border-purple-800 rounded-xl text-xs flex flex-wrap items-center justify-between gap-3 shadow-2xs">
                           <div className="flex flex-wrap items-center gap-3">
-                            <Badge className="bg-purple-600 text-white font-bold text-[10px]">Portal Credentials</Badge>
+                            <Badge className="bg-purple-600 text-white font-bold text-[10px]">Portal Access Credentials</Badge>
                             <span className="font-semibold text-slate-700 dark:text-slate-300">
                               Labour ID: <strong className="text-purple-700 dark:text-purple-300">{activeLabour.id}</strong>
                             </span>
@@ -530,7 +564,7 @@ function LaboursComponent() {
                               Login ID: <code className="bg-white dark:bg-purple-900/80 px-2 py-0.5 rounded border border-purple-300 font-extrabold text-purple-700 dark:text-purple-300 text-xs">{activeLabour.loginId || activeLabour.name.split(" ")[0]}</code>
                             </span>
                             <span className="font-semibold text-slate-700 dark:text-slate-300">
-                              Generated PIN: <code className="bg-white dark:bg-purple-900/80 px-2 py-0.5 rounded border border-purple-300 font-extrabold text-purple-700 dark:text-purple-300 text-xs">{activeLabour.pin || "4827"}</code>
+                              Generated 4-Digit PIN: <code className="bg-white dark:bg-purple-900/80 px-2 py-0.5 rounded border border-purple-300 font-extrabold text-purple-700 dark:text-purple-300 text-xs">{activeLabour.pin || "4827"}</code>
                             </span>
                           </div>
                           <Button
@@ -548,7 +582,28 @@ function LaboursComponent() {
                           </Button>
                         </div>
 
-                        {/* 4 KPI METRIC CARDS */}
+                        {/* STRUCTURED BLOCK 2: TECHNICAL SKILLS & CAPABILITIES */}
+                        <div className="p-3.5 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider flex items-center gap-1">
+                              🛠️ Technical Skills & Capabilities
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-semibold">{activeLabour.skills?.length || 0} Specializations</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {activeLabour.skills && activeLabour.skills.length > 0 ? (
+                              activeLabour.skills.map((skill, idx) => (
+                                <Badge key={idx} variant="outline" className="bg-white dark:bg-card text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 font-bold text-[11px] px-2.5 py-0.5">
+                                  ⚡ {skill}
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-xs text-slate-400 italic">No specific skills listed yet</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* STRUCTURED BLOCK 3: 4 KPI METRIC CARDS */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                           <div className="p-3 bg-blue-50/80 rounded-xl border border-blue-100">
                             <span className="text-[10px] font-bold uppercase text-blue-800">Total Hours Logged</span>
@@ -1003,7 +1058,35 @@ function LaboursComponent() {
                     placeholder="e.g. 9840998877"
                     value={labourFormData.phone}
                     onChange={(e) => setLabourFormData({ ...labourFormData, phone: e.target.value })}
+                    className={`h-9 text-xs rounded-xl bg-background ${
+                      labourFormData.phone.replace(/\D/g, "").length > 10 ? "border-red-500 focus-visible:ring-red-500" : ""
+                    }`}
+                  />
+                  {labourFormData.phone.replace(/\D/g, "").length > 10 && (
+                    <p className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-1">
+                      ⚠️ Mobile number cannot exceed 10 digits ({labourFormData.phone.replace(/\D/g, "").length}/10 digits)
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Login ID (Auto-generated if empty)</Label>
+                  <Input
+                    placeholder="e.g. Ramesh"
+                    value={labourFormData.loginId}
+                    onChange={(e) => setLabourFormData({ ...labourFormData, loginId: e.target.value })}
                     className="h-9 text-xs rounded-xl bg-background"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">4-Digit Security PIN (Auto-generated if empty)</Label>
+                  <Input
+                    placeholder="e.g. 4827"
+                    maxLength={4}
+                    value={labourFormData.pin}
+                    onChange={(e) => setLabourFormData({ ...labourFormData, pin: e.target.value.replace(/\D/g, "") })}
+                    className="h-9 text-xs rounded-xl bg-background font-mono font-bold"
                   />
                 </div>
               </div>

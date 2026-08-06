@@ -53,7 +53,7 @@ export const Route = createFileRoute("/engineers")({
 });
 
 function EngineersPageComponent() {
-  const { engineers, enquiries, projects, addEngineer, updateEngineer, deleteEngineer } = useRobotics();
+  const { engineers, enquiries, projects, addEngineer, updateEngineer, deleteEngineer, currentUser } = useRobotics();
   const navigate = useNavigate();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -135,6 +135,10 @@ function EngineersPageComponent() {
   }, [engineerRoster, searchQuery, statusFilter]);
 
   const handleOpenAddModal = () => {
+    if (currentUser?.role !== "CEO") {
+      toast.error("⚠️ Access Denied: Only Executive / Super Admin can add Supervisors & Engineers");
+      return;
+    }
     setEditingEng(null);
     setFormName("");
     setFormPhone("");
@@ -143,6 +147,10 @@ function EngineersPageComponent() {
   };
 
   const handleOpenEditModal = (eng: Engineer) => {
+    if (currentUser?.role !== "CEO") {
+      toast.error("⚠️ Access Denied: Only Executive / Super Admin can edit Supervisors & Engineers");
+      return;
+    }
     setEditingEng(eng);
     setFormName(eng.name);
     setFormPhone(eng.phone);
@@ -152,6 +160,10 @@ function EngineersPageComponent() {
 
   const handleSaveEngineer = (e: React.FormEvent) => {
     e.preventDefault();
+    if (currentUser?.role !== "CEO") {
+      toast.error("⚠️ Access Denied: Only Executive / Super Admin can add Supervisors & Engineers");
+      return;
+    }
     if (!formName.trim()) {
       toast.error("❌ Engineer Name is required");
       return;
@@ -159,6 +171,10 @@ function EngineersPageComponent() {
     const cleanPhone = formPhone.replace(/\D/g, "");
     if (cleanPhone.length < 10) {
       toast.error("❌ Phone Number must be at least 10 digits");
+      return;
+    }
+    if (cleanPhone.length > 10) {
+      toast.error("❌ Mobile Number cannot exceed 10 digits");
       return;
     }
 
@@ -447,8 +463,15 @@ function EngineersPageComponent() {
                 value={formPhone}
                 onChange={(e) => setFormPhone(e.target.value)}
                 required
-                className="h-9 text-xs rounded-lg"
+                className={`h-9 text-xs rounded-lg ${
+                  formPhone.replace(/\D/g, "").length > 10 ? "border-red-500 focus-visible:ring-red-500" : ""
+                }`}
               />
+              {formPhone.replace(/\D/g, "").length > 10 && (
+                <p className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-1">
+                  ⚠️ Mobile number cannot exceed 10 digits ({formPhone.replace(/\D/g, "").length}/10 digits)
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">

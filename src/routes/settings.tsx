@@ -28,13 +28,22 @@ export const Route = createFileRoute("/settings")({
 });
 
 function SettingsComponent() {
-  const { settings, updateSettings, resetDemoData, resetToCleanDemoMode } = useRobotics();
+  const { settings, updateSettings, resetDemoData, resetToCleanDemoMode, currentUser } = useRobotics();
 
   const [activeTab, setActiveTab] = useState<"SETTINGS" | "MASTER_DATA">("MASTER_DATA");
   const [formState, setFormState] = useState({ ...settings });
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    if (currentUser?.role !== "CEO") {
+      toast.error("⚠️ Access Denied: Only Executive / Super Admin can change system configuration settings");
+      return;
+    }
+    const cleanPhone = formState.phone ? formState.phone.replace(/\D/g, "") : "";
+    if (cleanPhone && cleanPhone.length > 10) {
+      toast.error("❌ Official Contact Phone cannot exceed 10 digits");
+      return;
+    }
     updateSettings(formState);
   };
 
@@ -137,8 +146,15 @@ function SettingsComponent() {
                   <Input
                     value={formState.phone}
                     onChange={(e) => setFormState({ ...formState, phone: e.target.value })}
-                    className="h-9 rounded-lg"
+                    className={`h-9 rounded-lg ${
+                      (formState.phone || "").replace(/\D/g, "").length > 10 ? "border-red-500 focus-visible:ring-red-500" : ""
+                    }`}
                   />
+                  {(formState.phone || "").replace(/\D/g, "").length > 10 && (
+                    <p className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-1">
+                      ⚠️ Phone number cannot exceed 10 digits ({(formState.phone || "").replace(/\D/g, "").length}/10 digits)
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1">

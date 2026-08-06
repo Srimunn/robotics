@@ -257,6 +257,15 @@ function DashboardComponent() {
       toast.error("Please enter Customer Name and Phone Number");
       return;
     }
+    const cleanEnqPhone = enqPhone.replace(/\D/g, "");
+    if (cleanEnqPhone.length < 10) {
+      toast.error("❌ Phone Number must be at least 10 digits");
+      return;
+    }
+    if (cleanEnqPhone.length > 10) {
+      toast.error("❌ Mobile Number cannot exceed 10 digits");
+      return;
+    }
 
     const eng = engineers.find((x) => x.id === enqEngineerId || x.name === enqEngineerName);
 
@@ -365,6 +374,15 @@ function DashboardComponent() {
     e.preventDefault();
     if (!labourName || !labourPhone) {
       toast.error("Please enter Labour Name and Phone Number");
+      return;
+    }
+    const cleanLabourPhone = labourPhone.replace(/\D/g, "");
+    if (cleanLabourPhone.length < 10) {
+      toast.error("❌ Phone Number must be at least 10 digits");
+      return;
+    }
+    if (cleanLabourPhone.length > 10) {
+      toast.error("❌ Mobile Number cannot exceed 10 digits");
       return;
     }
 
@@ -1399,8 +1417,15 @@ function DashboardComponent() {
                     placeholder="e.g. 9876543210"
                     value={enqPhone}
                     onChange={(e) => setEnqPhone(e.target.value)}
-                    className="h-9 text-xs rounded-xl bg-background"
+                    className={`h-9 text-xs rounded-xl bg-background ${
+                      enqPhone.replace(/\D/g, "").length > 10 ? "border-red-500 focus-visible:ring-red-500" : ""
+                    }`}
                   />
+                  {enqPhone.replace(/\D/g, "").length > 10 && (
+                    <p className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-1">
+                      ⚠️ Mobile number cannot exceed 10 digits ({enqPhone.replace(/\D/g, "").length}/10 digits)
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1847,8 +1872,15 @@ function DashboardComponent() {
                     placeholder="e.g. 9840112233"
                     value={labourPhone}
                     onChange={(e) => setLabourPhone(e.target.value)}
-                    className="h-9 text-xs rounded-xl bg-background"
+                    className={`h-9 text-xs rounded-xl bg-background ${
+                      labourPhone.replace(/\D/g, "").length > 10 ? "border-red-500 focus-visible:ring-red-500" : ""
+                    }`}
                   />
+                  {labourPhone.replace(/\D/g, "").length > 10 && (
+                    <p className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-1">
+                      ⚠️ Mobile number cannot exceed 10 digits ({labourPhone.replace(/\D/g, "").length}/10 digits)
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
