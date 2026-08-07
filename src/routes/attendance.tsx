@@ -251,10 +251,7 @@ function AttendancePageComponent() {
               <CalendarCheck className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">Attendance & Payroll Aggregation Hub</h1>
-              <p className="text-xs text-muted-foreground">
-                Automated attendance aggregation from active projects. Zero duplicate entry. Real-time weekly & monthly wage calculations.
-              </p>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">Attendance</h1>
             </div>
           </div>
         </div>
@@ -275,7 +272,7 @@ function AttendancePageComponent() {
             className="text-xs font-semibold h-9 rounded-xl gap-1.5"
           >
             <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
-            Export Payroll Summary
+            Export Summary
           </Button>
         </div>
       </div>
@@ -287,7 +284,6 @@ function AttendancePageComponent() {
             <div>
               <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Total Days Logged</p>
               <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-foreground">{totalDaysLogged}</h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Recorded on active sites</p>
             </div>
             <div className="h-9 w-9 rounded-lg bg-blue-50 dark:bg-blue-950/40 grid place-items-center text-blue-600">
               <Layers className="h-5 w-5" />
@@ -298,9 +294,8 @@ function AttendancePageComponent() {
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Total Days Present</p>
-              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-emerald-600 dark:text-emerald-400">{totalPresentCount}</h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Full site attendance</p>
+              <p className="text-[11px] font-medium text-emerald-600 uppercase tracking-wider">Total Present</p>
+              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-emerald-600">{totalPresentCount}</h3>
             </div>
             <div className="h-9 w-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 grid place-items-center text-emerald-600">
               <CheckCircle2 className="h-5 w-5" />
@@ -311,11 +306,10 @@ function AttendancePageComponent() {
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-medium text-slate-900 dark:text-slate-100 uppercase tracking-wider">Overtime Hours</p>
-              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-slate-900 dark:text-slate-100">{totalOvertimeHours} hrs</h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Logged extra shifts</p>
+              <p className="text-[11px] font-medium text-amber-600 uppercase tracking-wider">Overtime Hours</p>
+              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-amber-600">{totalOvertimeHours} hrs</h3>
             </div>
-            <div className="h-9 w-9 rounded-lg bg-slate-100 dark:bg-slate-800 grid place-items-center text-slate-900 dark:text-slate-100">
+            <div className="h-9 w-9 rounded-lg bg-amber-50 dark:bg-amber-950/40 grid place-items-center text-amber-600">
               <Clock className="h-5 w-5" />
             </div>
           </CardContent>
@@ -324,74 +318,54 @@ function AttendancePageComponent() {
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider">Monthly Payroll</p>
-              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-amber-600 dark:text-amber-400">
-                ₹{totalMonthlyPayroll.toLocaleString("en-IN")}
-              </h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Calculated total wages</p>
+              <p className="text-[11px] font-medium text-purple-600 uppercase tracking-wider">Monthly Payroll</p>
+              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-purple-600">₹{totalMonthlyPayroll.toLocaleString("en-IN")}</h3>
             </div>
-            <div className="h-9 w-9 rounded-lg bg-amber-50 dark:bg-amber-950/40 grid place-items-center text-amber-600">
+            <div className="h-9 w-9 rounded-lg bg-purple-50 dark:bg-purple-950/40 grid place-items-center text-purple-600">
               <DollarSign className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filter Bar */}
+      {/* Filter and Search Bar */}
       <Card className="rounded-xl border border-border/80 bg-white dark:bg-card shadow-xs">
-        <CardContent className="p-4 space-y-3">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="relative w-full sm:w-80">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search Labour Name, ID, Phone..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9 text-xs rounded-lg"
-              />
-            </div>
+        <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-9 text-xs rounded-lg"
+            />
+          </div>
 
-            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                <Calendar className="h-3.5 w-3.5 text-blue-600" />
-                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger className="h-9 text-xs w-[140px] rounded-lg">
-                    <SelectValue placeholder="All Months" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Months</SelectItem>
-                    <SelectItem value="2026-08">August 2026</SelectItem>
-                    <SelectItem value="2026-07">July 2026</SelectItem>
-                    <SelectItem value="2026-06">June 2026</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="h-9 text-xs w-[140px] rounded-lg">
+                <SelectValue placeholder="Type: All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="permanent">Permanent</SelectItem>
+                <SelectItem value="contract">Contract</SelectItem>
+              </SelectContent>
+            </Select>
 
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="h-9 text-xs w-[150px] rounded-lg">
-                  <SelectValue placeholder="Labour Type: All" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="permanent">Permanent Staff</SelectItem>
-                  <SelectItem value="contract">Contract Staff</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={projectFilter} onValueChange={setProjectFilter}>
-                <SelectTrigger className="h-9 text-xs w-[170px] rounded-lg">
-                  <SelectValue placeholder="Project: All" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Projects</SelectItem>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.id} - {p.customerName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={projectFilter} onValueChange={setProjectFilter}>
+              <SelectTrigger className="h-9 text-xs w-[170px] rounded-lg">
+                <SelectValue placeholder="Project: All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Projects</SelectItem>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.id} - {p.customerName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -402,15 +376,15 @@ function AttendancePageComponent() {
           <Table>
             <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="text-xs font-bold text-muted-foreground w-28">Labour ID</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground min-w-[200px]">Labour Name</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground">Type</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-center">Days Present</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-center">Overtime</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-right">Default Weekly Wage</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-right">Calculated Weekly Wage</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-right">Calculated Monthly Wage</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-right pr-4">Action</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground w-28">ID</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground min-w-[200px]">WORKER</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground">TYPE</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground text-center">PRESENT</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground text-center">OVERTIME</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground text-right">BASE WAGE</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground text-right">WEEKLY WAGE</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground text-right">MONTHLY WAGE</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground text-right pr-4">ACTION</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

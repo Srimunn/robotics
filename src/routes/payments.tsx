@@ -242,10 +242,7 @@ function PaymentsComponent() {
               <Wallet className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">Payments & Accounts Receivable Credit Hub</h1>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Enterprise read-only credit management, dynamic payment stage tracking, automated balance calculation & CEO accounts receivable insights.
-              </p>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">Payments</h1>
             </div>
           </div>
         </div>
@@ -255,23 +252,20 @@ function PaymentsComponent() {
             className="text-xs font-semibold h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-sm"
           >
             <Plus className="h-4 w-4" />
-            Receive Stage Payment
+            + Receive Payment
           </Button>
         </div>
       </div>
 
-      {/* Overview Financial KPI Cards */}
+      {/* KPI Cards Header */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Total Contract Value</p>
-              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-foreground">
-                ₹{totalContractValue.toLocaleString("en-IN")}
-              </h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">{projects.length} active enterprise projects</p>
+              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-foreground">₹{totalContractValue.toLocaleString("en-IN")}</h3>
             </div>
-            <div className="h-9 w-9 rounded-lg bg-slate-100 dark:bg-slate-800 grid place-items-center text-slate-700 dark:text-slate-300">
+            <div className="h-9 w-9 rounded-lg bg-blue-50 dark:bg-blue-950/40 grid place-items-center text-blue-600">
               <FolderKanban className="h-5 w-5" />
             </div>
           </CardContent>
@@ -280,11 +274,10 @@ function PaymentsComponent() {
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Collected Revenue</p>
+              <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Collected Amount</p>
               <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-emerald-600 dark:text-emerald-400">
                 ₹{totalCollectedSum.toLocaleString("en-IN")}
               </h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">{payments.length} settled transactions</p>
             </div>
             <div className="h-9 w-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 grid place-items-center text-emerald-600">
               <CheckCircle2 className="h-5 w-5" />
@@ -295,14 +288,13 @@ function PaymentsComponent() {
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-medium text-rose-600 dark:text-rose-400 uppercase tracking-wider">Outstanding Balance</p>
-              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-rose-600 dark:text-rose-400">
+              <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider">Outstanding Balance</p>
+              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-amber-600 dark:text-amber-400">
                 ₹{totalOutstandingSum.toLocaleString("en-IN")}
               </h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Pending collections</p>
             </div>
-            <div className="h-9 w-9 rounded-lg bg-rose-50 dark:bg-rose-950/40 grid place-items-center text-rose-600">
-              <AlertCircle className="h-5 w-5" />
+            <div className="h-9 w-9 rounded-lg bg-amber-50 dark:bg-amber-950/40 grid place-items-center text-amber-600">
+              <Clock className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
@@ -310,24 +302,23 @@ function PaymentsComponent() {
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-medium text-slate-900 dark:text-slate-100 uppercase tracking-wider">Accounts Overdue</p>
-              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-slate-900 dark:text-slate-100">
+              <p className="text-[11px] font-medium text-rose-600 dark:text-rose-400 uppercase tracking-wider">Overdue Accounts</p>
+              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-rose-600 dark:text-rose-400">
                 {totalOverdueCount}
               </h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Overdue milestone accounts</p>
             </div>
-            <div className="h-9 w-9 rounded-lg bg-slate-100 dark:bg-slate-800 grid place-items-center text-slate-900 dark:text-slate-100">
-              <ShieldAlert className="h-5 w-5" />
+            <div className="h-9 w-9 rounded-lg bg-rose-50 dark:bg-rose-950/40 grid place-items-center text-rose-600">
+              <AlertCircle className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Navigation Tabs & Interactive Filters */}
+      {/* Main Tabs Navigation Bar */}
       <Card className="rounded-xl border border-border/80 bg-white dark:bg-card shadow-xs">
-        <CardContent className="p-4 space-y-3">
+        <CardContent className="p-3 space-y-3">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl shrink-0">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
               <button
                 onClick={() => setActiveTab("RECEIVABLES")}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
@@ -336,7 +327,7 @@ function PaymentsComponent() {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                Accounts Receivable Cockpit (Read-Only)
+                Receivables
               </button>
               <button
                 onClick={() => setActiveTab("HISTORY")}
@@ -346,7 +337,7 @@ function PaymentsComponent() {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                Immutable Payment History Ledger
+                History
               </button>
               <button
                 onClick={() => setActiveTab("CUSTOMER")}
@@ -356,7 +347,7 @@ function PaymentsComponent() {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                Customer Account Ledger
+                Ledger
               </button>
             </div>
 
@@ -364,7 +355,7 @@ function PaymentsComponent() {
               <div className="relative w-full sm:w-64 min-w-[200px]">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search Customer, Project, Ref #..."
+                  placeholder="Search..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9 h-9 text-xs rounded-lg"
@@ -389,7 +380,7 @@ function PaymentsComponent() {
           {/* Quick Filter Badges for Accounts Receivable */}
           {activeTab === "RECEIVABLES" && (
             <div className="flex items-center gap-1.5 overflow-x-auto pt-2 border-t text-xs scrollbar-none">
-              <span className="text-muted-foreground font-semibold text-[11px] whitespace-nowrap mr-1">Filter Accounts:</span>
+              <span className="text-muted-foreground font-semibold text-[11px] whitespace-nowrap mr-1">Filter:</span>
               {[
                 { id: "ALL", label: "All Projects" },
                 { id: "DUE_TODAY", label: "Due Today" },
@@ -430,12 +421,12 @@ function PaymentsComponent() {
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="text-xs font-bold text-muted-foreground whitespace-nowrap min-w-[150px]">CUSTOMER</TableHead>
                   <TableHead className="text-xs font-bold text-muted-foreground whitespace-nowrap min-w-[180px]">PROJECT</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground text-right whitespace-nowrap">CONTRACT VALUE</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground text-right whitespace-nowrap">COLLECTED (₹)</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground text-right whitespace-nowrap">OUTSTANDING (₹)</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground whitespace-nowrap min-w-[130px]">NEXT DUE DATE</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground text-center whitespace-nowrap">DAYS OVERDUE</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground text-center whitespace-nowrap">PAYMENT STATUS</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground text-right whitespace-nowrap">VALUE</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground text-right whitespace-nowrap">RECEIVED</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground text-right whitespace-nowrap">BALANCE</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground whitespace-nowrap min-w-[130px]">DUE DATE</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground text-center whitespace-nowrap">OVERDUE</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground text-center whitespace-nowrap">STATUS</TableHead>
                   <TableHead className="text-xs font-bold text-muted-foreground text-right pr-4 whitespace-nowrap">ACTION</TableHead>
                 </TableRow>
               </TableHeader>

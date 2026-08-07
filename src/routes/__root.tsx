@@ -160,10 +160,6 @@ function MainHeader() {
           <SidebarTrigger className="text-slate-700 hover:text-slate-900 hover:bg-slate-100" />
           <div className="hidden sm:flex items-center gap-2 text-xs text-slate-600">
             <span className="font-bold text-slate-900 tracking-wide">Robotics ERP</span>
-            <span className="text-slate-300">/</span>
-            <span className="bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full font-semibold text-[10px] border border-slate-200 flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> MongoDB Atlas Connected
-            </span>
           </div>
         </div>
 
@@ -175,7 +171,7 @@ function MainHeader() {
           >
             <div className="flex items-center gap-2 truncate">
               <Search className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-              <span className="truncate">Search Customer, Project, Enquiry, Phone (Ctrl+K)...</span>
+              <span className="truncate">Search (Ctrl+K)...</span>
             </div>
             <kbd className="hidden sm:inline-block text-[10px] font-mono bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-400">
               Ctrl + K
@@ -185,19 +181,6 @@ function MainHeader() {
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
-          {/* Clean Demo Mode Reset Button */}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              if (confirm("Reset ERP to Clean Demo Mode?\n\nAll current enquiry, project, payment, and attendance records will be cleared for a 100% fresh live executive demonstration.")) {
-                resetToCleanDemoMode();
-              }
-            }}
-            className="text-xs rounded-lg gap-1 border-rose-200 bg-rose-50/60 text-rose-700 hover:bg-rose-100"
-          >
-            🧹 Clean Demo Reset
-          </Button>
           {/* Notifications Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

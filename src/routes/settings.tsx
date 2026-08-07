@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useRobotics } from "@/lib/robotics-context";
+import { toast } from "sonner";
 import { MasterDataManager } from "@/components/erp/MasterDataManager";
 import {
   Settings,
@@ -52,35 +53,15 @@ function SettingsComponent() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-card p-6 rounded-xl border border-border shadow-xs">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">System Administration & Master Data</h1>
-            <Badge variant="outline" className="bg-slate-100 text-slate-700">
-              ERP Configuration
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Manage company profile, automation rules, and Smart Master Data governance across all system categories.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Settings</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (confirm("Reset ERP to Clean Demo Mode?\n\nAll current enquiry, project, payment, and attendance records will be cleared for a 100% fresh live executive demonstration.")) {
-                resetToCleanDemoMode();
-              }
-            }}
-            className="text-xs text-rose-600 border-rose-200 hover:bg-rose-50 rounded-lg gap-1.5"
-          >
-            🧹 Clean Demo Reset
-          </Button>
           {activeTab === "SETTINGS" && (
             <Button
               onClick={handleSave}
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1.5 shadow-xs"
             >
-              <Save className="h-4 w-4" /> Save Settings
+              <Save className="h-4 w-4" /> Save
             </Button>
           )}
         </div>
@@ -94,7 +75,7 @@ function SettingsComponent() {
           onClick={() => setActiveTab("MASTER_DATA")}
           className={`text-xs rounded-lg gap-1.5 ${activeTab === "MASTER_DATA" ? "bg-blue-600 hover:bg-blue-700 text-white" : ""}`}
         >
-          <Database className="h-3.5 w-3.5" /> Smart Master Data Governance (12 Categories)
+          <Database className="h-3.5 w-3.5" /> Master Data
         </Button>
         <Button
           variant={activeTab === "SETTINGS" ? "default" : "ghost"}
@@ -102,7 +83,7 @@ function SettingsComponent() {
           onClick={() => setActiveTab("SETTINGS")}
           className={`text-xs rounded-lg gap-1.5 ${activeTab === "SETTINGS" ? "bg-blue-600 hover:bg-blue-700 text-white" : ""}`}
         >
-          <SlidersHorizontal className="h-3.5 w-3.5" /> General ERP Settings & Branding
+          <SlidersHorizontal className="h-3.5 w-3.5" /> General Settings
         </Button>
       </div>
 

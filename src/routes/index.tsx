@@ -323,12 +323,13 @@ function DashboardComponent() {
       });
 
       // 3. PROJECT STATUS TRANSITIONS & HISTORY
-      (proj.statusHistory || []).forEach((sh, idx) => {
+      (proj.statusHistory || []).forEach((sh: any, idx) => {
+        const dateStr = String(sh.timestamp || sh.updatedAt || realTodayStr);
         pushUnique({
           id: `sh_${proj.id}_${idx}`,
-          time: sh.updatedAt?.slice(11, 16) || "09:00 AM",
-          date: sh.updatedAt?.slice(0, 10) || realTodayStr,
-          title: `Project ${proj.id} (${proj.customerName}) status changed to ${sh.status.toUpperCase()}`,
+          time: dateStr.length >= 16 ? dateStr.slice(11, 16) : "09:00 AM",
+          date: dateStr.length >= 10 ? dateStr.slice(0, 10) : realTodayStr,
+          title: `Project ${proj.id} (${proj.customerName}) status changed to ${(sh.status || "").toUpperCase()}`,
           subtitle: `Updated by ${sh.updatedBy || "Supervisor"} • Nature of Work: ${proj.natureOfWork}`,
           category: "PROJECTS",
           type: sh.status === "Completed" ? "completed" : sh.status === "Ongoing" ? "started" : "update",
@@ -362,7 +363,7 @@ function DashboardComponent() {
           time: "05:30 PM",
           date: proj.scheduledDate || realTodayStr,
           title: `Project ${proj.id} (${proj.customerName}) marked COMPLETED`,
-          subtitle: `Contract Value: ₹${proj.projectValue.toLocaleString("en-IN")} • Lead Engineer: ${proj.assignedEngineerName || "Er. Rajesh Kumar"}`,
+          subtitle: `Contract Value: ₹${(proj.projectValue || 0).toLocaleString("en-IN")} • Lead Engineer: ${proj.assignedEngineerName || "Er. Rajesh Kumar"}`,
           category: "PROJECTS",
           type: "completed",
           badgeText: "Project Completed",
@@ -393,7 +394,7 @@ function DashboardComponent() {
           id: `stg_${stg.id}`,
           time: "02:30 PM",
           date: stg.paidDate || stg.dueDate || realTodayStr,
-          title: `Milestone Stage (${stg.stageName}): ₹${stg.amount.toLocaleString("en-IN")} for ${proj.customerName} (${proj.id})`,
+          title: `Milestone Stage (${stg.stageName}): ₹${(stg.amount || 0).toLocaleString("en-IN")} for ${proj.customerName} (${proj.id})`,
           subtitle: `Stage Status: ${stg.status} • Reference: ${stg.referenceNumber || "Bank Transfer"}`,
           category: "PAYMENTS",
           type: "payment",
@@ -407,14 +408,15 @@ function DashboardComponent() {
     });
 
     // 3. MACHINES & EQUIPMENT ALLOCATED
-    machineIssues.forEach((mi) => {
+    machineIssues.forEach((mi: any) => {
       const proj = projects.find((p) => p.id === mi.projectId);
+      const issueDateStr = String(mi.issueDate || realTodayStr);
       pushUnique({
         id: `mi_${mi.id}`,
         time: "10:15 AM",
-        date: mi.issueDate || realTodayStr,
+        date: issueDateStr.length >= 10 ? issueDateStr.slice(0, 10) : realTodayStr,
         title: `Machine Added: ${mi.machineName}`,
-        subtitle: `Issued to ${mi.issuedTo || "Site Crew"} for Project ${mi.projectId} (${proj?.customerName || "Site"})`,
+        subtitle: `Issued by ${mi.issuedBy || mi.issuedTo || "Site Crew"} for Project ${mi.projectId} (${proj?.customerName || "Site"})`,
         category: "EQUIPMENT",
         type: "machine",
         badgeText: "Machine Added",
@@ -423,14 +425,14 @@ function DashboardComponent() {
       });
     });
 
-    machines.forEach((m) => {
+    machines.forEach((m: any) => {
       if (m.issuedQuantity > 0) {
-        const linkedProj = projects.find((p) => p.natureOfWork?.toLowerCase().includes(m.category.toLowerCase()) || p.id === m.assignedProjectId);
+        const linkedProj = projects.find((p) => p.natureOfWork?.toLowerCase().includes((m.category || "").toLowerCase()) || p.id === m.assignedProjectId);
         pushUnique({
           id: `m_${m.id}`,
           time: "10:30 AM",
           date: realTodayStr,
-          title: `Equipment Deployed: ${m.name}`,
+          title: `Equipment Deployed: ${m.toolName || m.name}`,
           subtitle: `${m.category} active on site (${m.issuedQuantity} unit(s) in service)`,
           category: "EQUIPMENT",
           type: "machine",
@@ -625,6 +627,8 @@ function DashboardComponent() {
       status: "Available",
       skills: [],
       wageHistory: [],
+      loginId: "",
+      pin: "0000",
     });
     setAddLabourOpen(false);
     setLabourName("");
@@ -645,17 +649,9 @@ function DashboardComponent() {
           =========================================================================== */}
       <div className="sticky top-14 z-20 bg-white/95 dark:bg-card/95 backdrop-blur-md border-b border-border px-6 py-4 rounded-xl shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-              <Activity className="h-5 w-5 text-blue-600" /> Executive Dashboard
-            </h1>
-            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-bold">
-              30-Second Operations Board
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Enterprise Robotics Operations & Live Execution Management Cockpit.
-          </p>
+          <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <Activity className="h-5 w-5 text-blue-600" /> Dashboard
+          </h1>
         </div>
 
         {/* Header Action Buttons */}

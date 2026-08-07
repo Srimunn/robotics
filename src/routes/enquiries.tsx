@@ -180,8 +180,8 @@ function EnquiriesComponent() {
     }
 
     setIsSaving(true);
-    setTimeout(() => {
-      const created = addEnquiry({
+    setTimeout(async () => {
+      const created = await addEnquiry({
         enquiryDate: createData.enquiryDate,
         customerName: createData.customerName,
         phone: createData.phone,
@@ -227,8 +227,8 @@ function EnquiriesComponent() {
     }, 250);
   };
 
-  const handleConvert = (enquiryId: string) => {
-    const proj = approveAndConvertEnquiryToProject(enquiryId);
+  const handleConvert = async (enquiryId: string) => {
+    const proj = await approveAndConvertEnquiryToProject(enquiryId);
     if (proj) {
       setActiveEnquiry(null);
       navigate({ to: "/projects" });
@@ -285,21 +285,13 @@ function EnquiriesComponent() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-card p-6 rounded-xl border border-border shadow-xs">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Customer Enquiries & Quotations</h1>
-            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 gap-1">
-              <ArrowRightLeft className="h-3 w-3" /> Auto Bi-Directional Sync
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Stage 1 of Enterprise ERP. Approved enquiries convert directly into Projects with zero data re-entry.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Enquiries</h1>
         </div>
         <Button
           onClick={() => setCreateOpen(true)}
           className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1.5 shadow-xs"
         >
-          <Plus className="h-4 w-4" /> New Customer Enquiry
+          <Plus className="h-4 w-4" /> + New Enquiry
         </Button>
       </div>
 
@@ -308,7 +300,7 @@ function EnquiriesComponent() {
         <div className="relative w-full sm:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search Enquiry #, Customer, Engineer, Phone..."
+            placeholder="Search..."
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -319,7 +311,7 @@ function EnquiriesComponent() {
         </div>
 
         <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-          <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Decision Filter:</span>
+          <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Filter:</span>
           {["ALL", "Follow-up", "Thinking", "Approved", "Cancelled"].map((dec) => (
             <Button
               key={dec}
@@ -349,8 +341,7 @@ function EnquiriesComponent() {
       <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card overflow-hidden">
         <CardHeader className="p-4 border-b flex flex-row items-center justify-between">
           <div>
-            <CardTitle className="text-sm font-semibold">Customer Enquiry Workflow Records ({filteredEnquiries.length})</CardTitle>
-            <CardDescription className="text-xs">Single source of truth with bi-directional project synchronization</CardDescription>
+            <CardTitle className="text-sm font-semibold">Enquiries ({filteredEnquiries.length})</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -358,15 +349,15 @@ function EnquiriesComponent() {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50/80 dark:bg-slate-900/50 text-muted-foreground border-b text-[11px] font-bold uppercase tracking-wider">
                 <tr>
-                  <th className="p-3 pl-4 whitespace-nowrap">Enquiry ID</th>
-                  <th className="p-3 whitespace-nowrap min-w-[160px]">Customer & Location</th>
-                  <th className="p-3 whitespace-nowrap min-w-[200px]">Service Need / Leakage</th>
-                  <th className="p-3 whitespace-nowrap">Assigned Engineer</th>
-                  <th className="p-3 whitespace-nowrap">Quotation Amount</th>
-                  <th className="p-3 whitespace-nowrap">Work Committed Date</th>
-                  <th className="p-3 whitespace-nowrap">Actual Work Started</th>
-                  <th className="p-3 whitespace-nowrap">Decision</th>
-                  <th className="p-3 text-right pr-4 whitespace-nowrap">Action</th>
+                  <th className="p-3 pl-4 whitespace-nowrap">ID</th>
+                  <th className="p-3 whitespace-nowrap min-w-[160px]">CUSTOMER</th>
+                  <th className="p-3 whitespace-nowrap min-w-[200px]">WORK TYPE</th>
+                  <th className="p-3 whitespace-nowrap">ENGINEER</th>
+                  <th className="p-3 whitespace-nowrap">AMOUNT</th>
+                  <th className="p-3 whitespace-nowrap">START DATE</th>
+                  <th className="p-3 whitespace-nowrap">STARTED</th>
+                  <th className="p-3 whitespace-nowrap">STATUS</th>
+                  <th className="p-3 text-right pr-4 whitespace-nowrap">ACTION</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -950,8 +941,7 @@ function EnquiriesComponent() {
                   <PhoneCall className="h-5 w-5" />
                 </div>
                 <div>
-                  <span>Log New Customer Enquiry</span>
-                  <p className="text-xs font-normal text-muted-foreground">Record client details, service needs, reference & engineer assignment</p>
+                  <span>New Enquiry</span>
                 </div>
               </div>
             </DialogTitle>
@@ -961,15 +951,15 @@ function EnquiriesComponent() {
             {/* SECTION 1: CUSTOMER CONTACT INFORMATION */}
             <div className="p-4 rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/20 space-y-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
-                <UserCheck className="h-4 w-4 text-blue-600" /> Section 1: Customer Contact Information
+                <UserCheck className="h-4 w-4 text-blue-600" /> Customer
               </h3>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Customer Full Name *</Label>
+                  <Label className="text-xs font-semibold">Name *</Label>
                   <Input
                     required
-                    placeholder="e.g. AeroTech Solutions / Ramesh"
+                    placeholder="Name"
                     value={createData.customerName}
                     onChange={(e) => setCreateData({ ...createData, customerName: e.target.value })}
                     className="h-9 text-xs rounded-xl bg-background"
@@ -977,10 +967,10 @@ function EnquiriesComponent() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Mobile Phone Number *</Label>
+                  <Label className="text-xs font-semibold">Phone *</Label>
                   <Input
                     required
-                    placeholder="e.g. 9876543210"
+                    placeholder="Phone"
                     value={createData.phone}
                     onChange={(e) => setCreateData({ ...createData, phone: e.target.value })}
                     className={`h-9 text-xs rounded-xl bg-background ${
@@ -989,16 +979,16 @@ function EnquiriesComponent() {
                   />
                   {createData.phone.replace(/\D/g, "").length > 10 && (
                     <p className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-1">
-                      ⚠️ Mobile number cannot exceed 10 digits ({createData.phone.replace(/\D/g, "").length}/10 digits)
+                      ⚠️ Phone number cannot exceed 10 digits ({createData.phone.replace(/\D/g, "").length}/10 digits)
                     </p>
                   )}
                 </div>
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs font-semibold">Site Address / Location</Label>
+                <Label className="text-xs font-semibold">Location</Label>
                 <Input
-                  placeholder="e.g. Plot 42, Industrial Park, HITEC City, Hyderabad"
+                  placeholder="Location"
                   value={createData.location}
                   onChange={(e) => setCreateData({ ...createData, location: e.target.value })}
                   className="h-9 text-xs rounded-xl bg-background"
@@ -1009,11 +999,11 @@ function EnquiriesComponent() {
             {/* SECTION 2: SERVICE NEED & REFERENCE DETAILS */}
             <div className="p-4 rounded-xl border border-purple-100 dark:border-purple-900/40 bg-purple-50/40 dark:bg-purple-950/20 space-y-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
-                <Sparkles className="h-4 w-4 text-purple-600" /> Section 2: Service Need & Lead Source
+                <Sparkles className="h-4 w-4 text-purple-600" /> Work Details
               </h3>
 
               <div className="space-y-1">
-                <Label className="text-xs font-semibold">Service Need / Leakage Type *</Label>
+                <Label className="text-xs font-semibold">Work Type *</Label>
                 <SmartComboBox
                   category="Leakage Type"
                   value={createData.leakageType}
@@ -1033,7 +1023,7 @@ function EnquiriesComponent() {
 
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-semibold">Referred By / Reference</Label>
+                    <Label className="text-xs font-semibold">Referred By</Label>
                     {["Word of Mouth", "Existing Customer", "Builder Reference", "Engineer Reference", "CEO Reference"].includes(createData.leadSource) && (
                       <Badge variant="outline" className="text-[9px] bg-purple-100 text-purple-700 border-purple-300">
                         ★ Recommended
@@ -1052,12 +1042,12 @@ function EnquiriesComponent() {
             {/* SECTION 3: ENGINEERING ASSIGNMENT & ESTIMATE */}
             <div className="p-4 rounded-xl border border-amber-100 dark:border-amber-900/40 bg-amber-50/40 dark:bg-amber-950/20 space-y-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-                <UserCheck className="h-4 w-4 text-amber-600" /> Section 3: Engineering Assignment & Site Visit
+                <UserCheck className="h-4 w-4 text-amber-600" /> Engineer & Visit
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Assign Lead Engineer</Label>
+                  <Label className="text-xs font-semibold">Engineer</Label>
                   <SmartComboBox
                     category="Engineer Names"
                     value={createData.assignedEngineerName}
@@ -1077,10 +1067,10 @@ function EnquiriesComponent() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Quotation Estimate (₹)</Label>
+                  <Label className="text-xs font-semibold">Amount (₹)</Label>
                   <Input
                     type="number"
-                    placeholder="e.g. 150000"
+                    placeholder="Amount"
                     value={createData.quotationAmount || ""}
                     onChange={(e) => {
                       const val = e.target.value === "" ? 0 : Number(e.target.value);
@@ -1095,13 +1085,13 @@ function EnquiriesComponent() {
             {/* SECTION 4: WORK COMMITMENT TIMELINE */}
             <div className="p-4 rounded-xl border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-950/20 space-y-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
-                <CalendarCheck className="h-4 w-4 text-emerald-600" /> Section 4: Work Commitment & Execution Dates
+                <CalendarCheck className="h-4 w-4 text-emerald-600" /> Dates
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center gap-1">
-                    <CalendarCheck className="h-3.5 w-3.5 text-purple-600" /> Work Committed Date *
+                    <CalendarCheck className="h-3.5 w-3.5 text-purple-600" /> Start Date *
                   </Label>
                   <Input
                     type="date"
@@ -1113,7 +1103,7 @@ function EnquiriesComponent() {
 
                 <div className="space-y-1">
                   <Label className="text-xs font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1">
-                    <PlayCircle className="h-3.5 w-3.5 text-emerald-600" /> Actual Work Started Date
+                    <PlayCircle className="h-3.5 w-3.5 text-emerald-600" /> Work Started
                   </Label>
                   <Input
                     type="date"
@@ -1127,7 +1117,7 @@ function EnquiriesComponent() {
 
             {/* SECTION 5: INITIAL REMARKS */}
             <div className="space-y-1 pt-1">
-              <Label className="text-xs font-semibold">Initial Remarks & Notes</Label>
+              <Label className="text-xs font-semibold">Notes</Label>
               <SmartComboBox
                 category="Remarks Templates"
                 value={createData.remarks}

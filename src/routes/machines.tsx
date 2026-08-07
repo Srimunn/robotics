@@ -287,10 +287,7 @@ function MachinesPageComponent() {
               <Wrench className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">Machines & Tools Inventory</h1>
-              <p className="text-xs text-muted-foreground">
-                Automated equipment tracking, project issue/return operations & condition management.
-              </p>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">Tools</h1>
             </div>
           </div>
         </div>
@@ -300,30 +297,29 @@ function MachinesPageComponent() {
             onClick={() => setIsAuditLogOpen(true)}
             className="text-xs font-semibold h-9 rounded-xl gap-1.5"
           >
-            <History className="h-3.5 w-3.5 text-blue-600" />
-            Stock Audit Log
+            <History className="h-3.5 w-3.5 text-slate-500" />
+            Audit Logs
           </Button>
           <Button
             onClick={handleOpenAddModal}
             className="text-xs font-semibold h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-sm"
           >
             <Plus className="h-4 w-4" />
-            Add New Machine
+            + Add Tool
           </Button>
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Total Machine Units</p>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Total Equipment</p>
               <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-foreground">{totalMachines}</h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">{machines.length} Tool Models</p>
             </div>
-            <div className="h-9 w-9 rounded-lg bg-slate-100 dark:bg-slate-800 grid place-items-center text-slate-700 dark:text-slate-300">
-              <Box className="h-5 w-5" />
+            <div className="h-9 w-9 rounded-lg bg-blue-50 dark:bg-blue-950/40 grid place-items-center text-blue-600">
+              <Wrench className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
@@ -333,7 +329,6 @@ function MachinesPageComponent() {
             <div>
               <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Available Stock</p>
               <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-emerald-600 dark:text-emerald-400">{totalAvailable}</h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Ready for deployment</p>
             </div>
             <div className="h-9 w-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 grid place-items-center text-emerald-600">
               <CheckCircle2 className="h-5 w-5" />
@@ -344,12 +339,11 @@ function MachinesPageComponent() {
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wider">Issued / Deployed</p>
-              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-blue-600 dark:text-blue-400">{totalIssued}</h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Active on client sites</p>
+              <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider">Issued to Sites</p>
+              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-amber-600 dark:text-amber-400">{totalIssued}</h3>
             </div>
-            <div className="h-9 w-9 rounded-lg bg-blue-50 dark:bg-blue-950/40 grid place-items-center text-blue-600">
-              <Send className="h-5 w-5" />
+            <div className="h-9 w-9 rounded-lg bg-amber-50 dark:bg-amber-950/40 grid place-items-center text-amber-600">
+              <Clock className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
@@ -357,22 +351,8 @@ function MachinesPageComponent() {
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-medium text-slate-900 dark:text-slate-100 uppercase tracking-wider">Under Repair</p>
-              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-slate-900 dark:text-slate-100">{totalRepair}</h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">In maintenance workshop</p>
-            </div>
-            <div className="h-9 w-9 rounded-lg bg-slate-100 dark:bg-slate-800 grid place-items-center text-slate-900 dark:text-slate-100">
-              <Wrench className="h-5 w-5" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card col-span-2 md:col-span-1">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-medium text-rose-600 dark:text-rose-400 uppercase tracking-wider">Lost / Damaged</p>
-              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-rose-600 dark:text-rose-400">{totalLost}</h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Written off inventory</p>
+              <p className="text-[11px] font-medium text-rose-600 dark:text-rose-400 uppercase tracking-wider">Under Maintenance</p>
+              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-rose-600 dark:text-rose-400">{totalRepair}</h3>
             </div>
             <div className="h-9 w-9 rounded-lg bg-rose-50 dark:bg-rose-950/40 grid place-items-center text-rose-600">
               <AlertTriangle className="h-5 w-5" />
@@ -389,7 +369,7 @@ function MachinesPageComponent() {
             <div className="relative w-full lg:w-80">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search Tool Name, ID, Category, Brand..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 h-9 text-xs rounded-lg"
@@ -442,14 +422,14 @@ function MachinesPageComponent() {
           <Table>
             <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="text-xs font-bold text-muted-foreground w-28">Machine ID</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground min-w-[220px]">Tool / Machine Name</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground">Category & Brand</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground">Attachment</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-center">Available / Total</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-center">Stock Breakdown</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground">Condition</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-right pr-4">Actions</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground w-28">ID</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground min-w-[220px]">TOOL NAME</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground">CATEGORY</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground">ATTACHMENT</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground text-center">QTY</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground text-center">BREAKDOWN</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground">CONDITION</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground text-right pr-4">ACTION</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -606,18 +586,15 @@ function MachinesPageComponent() {
           <DialogHeader>
             <DialogTitle className="text-lg font-bold flex items-center gap-2">
               <Wrench className="h-5 w-5 text-blue-600" />
-              {editingMachine ? `Edit Machine (${editingMachine.id})` : "Add New Machine / Tool"}
+              {editingMachine ? `Edit Tool (${editingMachine.id})` : "Add Tool"}
             </DialogTitle>
-            <DialogDescription className="text-xs">
-              Define tool specs and initial stock quantities.
-            </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSaveMachine} className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Tool / Machine Name *</Label>
+              <Label className="text-xs font-semibold">Name *</Label>
               <Input
-                placeholder="e.g. 6-Axis Welding Torch Head"
+                placeholder="Name"
                 value={formToolName}
                 onChange={(e) => setFormToolName(e.target.value)}
                 required
@@ -627,7 +604,7 @@ function MachinesPageComponent() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Category (Smart Search)</Label>
+                <Label className="text-xs font-semibold">Category</Label>
                 <SmartComboBox
                   category="Machine Category"
                   value={formCategory}
@@ -636,7 +613,7 @@ function MachinesPageComponent() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Brand (Smart Search)</Label>
+                <Label className="text-xs font-semibold">Brand</Label>
                 <SmartComboBox
                   category="Machine Brand"
                   value={formBrand}
@@ -647,7 +624,7 @@ function MachinesPageComponent() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Attachment (Smart Search)</Label>
+                <Label className="text-xs font-semibold">Attachment</Label>
                 <SmartComboBox
                   category="Machine Attachment"
                   value={formAttachment}
@@ -656,7 +633,7 @@ function MachinesPageComponent() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Unit (Smart Search)</Label>
+                <Label className="text-xs font-semibold">Unit</Label>
                 <SmartComboBox
                   category="Machine Unit"
                   value={formUnit}
@@ -667,7 +644,7 @@ function MachinesPageComponent() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Total Stock Quantity *</Label>
+                <Label className="text-xs font-semibold">Stock *</Label>
                 <Input
                   type="number"
                   min="1"
@@ -679,7 +656,7 @@ function MachinesPageComponent() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Initial Condition</Label>
+                <Label className="text-xs font-semibold">Condition</Label>
                 <Select value={formCondition} onValueChange={(val: MachineCondition) => setFormCondition(val)}>
                   <SelectTrigger className="h-9 text-xs rounded-lg">
                     <SelectValue />
@@ -694,9 +671,9 @@ function MachinesPageComponent() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Remarks & Notes</Label>
+              <Label className="text-xs font-semibold">Notes</Label>
               <Textarea
-                placeholder="Serial numbers, specs, or calibration info..."
+                placeholder="Notes"
                 value={formRemarks}
                 onChange={(e) => setFormRemarks(e.target.value)}
                 rows={2}

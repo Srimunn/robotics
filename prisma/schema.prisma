@@ -1,0 +1,583 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserRole {
+  CEO
+  Worker
+  Labor
+}
+
+enum SiteVisitStatus {
+  Pending
+  Assigned
+  Visited
+  Completed
+}
+
+enum CustomerDecision {
+  FollowUp
+  Thinking
+  Approved
+  Cancelled
+}
+
+enum ProjectStatus {
+  Waiting
+  Scheduled
+  Ongoing
+  Completed
+  Closed
+}
+
+enum PaymentStatus {
+  Pending
+  Partial
+  Paid
+  Overdue
+}
+
+enum PaymentStageStatus {
+  Pending
+  Paid
+  Partial
+  Overdue
+}
+
+enum LabourType {
+  Permanent
+  Contract
+}
+
+enum LabourStatus {
+  Available
+  Assigned
+  Leave
+}
+
+enum AttendanceStatus {
+  Present
+  Absent
+  Leave
+  HalfDay
+  Overtime
+}
+
+enum MachineCondition {
+  Good
+  Damaged
+  RepairRequired
+  Lost
+}
+
+enum MachineIssueStatus {
+  Issued
+  Returned
+  PartiallyReturned
+  UnderRepair
+  Lost
+}
+
+enum StockItemType {
+  Machine
+  Material
+}
+
+enum StockActionType {
+  Issue
+  Return
+  RepairMove
+  LostMove
+  StockAddition
+  StockAdjustment
+}
+
+enum VerificationStatus {
+  PendingVerification
+  Verified
+  Rejected
+}
+
+// ============================================================
+// AUTH
+// ============================================================
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  role         UserRole
+  name         String
+  labourId     String?  @unique
+  labour       Labour?  @relation(fields: [labourId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ============================================================
+// MASTER DATA & SETTINGS
+// ============================================================
+
+model MasterDataItem {
+  id        String   @id
+  category  String
+  value     String
+  isActive  Boolean  @default(true)
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([category, value])
+  @@index([category])
+}
+
+model SystemSettings {
+  id                                 String   @id @default("singleton")
+  companyName                        String
+  companyAddress                     String
+  phone                              String
+  email                              String
+  taxId                              String
+  autoUpdateProjectStatusOnPayment   Boolean  @default(true)
+  defaultLeadSources                 String[]
+  defaultLeakageTypes                String[]
+  defaultWeeklyWagePermanent         Int
+  defaultWeeklyWageContract          Int
+  defaultDailyWagePermanent          Int?
+  defaultDailyWageContract           Int?
+  updatedAt                          DateTime @updatedAt
+}
+
+// ============================================================
+// PEOPLE
+// ============================================================
+
+model Engineer {
+  id                   String     @id
+  name                 String
+  phone                String
+  specialty            String
+  status               String?    @default("Available")
+  currentProjectId     String?
+  currentProjectName   String?
+  nextAvailableDate    DateTime?
+  email                String?
+  enquiries            Enquiry[]
+  projects             Project[]
+}
+
+model Labour {
+  id                 String              @id
+  name               String
+  phone              String
+  type               LabourType
+  defaultWeeklyWage  Int
+  dailyWage          Int?
+  status             LabourStatus        @default(Available)
+  skills             String[]
+  loginId            String              @unique
+  pin                String
+  photoUrl           String?
+  address            String?
+  wageHistory        LabourWageHistory[]
+  labourLogs         ProjectLabourLog[]
+  assignments        ProjectLabourAssignment[]
+  attendance         AttendanceRecord[]
+  user               User?
+}
+
+model LabourWageHistory {
+  id           String   @id @default(cuid())
+  labourId     String
+  labour       Labour   @relation(fields: [labourId], references: [id], onDelete: Cascade)
+  projectId    String
+  projectName  String
+  weeklyWage   Int
+  assignedDate DateTime
+
+  @@index([labourId])
+  @@index([projectId])
+}
+
+model Customer {
+  id          String   @id
+  name        String
+  phone       String
+  location    String
+  createdAt   DateTime @default(now())
+
+  @@unique([name, phone])
+}
+
+// ============================================================
+// ENQUIRIES & PROJECTS
+// ============================================================
+
+model Enquiry {
+  id                       String             @id
+  enquiryDate              DateTime
+  customerName             String
+  phone                    String
+  location                 String
+  leadSource               String
+  referredBy               String?
+  leakageType              String
+  assignedEngineerId       String?
+  assignedEngineerName     String?
+  assignedEngineer         Engineer?          @relation(fields: [assignedEngineerId], references: [id])
+  siteVisitDate            DateTime?
+  siteVisitStatus          SiteVisitStatus    @default(Pending)
+  quotationDate            DateTime?
+  quotationAmount          Decimal?           @db.Decimal(12, 2)
+  quotationPdfUrl          String?
+  remarks                  String?
+  workCommittedDate        DateTime?
+  actualWorkStartedDate    DateTime?
+  customerDecision         CustomerDecision   @default(FollowUp)
+  customerStatus           String?
+  cancellationReason       String?
+  projectId                String?            @unique
+  project                  Project?           @relation("EnquiryProject", fields: [projectId], references: [id])
+  createdAt                DateTime           @default(now())
+
+  @@index([customerName])
+  @@index([assignedEngineerId])
+}
+
+model Project {
+  id                       String             @id
+  enquiry                  Enquiry?           @relation("EnquiryProject")
+  customerName             String
+  phone                    String
+  location                 String
+  leadSource               String?
+  referredBy               String?
+  leakageType              String?
+  natureOfWork             String
+  assignedEngineerId       String?
+  assignedEngineerName     String?
+  assignedEngineer         Engineer?          @relation(fields: [assignedEngineerId], references: [id])
+  siteVisitDate            DateTime?
+  siteVisitStatus          SiteVisitStatus?
+  quotationDate            DateTime?
+  quotationAmount          Decimal?           @db.Decimal(12, 2)
+  projectValue             Decimal            @db.Decimal(12, 2)
+  scheduledDate            DateTime
+  workCommittedDate        DateTime?
+  actualWorkStartedDate    DateTime?
+  customerDecision         CustomerDecision?
+  cancellationReason       String?
+  remarks                  String
+  status                   ProjectStatus      @default(Waiting)
+  receivedAmount           Decimal            @default(0) @db.Decimal(12, 2)
+  balanceAmount            Decimal            @default(0) @db.Decimal(12, 2)
+  paymentStatus            PaymentStatus      @default(Pending)
+  beforeWorkPhotoUrl       String?
+  afterWorkPhotoUrl        String?
+  internalNotes            String
+  createdAt                DateTime           @default(now())
+  statusHistory            ProjectStatusHistory[]
+  activities               ProjectActivity[]
+  labourAssignments        ProjectLabourAssignment[]
+  labourLogs               ProjectLabourLog[]
+  machineIssues            MachineIssueRecord[]
+  materialIssues           MaterialIssueRecord[]
+  paymentStages            PaymentStageItem[]
+  payments                 Payment[]
+  documents                ProjectDocument[]
+
+  @@index([customerName])
+  @@index([assignedEngineerId])
+  @@index([status])
+}
+
+model ProjectStatusHistory {
+  id        String        @id @default(cuid())
+  projectId String
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status    ProjectStatus
+  timestamp DateTime      @default(now())
+  note      String
+
+  @@index([projectId])
+}
+
+model ProjectActivity {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  timestamp DateTime @default(now())
+  event     String
+  actor     String
+  details   String
+
+  @@index([projectId])
+}
+
+model ProjectLabourAssignment {
+  id           String     @id @default(cuid())
+  projectId    String
+  project      Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  labourId     String
+  labour       Labour     @relation(fields: [labourId], references: [id])
+  labourName   String
+  labourType   LabourType
+  weeklyWage   Int
+  assignedDate DateTime
+
+  @@unique([projectId, labourId])
+  @@index([projectId])
+  @@index([labourId])
+}
+
+model ProjectLabourLog {
+  id                    String              @id @default(cuid())
+  projectId             String
+  project               Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  labourId              String
+  labour                Labour              @relation(fields: [labourId], references: [id])
+  labourName            String
+  labourType            LabourType
+  weeklyWage            Int
+  dailyWage             Int?
+  date                  DateTime
+  inTime                String?
+  outTime               String?
+  attendance            AttendanceStatus
+  hoursWorked           Float
+  earnedMoney           Int?
+  workDescription       String
+  remarks               String?
+  inPhotoUrl            String?
+  outPhotoUrl           String?
+  inLocation            Json?
+  outLocation           Json?
+  verificationStatus    VerificationStatus? @default(PendingVerification)
+  verifiedBy            String?
+  verifiedDate          DateTime?
+  verificationComments  String?
+  isGpsWarning          Boolean?
+
+  @@unique([projectId, labourId, date])
+  @@index([projectId])
+  @@index([labourId])
+  @@index([date])
+}
+
+model PaymentStageItem {
+  id             String              @id
+  projectId      String
+  project        Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stageName      String
+  amount         Decimal             @db.Decimal(12, 2)
+  dueDate        DateTime
+  status         PaymentStageStatus  @default(Pending)
+  paymentNotes   String?
+  paidAmount     Decimal?            @db.Decimal(12, 2)
+  paidDate       DateTime?
+  paymentMethod  String?
+  referenceNumber String?
+  remarks        String?
+
+  @@index([projectId])
+}
+
+model ProjectDocument {
+  id           String   @id
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectName  String?
+  customerName String?
+  category     String
+  title        String
+  fileUrl      String
+  uploadedAt   DateTime @default(now())
+  uploadedBy   String
+  fileSize     String?
+  notes        String?
+
+  @@index([projectId])
+}
+
+// ============================================================
+// PAYMENTS
+// ============================================================
+
+model Payment {
+  id                   String    @id
+  projectId            String
+  project              Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  paymentDate          DateTime
+  amount               Decimal   @db.Decimal(12, 2)
+  mode                 String
+  referenceNumber      String
+  remarks              String
+  stageId              String?
+  stageName            String?
+  receivedBy           String?
+  receiptNumber        String?   @unique
+  upiApp               String?
+  transactionId        String?   @unique
+  upiReferenceNumber   String?
+  utrNumber            String?   @unique
+  bankName             String?
+  accountReceived      String?
+  chequeNumber         String?   @unique
+  chequeDate           DateTime?
+  proofUrl             String?
+  proofName            String?
+  createdAt            DateTime  @default(now())
+
+  @@index([projectId])
+  @@index([paymentDate])
+}
+
+// ============================================================
+// ATTENDANCE
+// ============================================================
+
+model AttendanceRecord {
+  id                    String              @id
+  labourId              String
+  labour                Labour              @relation(fields: [labourId], references: [id], onDelete: Cascade)
+  labourName            String?
+  projectId             String?
+  projectName           String?
+  date                  DateTime
+  status                AttendanceStatus
+  inTime                String?
+  outTime               String?
+  hoursWorked           Float?
+  earnedMoney           Int?
+  workDescription       String?
+  weeklyWage            Int?
+  remarks               String?
+  inPhotoUrl            String?
+  outPhotoUrl           String?
+  inLocation            Json?
+  outLocation           Json?
+  verificationStatus    VerificationStatus?
+  verifiedBy            String?
+  verifiedDate          DateTime?
+  verificationComments  String?
+  isGpsWarning          Boolean?
+
+  @@unique([labourId, date])
+  @@index([labourId])
+  @@index([date])
+}
+
+// ============================================================
+// INVENTORY
+// ============================================================
+
+model Machine {
+  id                 String                @id
+  toolName           String
+  category           String
+  attachment         String?
+  brand              String
+  currentStock       Int
+  availableQuantity  Int
+  issuedQuantity     Int                   @default(0)
+  repairQuantity     Int                   @default(0)
+  lostQuantity       Int                   @default(0)
+  unit               String
+  condition          MachineCondition      @default(Good)
+  remarks            String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  issues             MachineIssueRecord[]
+}
+
+model MachineIssueRecord {
+  id                   String              @id
+  machineId            String
+  machine              Machine             @relation(fields: [machineId], references: [id])
+  machineName          String
+  category             String?
+  brand                String?
+  projectId            String
+  project              Project             @relation(fields: [projectId], references: [id])
+  projectName          String
+  customerName         String
+  quantity             Int
+  issueDate            DateTime
+  expectedReturnDate   DateTime
+  actualReturnedDate   DateTime?
+  issuedBy             String
+  returnedQuantity     Int                 @default(0)
+  conditionOnReturn    MachineCondition?
+  status               MachineIssueStatus  @default(Issued)
+  remarks              String?
+  returnRemarks        String?
+
+  @@index([machineId])
+  @@index([projectId])
+}
+
+model Material {
+  id            String                 @id
+  name          String
+  category      String
+  unit          String
+  currentStock  Int
+  minimumStock  Int
+  supplier      String
+  purchaseCost  Decimal                @db.Decimal(12, 2)
+  remarks       String?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  issues        MaterialIssueRecord[]
+}
+
+model MaterialIssueRecord {
+  id           String    @id
+  materialId   String?
+  material     Material? @relation(fields: [materialId], references: [id])
+  materialName String
+  category     String?
+  unit         String?
+  projectId    String
+  project      Project   @relation(fields: [projectId], references: [id])
+  projectName  String
+  customerName String
+  quantity     Int
+  unitCost     Decimal?  @db.Decimal(12, 2)
+  totalCost    Decimal?  @db.Decimal(12, 2)
+  issueDate    DateTime
+  issuedBy     String
+  remarks      String?
+
+  @@index([materialId])
+  @@index([projectId])
+}
+
+model StockAuditLog {
+  id                String           @id
+  timestamp         DateTime         @default(now())
+  itemType          StockItemType
+  itemId            String
+  itemName          String
+  actionType        StockActionType
+  quantity          Int
+  previousAvailable Int?
+  newAvailable      Int?
+  projectId         String?
+  projectName       String?
+  customerName      String?
+  issuedByOrActor   String
+  condition         MachineCondition?
+  notes             String?
+
+  @@index([itemId])
+  @@index([timestamp])
+}

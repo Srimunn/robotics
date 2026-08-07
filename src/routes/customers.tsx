@@ -50,15 +50,7 @@ function CustomersComponent() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-card p-6 rounded-xl border border-border shadow-xs">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Customer Master</h1>
-            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-              Auto-Aggregated
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Unified client database built automatically from enquiries and project contracts.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Customers</h1>
         </div>
       </div>
 
@@ -67,7 +59,7 @@ function CustomersComponent() {
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search Customer Name, Phone, Location..."
+            placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9 text-xs rounded-lg h-9"

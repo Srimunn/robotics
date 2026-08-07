@@ -103,7 +103,7 @@ function ReportsComponent() {
         const matchName = item.customer.name.toLowerCase().includes(q);
         const matchPhone = item.customer.phone?.toLowerCase().includes(q) || false;
         const matchLoc = item.customer.location?.toLowerCase().includes(q) || false;
-        const matchEmail = item.customer.email?.toLowerCase().includes(q) || false;
+        const matchEmail = (item.customer as any).email?.toLowerCase().includes(q) || false;
         if (!matchName && !matchPhone && !matchLoc && !matchEmail) return false;
       }
 
@@ -157,7 +157,7 @@ function ReportsComponent() {
 
   const paidStatusCount = projects.filter((p) => p.paymentStatus === "Paid").length;
   const partialStatusCount = projects.filter((p) => p.paymentStatus === "Partial").length;
-  const unpaidStatusCount = projects.filter((p) => p.paymentStatus === "Unpaid").length;
+  const unpaidStatusCount = projects.filter((p) => p.paymentStatus === "Pending" || (p.paymentStatus as any) === "Unpaid").length;
 
   // Pending Collections Custom Filtering States
   const [pendingPaymentStatusFilter, setPendingPaymentStatusFilter] = useState<string>("ALL");
@@ -517,28 +517,20 @@ function ReportsComponent() {
       {/* Header */}
       <div className="bg-white dark:bg-card p-6 rounded-xl border border-border shadow-xs">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Automated Reports Engine</h1>
-            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-              Live Real-Time
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Zero manual aggregation. All metrics generated instantly from business operations.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Reports</h1>
         </div>
       </div>
 
       {/* Report Selector Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto bg-white dark:bg-card p-3 rounded-xl border border-border shadow-xs">
         {[
-          { id: "REVENUE", label: "Revenue Report", icon: TrendingUp },
-          { id: "PROJECTS", label: "Projects Report", icon: FolderKanban },
-          { id: "PENDING", label: "Pending Collections", icon: Coins },
-          { id: "ENQUIRIES", label: "Enquiries & Quotations", icon: FileText },
-          { id: "ATTENDANCE", label: "Attendance & Payroll", icon: Calendar },
-          { id: "NATURE", label: "Work Report", icon: Wrench },
-          { id: "CUSTOMER", label: "Customer Ledger", icon: Users },
+          { id: "REVENUE", label: "Revenue", icon: TrendingUp },
+          { id: "PROJECTS", label: "Projects", icon: FolderKanban },
+          { id: "PENDING", label: "Pending", icon: Coins },
+          { id: "ENQUIRIES", label: "Enquiries", icon: FileText },
+          { id: "ATTENDANCE", label: "Attendance", icon: Calendar },
+          { id: "NATURE", label: "Work", icon: Wrench },
+          { id: "CUSTOMER", label: "Ledger", icon: Users },
         ].map((tab) => (
           <Button
             key={tab.id}
@@ -1078,7 +1070,7 @@ function ReportsComponent() {
               <span className="text-[11px] font-bold text-muted-foreground mr-1">Collection Status:</span>
               {[
                 { id: "ALL", label: `All Pending (${projects.filter((p) => (p.balanceAmount || 0) > 0).length})` },
-                { id: "Unpaid", label: `Unpaid Only (${projects.filter((p) => p.paymentStatus === "Unpaid" && (p.balanceAmount || 0) > 0).length})` },
+                { id: "Unpaid", label: `Unpaid Only (${projects.filter((p) => (p.paymentStatus === "Pending" || (p.paymentStatus as any) === "Unpaid") && (p.balanceAmount || 0) > 0).length})` },
                 { id: "Partial", label: `Partial Paid (${projects.filter((p) => p.paymentStatus === "Partial" && (p.balanceAmount || 0) > 0).length})` },
               ].map((tab) => (
                 <button
@@ -1210,7 +1202,7 @@ function ReportsComponent() {
                         <td className="p-3 text-right pr-4">
                           <Badge
                             className={`text-[10px] ${
-                              p.paymentStatus === "Unpaid"
+                              p.paymentStatus === "Pending" || (p.paymentStatus as any) === "Unpaid"
                                 ? "bg-rose-100 text-rose-800 border border-rose-200"
                                 : "bg-amber-100 text-amber-800 border border-amber-200"
                             }`}

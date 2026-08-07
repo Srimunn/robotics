@@ -90,15 +90,13 @@ class LabourErrorBoundary extends React.Component<{ children: React.ReactNode },
             </Button>
             <Button
               variant="outline"
+              size="sm"
               onClick={() => {
-                try {
-                  localStorage.clear();
-                  window.location.reload();
-                } catch (e) {}
+                window.location.reload();
               }}
-              className="text-xs font-semibold rounded-lg px-4 border-rose-200 text-rose-700 hover:bg-rose-50"
+              className="text-xs font-semibold rounded-lg px-4 border-slate-200 text-slate-700 hover:bg-slate-50"
             >
-              Reset Stored Demo Data
+              Reload Page
             </Button>
           </div>
         </div>
@@ -182,27 +180,18 @@ function LaboursComponent() {
     status: "Available" as any,
   });
 
-  const handleAddLabourSubmit = (e: React.FormEvent) => {
+  const handleAddLabourSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!labourFormData.name.trim()) {
       toast.error("❌ Labour Name is required");
       return;
     }
-    const cleanPhone = labourFormData.phone.replace(/\D/g, "");
-    if (cleanPhone.length < 10) {
-      toast.error("❌ Phone Number must be at least 10 digits");
-      return;
-    }
-    if (cleanPhone.length > 10) {
-      toast.error("❌ Mobile Number cannot exceed 10 digits");
-      return;
-    }
 
-    const newL = addLabour({
+    const newL = await addLabour({
       name: labourFormData.name,
       phone: labourFormData.phone,
-      loginId: labourFormData.loginId.trim() || undefined,
-      pin: labourFormData.pin.trim() || undefined,
+      loginId: labourFormData.loginId.trim() || "",
+      pin: labourFormData.pin.trim() || "0000",
       type: labourFormData.type,
       defaultWeeklyWage: labourFormData.defaultWeeklyWage,
       status: labourFormData.status,
@@ -297,15 +286,7 @@ function LaboursComponent() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-card p-6 rounded-xl border border-border shadow-xs">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Labour Management</h1>
-            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400">
-              Weekly Wage Engine
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Labour paid WEEKLY. Wages configured per project assignment. Complete profiles with wage history, attendance % and working hours.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Workers</h1>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -322,7 +303,7 @@ function LaboursComponent() {
             onClick={() => setAddOpen(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1.5 shadow-xs"
           >
-            <Plus className="h-4 w-4" /> Add Labour Profile
+            <Plus className="h-4 w-4" /> + Add Worker
           </Button>
         </div>
       </div>
@@ -339,7 +320,7 @@ function LaboursComponent() {
             }}
             className={`text-xs rounded-lg gap-1.5 ${activeTab === "PROFILE" ? "bg-blue-600 hover:bg-blue-700" : ""}`}
           >
-            <User className="h-3.5 w-3.5" /> Labour Profile Cockpit
+            <User className="h-3.5 w-3.5" /> Profile
           </Button>
           <Button
             variant={activeTab === "ATTENDANCE" ? "default" : "outline"}
@@ -347,7 +328,7 @@ function LaboursComponent() {
             onClick={() => setActiveTab("ATTENDANCE")}
             className={`text-xs rounded-lg gap-1.5 ${activeTab === "ATTENDANCE" ? "bg-blue-600 hover:bg-blue-700" : ""}`}
           >
-            <Calendar className="h-3.5 w-3.5" /> Attendance Calendar & Logs
+            <Calendar className="h-3.5 w-3.5" /> Attendance
           </Button>
           <Button
             variant={activeTab === "MASTER" ? "default" : "outline"}
@@ -355,7 +336,7 @@ function LaboursComponent() {
             onClick={() => setActiveTab("MASTER")}
             className={`text-xs rounded-lg gap-1.5 ${activeTab === "MASTER" ? "bg-blue-600 hover:bg-blue-700" : ""}`}
           >
-            <HardHat className="h-3.5 w-3.5" /> Workforce Master Table
+            <HardHat className="h-3.5 w-3.5" /> Worker Table
           </Button>
         </div>
 

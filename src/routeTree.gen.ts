@@ -14,6 +14,7 @@ import { Route as AttendanceRouteImport } from './routes/attendance'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as EngineersRouteImport } from './routes/engineers'
 import { Route as EnquiriesRouteImport } from './routes/enquiries'
+import { Route as ImportRouteImport } from './routes/import'
 import { Route as LaboursRouteImport } from './routes/labours'
 import { Route as MachinesRouteImport } from './routes/machines'
 import { Route as MaterialsRouteImport } from './routes/materials'
@@ -45,6 +46,11 @@ const EngineersRoute = EngineersRouteImport.update({
 const EnquiriesRoute = EnquiriesRouteImport.update({
   id: '/enquiries',
   path: '/enquiries',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImportRoute = ImportRouteImport.update({
+  id: '/import',
+  path: '/import',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LaboursRoute = LaboursRouteImport.update({
@@ -89,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/customers': typeof CustomersRoute
   '/engineers': typeof EngineersRoute
   '/enquiries': typeof EnquiriesRoute
+  '/import': typeof ImportRoute
   '/labours': typeof LaboursRoute
   '/machines': typeof MachinesRoute
   '/materials': typeof MaterialsRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/customers': typeof CustomersRoute
   '/engineers': typeof EngineersRoute
   '/enquiries': typeof EnquiriesRoute
+  '/import': typeof ImportRoute
   '/labours': typeof LaboursRoute
   '/machines': typeof MachinesRoute
   '/materials': typeof MaterialsRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/customers': typeof CustomersRoute
   '/engineers': typeof EngineersRoute
   '/enquiries': typeof EnquiriesRoute
+  '/import': typeof ImportRoute
   '/labours': typeof LaboursRoute
   '/machines': typeof MachinesRoute
   '/materials': typeof MaterialsRoute
@@ -134,6 +143,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/engineers'
     | '/enquiries'
+    | '/import'
     | '/labours'
     | '/machines'
     | '/materials'
@@ -148,6 +158,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/engineers'
     | '/enquiries'
+    | '/import'
     | '/labours'
     | '/machines'
     | '/materials'
@@ -162,6 +173,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/engineers'
     | '/enquiries'
+    | '/import'
     | '/labours'
     | '/machines'
     | '/materials'
@@ -177,6 +189,7 @@ export interface RootRouteChildren {
   CustomersRoute: typeof CustomersRoute
   EngineersRoute: typeof EngineersRoute
   EnquiriesRoute: typeof EnquiriesRoute
+  ImportRoute: typeof ImportRoute
   LaboursRoute: typeof LaboursRoute
   MachinesRoute: typeof MachinesRoute
   MaterialsRoute: typeof MaterialsRoute
@@ -221,6 +234,13 @@ declare module '@tanstack/react-router' {
       path: '/enquiries'
       fullPath: '/enquiries'
       preLoaderRoute: typeof EnquiriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/import': {
+      id: '/import'
+      path: '/import'
+      fullPath: '/import'
+      preLoaderRoute: typeof ImportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/labours': {
@@ -281,6 +301,7 @@ const rootRouteChildren: RootRouteChildren = {
   CustomersRoute: CustomersRoute,
   EngineersRoute: EngineersRoute,
   EnquiriesRoute: EnquiriesRoute,
+  ImportRoute: ImportRoute,
   LaboursRoute: LaboursRoute,
   MachinesRoute: MachinesRoute,
   MaterialsRoute: MaterialsRoute,

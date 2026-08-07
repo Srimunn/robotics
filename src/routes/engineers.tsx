@@ -199,18 +199,13 @@ function EngineersPageComponent() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto min-h-screen">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-card p-5 rounded-2xl border border-border/80 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400">
-              <UserCheck className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">Engineer Management & Field Allocation</h1>
-              <p className="text-xs text-muted-foreground">
-                Real-time engineer availability tracking, assignment conflict prevention & field schedule monitoring.
-              </p>
-            </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-card p-6 rounded-xl border border-border shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400">
+            <UserCheck className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Engineers</h1>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -219,7 +214,7 @@ function EngineersPageComponent() {
             className="text-xs font-semibold h-9 rounded-xl bg-purple-600 hover:bg-purple-700 text-white gap-1.5 shadow-sm"
           >
             <Plus className="h-4 w-4" />
-            Add New Engineer
+            + Add Engineer
           </Button>
         </div>
       </div>
@@ -229,9 +224,8 @@ function EngineersPageComponent() {
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Total Engineers</p>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Total</p>
               <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-foreground">{totalEngineers}</h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Field technical specialists</p>
             </div>
             <div className="h-9 w-9 rounded-lg bg-purple-50 dark:bg-purple-950/40 grid place-items-center text-purple-600">
               <UserCheck className="h-5 w-5" />
@@ -242,9 +236,8 @@ function EngineersPageComponent() {
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Available Engineers</p>
+              <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Available</p>
               <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-emerald-600 dark:text-emerald-400">{availableEngineers}</h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Ready for immediate assignment</p>
             </div>
             <div className="h-9 w-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 grid place-items-center text-emerald-600">
               <CheckCircle2 className="h-5 w-5" />
@@ -255,9 +248,8 @@ function EngineersPageComponent() {
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider">Assigned / Busy</p>
+              <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider">Busy</p>
               <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-amber-600 dark:text-amber-400">{busyEngineers}</h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Active on project or site visits</p>
             </div>
             <div className="h-9 w-9 rounded-lg bg-amber-50 dark:bg-amber-950/40 grid place-items-center text-amber-600">
               <Clock className="h-5 w-5" />
@@ -268,9 +260,8 @@ function EngineersPageComponent() {
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wider">Site Visits Done</p>
+              <p className="text-[11px] font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wider">Visits Done</p>
               <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-blue-600 dark:text-blue-400">{visitsCompletedToday}</h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Completed site inspections</p>
             </div>
             <div className="h-9 w-9 rounded-lg bg-blue-50 dark:bg-blue-950/40 grid place-items-center text-blue-600">
               <CalendarCheck className="h-5 w-5" />
@@ -285,7 +276,7 @@ function EngineersPageComponent() {
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search Engineer Name, ID, Specialty, Phone..."
+              placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 h-9 text-xs rounded-lg"
@@ -298,9 +289,9 @@ function EngineersPageComponent() {
                 <SelectValue placeholder="Status: All" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="available">Available Only</SelectItem>
-                <SelectItem value="assigned">Assigned / Busy Only</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="available">Available</SelectItem>
+                <SelectItem value="assigned">Busy</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -313,13 +304,13 @@ function EngineersPageComponent() {
           <Table>
             <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="text-xs font-bold text-muted-foreground w-28">Engineer ID</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground min-w-[200px]">Engineer Name & Contact</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground">Specialty / Technical Focus</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-center">Current Status</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground">Current Active Assignment</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground">Next Available Date</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-right pr-4">Actions</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground w-28">ID</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground min-w-[200px]">NAME</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground">SPECIALTY</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground text-center">STATUS</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground">ASSIGNMENT</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground">NEXT AVAILABLE</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground text-right pr-4">ACTION</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

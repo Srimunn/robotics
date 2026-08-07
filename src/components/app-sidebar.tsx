@@ -14,6 +14,7 @@ import {
   Settings,
   Bot,
   LogOut,
+  FileSpreadsheet,
 } from "lucide-react";
 import {
   Sidebar,
@@ -38,8 +39,8 @@ const items = [
   { title: "Engineers", url: "/engineers", icon: UserCheck },
   { title: "Labours", url: "/labours", icon: HardHat },
   { title: "Attendance", url: "/attendance", icon: CalendarCheck },
-  { title: "Machines & Tools", url: "/machines", icon: Wrench },
-  { title: "Payments & Credit", url: "/payments", icon: Wallet },
+  { title: "Tools", url: "/machines", icon: Wrench },
+  { title: "Payments", url: "/payments", icon: Wallet },
   { title: "Reports", url: "/reports", icon: BarChart3 },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
@@ -66,9 +67,6 @@ export function AppSidebar() {
             <div className="truncate text-base font-extrabold tracking-tight text-slate-900">
               Robotics ERP
             </div>
-            <div className="truncate text-[11px] font-semibold text-slate-500">
-              Enterprise Operations Suite
-            </div>
           </div>
         </div>
       </SidebarHeader>
@@ -76,7 +74,7 @@ export function AppSidebar() {
       <SidebarContent className="px-2 py-3 bg-white">
         <SidebarGroup>
           <SidebarGroupLabel className="text-[10px] uppercase font-bold text-slate-400 px-2 tracking-wider">
-            Main Enterprise Modules
+            Menu
           </SidebarGroupLabel>
           <SidebarGroupContent className="mt-1">
             <SidebarMenu className="space-y-1">
@@ -113,14 +111,14 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-slate-200 p-3 bg-white space-y-2">
         <div className="flex items-center gap-2.5 p-1 text-left">
           <div className="h-7 w-7 rounded-lg bg-slate-100 text-slate-800 font-bold grid place-items-center text-[10px] border border-slate-200 shrink-0">
-            {currentUser?.role === "CEO" ? "CEO" : "SP"}
+            {currentUser?.role === "CEO" ? "CEO" : "WK"}
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-xs font-bold text-slate-900 truncate leading-tight">
-              {currentUser?.name || "Service User"}
+              {currentUser?.name || "User"}
             </p>
             <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">
-              {currentUser?.role === "CEO" ? "Super Admin" : "Supervisor"}
+              {currentUser?.role === "CEO" ? "Admin" : currentUser?.role === "Worker" ? "Worker" : "Manager"}
             </p>
           </div>
         </div>
@@ -128,7 +126,7 @@ export function AppSidebar() {
           onClick={() => logout()}
           className="w-full flex items-center justify-center gap-1.5 h-8 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 text-[11px] font-bold cursor-pointer transition-colors"
         >
-          <LogOut className="h-3.5 w-3.5" /> Sign Out Session
+          <LogOut className="h-3.5 w-3.5" /> Sign Out
         </button>
       </SidebarFooter>
     </Sidebar>

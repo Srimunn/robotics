@@ -163,7 +163,7 @@ function ProjectsComponent() {
   const [inlineLabourWage, setInlineLabourWage] = useState<number>(1400);
   const [inlineLabourSkillsStr, setInlineLabourSkillsStr] = useState("Robotics Servicing, Hydraulics");
 
-  const handleInlineAddLabourSubmit = (e: React.FormEvent) => {
+  const handleInlineAddLabourSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inlineLabourName.trim()) {
       toast.error("Please enter Labour Name");
@@ -179,7 +179,7 @@ function ProjectsComponent() {
       return;
     }
 
-    const newL = addLabour({
+    const newL = await addLabour({
       name: inlineLabourName,
       phone: inlineLabourPhone,
       type: inlineLabourType,
@@ -187,6 +187,8 @@ function ProjectsComponent() {
       status: "Available",
       skills: [],
       wageHistory: [],
+      loginId: "",
+      pin: "0000",
     });
 
     // If activeProject is open, automatically assign newly created labour to this active project immediately!
@@ -466,21 +468,13 @@ function ProjectsComponent() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-card p-6 rounded-xl border border-border shadow-xs">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Projects Master</h1>
-            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 gap-1">
-              <ArrowRightLeft className="h-3 w-3" /> Auto Bi-Directional Sync
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Stage 2 of Unified ERP Lifecycle. Single source of truth with Enquiry. Data syncs bi-directionally.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Projects</h1>
         </div>
         <Button
           onClick={() => setNoticeOpen(true)}
           className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1.5 shadow-xs"
         >
-          <Sparkles className="h-4 w-4" /> Go to Enquiries to Convert Project
+          <Sparkles className="h-4 w-4" /> Convert Project
         </Button>
       </div>
 
@@ -489,7 +483,7 @@ function ProjectsComponent() {
         <div className="relative w-full sm:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search Project ID, Customer, Engineer..."
+            placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9 text-xs rounded-lg h-9"
@@ -524,8 +518,7 @@ function ProjectsComponent() {
       <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
         <CardHeader className="p-4 border-b flex flex-row items-center justify-between">
           <div>
-            <CardTitle className="text-sm font-semibold">Active Enterprise Projects ({filteredProjects.length})</CardTitle>
-            <CardDescription className="text-xs">Click row to open full 10-Section Enterprise Project Cockpit</CardDescription>
+            <CardTitle className="text-sm font-semibold">Projects ({filteredProjects.length})</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -533,15 +526,15 @@ function ProjectsComponent() {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50/80 dark:bg-slate-900/50 text-muted-foreground border-b text-[11px] font-bold uppercase tracking-wider">
                 <tr>
-                  <th className="p-3 pl-4 whitespace-nowrap">Project ID</th>
-                  <th className="p-3 whitespace-nowrap min-w-[160px]">Customer & Location</th>
-                  <th className="p-3 whitespace-nowrap min-w-[200px]">Nature of Work</th>
-                  <th className="p-3 whitespace-nowrap">Lead Engineer</th>
-                  <th className="p-3 whitespace-nowrap">Work Committed Date</th>
-                  <th className="p-3 whitespace-nowrap">Actual Started Date</th>
-                  <th className="p-3 whitespace-nowrap">Financial Status</th>
-                  <th className="p-3 whitespace-nowrap">Status</th>
-                  <th className="p-3 text-right pr-4 whitespace-nowrap">Action</th>
+                  <th className="p-3 pl-4 whitespace-nowrap">ID</th>
+                  <th className="p-3 whitespace-nowrap min-w-[160px]">CUSTOMER</th>
+                  <th className="p-3 whitespace-nowrap min-w-[200px]">WORK TYPE</th>
+                  <th className="p-3 whitespace-nowrap">ENGINEER</th>
+                  <th className="p-3 whitespace-nowrap">START DATE</th>
+                  <th className="p-3 whitespace-nowrap">STARTED</th>
+                  <th className="p-3 whitespace-nowrap">PAYMENT</th>
+                  <th className="p-3 whitespace-nowrap">STATUS</th>
+                  <th className="p-3 text-right pr-4 whitespace-nowrap">ACTION</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -736,7 +729,7 @@ function ProjectsComponent() {
               {/* SECTION 1: VISUAL PROJECT TIMELINE */}
               <div className="bg-muted/30 p-4 rounded-xl border border-border">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Section 1: Project Progress Timeline
+                  Progress
                 </span>
                 <div className="flex items-center justify-between mt-3 px-2 relative">
                   {["Waiting", "Scheduled", "Ongoing", "Completed", "Closed"].map((st, idx) => {
@@ -768,7 +761,7 @@ function ProjectsComponent() {
               <Card className="rounded-xl border border-blue-100 shadow-2xs bg-white dark:bg-card w-full">
                   <CardHeader className="p-3.5 border-b bg-blue-50/50 flex flex-row items-center justify-between">
                     <CardTitle className="text-xs font-bold uppercase tracking-wider text-blue-900 flex items-center gap-2">
-                      <UserCheck className="h-4 w-4 text-blue-600" /> Section 2: Customer, Engineer & Work Dates
+                      <UserCheck className="h-4 w-4 text-blue-600" /> Details
                     </CardTitle>
                     <Badge variant="outline" className="text-[10px] bg-blue-100/80 text-blue-800 border-blue-300 font-bold">
                       Er. {activeProject.assignedEngineerName || "Er. Rajesh Kumar"}
@@ -825,7 +818,7 @@ function ProjectsComponent() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <CardTitle className="text-sm font-bold text-foreground">Section 3: Project Financial Summary & Payment Plan</CardTitle>
+                          <CardTitle className="text-sm font-bold text-foreground">Payments</CardTitle>
                           <Badge
                             className={`text-[10px] font-bold ${
                               activeProject.paymentStatus === "Paid"
@@ -840,9 +833,6 @@ function ProjectsComponent() {
                             {activeProject.paymentStatus}
                           </Badge>
                         </div>
-                        <CardDescription className="text-xs text-muted-foreground mt-0.5">
-                          Automated financial engine, dynamic milestone allocation & real-time collection progress.
-                        </CardDescription>
                       </div>
                     </div>
                     <Button
@@ -919,11 +909,8 @@ function ProjectsComponent() {
                 <CardHeader className="p-3 border-b bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                      <HardHat className="h-3.5 w-3.5 text-blue-600" /> Section 4: Labour Assignment & Weekly Wage Configuration
+                      <HardHat className="h-3.5 w-3.5 text-blue-600" /> Workers
                     </CardTitle>
-                    <CardDescription className="text-xs mt-0.5">
-                      Labour paid WEEKLY. Wages belong to this project assignment only.
-                    </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -1004,11 +991,8 @@ function ProjectsComponent() {
                 <CardHeader className="p-3 border-b bg-muted/20 flex flex-row items-center justify-between">
                   <div>
                     <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5 text-blue-600" /> Section 5: Labour Work Log & Attendance (Auto Calculation Rules)
+                      <Clock className="h-3.5 w-3.5 text-blue-600" /> Daily Log
                     </CardTitle>
-                    <CardDescription className="text-xs mt-0.5">
-                      Entering In Time automatically sets Attendance = <span className="font-bold text-emerald-600">Present</span> and calculates Hours Worked!
-                    </CardDescription>
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -1115,7 +1099,7 @@ function ProjectsComponent() {
               <Card className="rounded-xl border border-border">
                 <CardHeader className="p-3 border-b bg-muted/20">
                   <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                    <Briefcase className="h-3.5 w-3.5 text-amber-600" /> Section 6: Daily Work Log Summary
+                    <Briefcase className="h-3.5 w-3.5 text-amber-600" /> Work Summary
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-3 space-y-2">
@@ -1145,7 +1129,7 @@ function ProjectsComponent() {
               <Card className="rounded-xl border border-border">
                 <CardHeader className="p-3 border-b bg-muted/20">
                   <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                    <DollarSign className="h-3.5 w-3.5 text-emerald-600" /> Section 7: Payment Transactions
+                    <DollarSign className="h-3.5 w-3.5 text-emerald-600" /> Payments Log
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -1195,11 +1179,8 @@ function ProjectsComponent() {
                 <CardHeader className="p-3 border-b bg-muted/20 flex flex-row items-center justify-between">
                   <div>
                     <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                      <Wrench className="h-3.5 w-3.5 text-blue-600" /> Machines & Tools Used
+                      <Wrench className="h-3.5 w-3.5 text-blue-600" /> Tools Used
                     </CardTitle>
-                    <CardDescription className="text-xs mt-0.5">
-                      Track machines & tools issued to this project. Returning restores stock automatically.
-                    </CardDescription>
                   </div>
                   <Button
                     size="sm"
