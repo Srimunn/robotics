@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vinxi build",
-    "start": "vinxi start",
+    "build": "npx vinxi build",
+    "start": "npx vinxi start",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
