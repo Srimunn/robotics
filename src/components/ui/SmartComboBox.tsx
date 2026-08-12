@@ -198,7 +198,7 @@ export function SmartComboBox({
                     setManageModalOpen(true);
                   }}
                   title={`Manage Master List for ${category}`}
-                  className="h-6 w-6 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 text-muted-foreground hover:text-foreground"
+                  className="hidden sm:inline-flex h-6 w-6 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 text-muted-foreground hover:text-foreground"
                 >
                   <Settings className="h-3.5 w-3.5" />
                 </Button>

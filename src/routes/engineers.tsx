@@ -413,7 +413,7 @@ function EngineersPageComponent() {
 
       {/* ADD / EDIT ENGINEER MODAL */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogContent className="max-w-md rounded-2xl p-6">
+        <DialogContent className="max-w-full sm:max-w-md w-full max-h-[92vh] overflow-y-auto rounded-2xl p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold flex items-center gap-2">
               <UserCheck className="h-5 w-5 text-purple-600" />
@@ -461,18 +461,18 @@ function EngineersPageComponent() {
               />
             </div>
 
-            <DialogFooter className="pt-2">
+            <DialogFooter className="pt-2 flex flex-col-reverse sm:flex-row gap-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setIsAddModalOpen(false)}
-                className="h-9 text-xs rounded-xl"
+                className="h-9 text-xs rounded-xl w-full sm:w-auto"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
-                className="h-9 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-xs"
+                className="h-9 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-xs w-full sm:w-auto"
               >
                 {editingEng ? "Update Engineer" : "Save Engineer"}
               </Button>

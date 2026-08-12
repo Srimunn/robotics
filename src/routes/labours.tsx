@@ -459,7 +459,7 @@ function LaboursComponent() {
               </div>
 
               {/* PERMANENT VS CONTRACT LABOUR SELECTION TABS */}
-              <div className="grid grid-cols-3 gap-1 p-1 bg-muted/50 rounded-xl border border-border">
+              <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap p-1 bg-muted/50 rounded-xl border border-border">
                 <button
                   type="button"
                   onClick={() => {
@@ -467,7 +467,7 @@ function LaboursComponent() {
                     const perms = labours.filter((l) => l.type === "Permanent");
                     if (perms.length > 0) setSelectedLabourProfile(perms[0]);
                   }}
-                  className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all text-center ${
+                  className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all text-center flex-1 ${
                     labourTypeFilter === "PERMANENT"
                       ? "bg-blue-600 text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
@@ -1217,7 +1217,7 @@ function LaboursComponent() {
 
       {/* ADD LABOUR PROFILE MODAL */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-xl rounded-2xl p-6 bg-white dark:bg-card border border-border shadow-2xl">
+        <DialogContent className="max-w-full sm:max-w-xl w-full max-h-[92vh] overflow-y-auto rounded-2xl p-4 sm:p-6 bg-white dark:bg-card border border-border shadow-2xl">
           <DialogHeader className="border-b pb-3">
             <DialogTitle className="flex items-center gap-2.5 text-base font-extrabold text-foreground">
               <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 grid place-items-center border border-blue-200 dark:border-blue-800">
@@ -1317,11 +1317,11 @@ function LaboursComponent() {
               </div>
             </div>
 
-            <DialogFooter className="pt-3 border-t flex items-center justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setAddOpen(false)} className="rounded-xl text-xs">
+            <DialogFooter className="pt-3 border-t flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setAddOpen(false)} className="rounded-xl text-xs w-full sm:w-auto">
                 Cancel
               </Button>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-10 text-xs font-bold shadow-md px-5">
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-10 text-xs font-bold shadow-md px-5 w-full sm:w-auto">
                 Add Labour Profile
               </Button>
             </DialogFooter>

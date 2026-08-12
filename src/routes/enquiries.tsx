@@ -930,7 +930,7 @@ function EnquiriesComponent() {
 
       {/* CREATE NEW ENQUIRY DIALOG FORM */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-3xl rounded-2xl border border-border shadow-2xl p-6 max-h-[92vh] overflow-y-auto bg-background">
+        <DialogContent className="max-w-full sm:max-w-3xl w-full rounded-2xl border border-border shadow-2xl p-4 sm:p-6 max-h-[92vh] overflow-y-auto bg-background">
           <DialogHeader className="border-b pb-3">
             <DialogTitle className="text-lg font-extrabold flex items-center justify-between text-foreground">
               <div className="flex items-center gap-2.5">
@@ -1118,14 +1118,14 @@ function EnquiriesComponent() {
               />
             </div>
 
-            <DialogFooter className="pt-4 border-t flex items-center justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} className="rounded-xl text-xs">
+            <DialogFooter className="pt-4 border-t flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} className="rounded-xl text-xs w-full sm:w-auto">
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={isSaving}
-                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs gap-1 font-bold shadow-md px-5"
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs gap-1 font-bold shadow-md px-5 w-full sm:w-auto"
               >
                 {isSaving ? "Saving..." : "Save Enquiry"}
               </Button>

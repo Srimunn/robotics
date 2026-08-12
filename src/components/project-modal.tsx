@@ -60,7 +60,7 @@ export function ProjectModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-full sm:max-w-2xl w-full max-h-[92vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>{initial ? "Edit Project" : "Add New Project"}</DialogTitle>
           <DialogDescription>
@@ -72,7 +72,7 @@ export function ProjectModal({
             e.preventDefault();
             onSubmit(form);
           }}
-          className="grid gap-4 sm:grid-cols-2"
+          className="grid gap-4 grid-cols-1 sm:grid-cols-2"
         >
           <div className="grid gap-2">
             <Label>Date</Label>
@@ -139,11 +139,11 @@ export function ProjectModal({
             <div className="text-sm text-muted-foreground">Balance Amount (auto)</div>
             <div className="text-xl font-bold">{formatCurrency(balance)}</div>
           </div>
-          <DialogFooter className="sm:col-span-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="sm:col-span-2 flex flex-col-reverse sm:flex-row gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button type="submit">{initial ? "Save Changes" : "Add Project"}</Button>
+            <Button type="submit" className="w-full sm:w-auto">{initial ? "Save Changes" : "Add Project"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -582,7 +582,7 @@ function MachinesPageComponent() {
 
       {/* ADD / EDIT MACHINE MODAL */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogContent className="max-w-md rounded-2xl p-6">
+        <DialogContent className="max-w-full sm:max-w-md w-full max-h-[92vh] overflow-y-auto rounded-2xl p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold flex items-center gap-2">
               <Wrench className="h-5 w-5 text-blue-600" />
@@ -594,7 +594,6 @@ function MachinesPageComponent() {
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Name *</Label>
               <Input
-                placeholder="Name"
                 value={formToolName}
                 onChange={(e) => setFormToolName(e.target.value)}
                 required
@@ -602,7 +601,7 @@ function MachinesPageComponent() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Category</Label>
                 <SmartComboBox
@@ -622,7 +621,7 @@ function MachinesPageComponent() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Attachment</Label>
                 <SmartComboBox
@@ -642,7 +641,7 @@ function MachinesPageComponent() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Stock *</Label>
                 <Input
@@ -673,7 +672,6 @@ function MachinesPageComponent() {
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Notes</Label>
               <Textarea
-                placeholder="Notes"
                 value={formRemarks}
                 onChange={(e) => setFormRemarks(e.target.value)}
                 rows={2}
@@ -681,18 +679,18 @@ function MachinesPageComponent() {
               />
             </div>
 
-            <DialogFooter className="pt-2">
+            <DialogFooter className="pt-2 flex flex-col-reverse sm:flex-row gap-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setIsAddModalOpen(false)}
-                className="h-9 text-xs rounded-xl"
+                className="h-9 text-xs rounded-xl w-full sm:w-auto"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
-                className="h-9 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs"
+                className="h-9 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs w-full sm:w-auto"
               >
                 {editingMachine ? "Update Machine" : "Save Machine"}
               </Button>

@@ -819,15 +819,12 @@ function PaymentsComponent() {
 
       {/* RECEIVE PAYMENT POPUP DIALOG */}
       <Dialog open={receiveOpen} onOpenChange={setReceiveOpen}>
-        <DialogContent className="max-w-md rounded-2xl p-6 bg-white dark:bg-card">
+        <DialogContent className="max-w-full sm:max-w-md w-full max-h-[92vh] overflow-y-auto rounded-2xl p-4 sm:p-6 bg-white dark:bg-card">
           <DialogHeader>
             <DialogTitle className="text-base font-bold flex items-center gap-2 text-foreground">
               <DollarSign className="h-5 w-5 text-emerald-600" />
               Receive Stage Payment & Update Balances
             </DialogTitle>
-            <DialogDescription className="text-xs">
-              Recording payment automatically updates Project Collected Amount, Outstanding Balance, %, Payment Status & Stage Allocations.
-            </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleReceiveSubmit} className="space-y-4 py-2 text-xs">
@@ -854,7 +851,7 @@ function PaymentsComponent() {
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Amount Received (₹) *</Label>
                 <Input
@@ -895,7 +892,7 @@ function PaymentsComponent() {
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Received By</Label>
                 <Input
@@ -920,20 +917,20 @@ function PaymentsComponent() {
               </div>
             </div>
 
-            <DialogFooter className="pt-2">
+            <DialogFooter className="pt-2 flex flex-col-reverse sm:flex-row gap-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setReceiveOpen(false)}
-                className="h-9 text-xs rounded-xl"
+                className="h-9 text-xs rounded-xl w-full sm:w-auto"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
-                className="h-9 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs gap-1"
+                className="h-9 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs w-full sm:w-auto"
               >
-                <CheckCircle2 className="h-4 w-4" /> Submit Payment & Update Balances
+                Record Payment
               </Button>
             </DialogFooter>
           </form>

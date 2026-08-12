@@ -60,7 +60,7 @@ export function LoginPage() {
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-slate-100 to-blue-50 p-4 font-sans">
-      <Card className="w-full max-w-md rounded-2xl border border-slate-200/80 bg-white shadow-xl p-6 sm:p-8 space-y-6">
+      <Card className="w-full max-w-sm sm:max-w-md rounded-2xl border border-slate-200/80 bg-white shadow-xl p-5 sm:p-8 space-y-6">
         {/* Header with Company Logo & Name */}
         <div className="flex flex-col items-center text-center space-y-3">
           <div className="h-12 w-12 rounded-full bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
