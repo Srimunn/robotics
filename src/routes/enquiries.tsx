@@ -956,7 +956,6 @@ function EnquiriesComponent() {
                   <Label className="text-xs font-semibold">Name *</Label>
                   <Input
                     required
-                    placeholder="Name"
                     value={createData.customerName}
                     onChange={(e) => setCreateData({ ...createData, customerName: e.target.value })}
                     className="h-9 text-xs rounded-xl bg-background"
@@ -967,7 +966,6 @@ function EnquiriesComponent() {
                   <Label className="text-xs font-semibold">Phone *</Label>
                   <Input
                     required
-                    placeholder="Phone"
                     value={createData.phone}
                     onChange={(e) => setCreateData({ ...createData, phone: e.target.value })}
                     className={`h-9 text-xs rounded-xl bg-background ${
@@ -985,7 +983,6 @@ function EnquiriesComponent() {
               <div className="space-y-1">
                 <Label className="text-xs font-semibold">Location</Label>
                 <Input
-                  placeholder="Location"
                   value={createData.location}
                   onChange={(e) => setCreateData({ ...createData, location: e.target.value })}
                   className="h-9 text-xs rounded-xl bg-background"
@@ -1067,7 +1064,6 @@ function EnquiriesComponent() {
                   <Label className="text-xs font-semibold">Amount (₹)</Label>
                   <Input
                     type="number"
-                    placeholder="Amount"
                     value={createData.quotationAmount === undefined || createData.quotationAmount === null ? "" : createData.quotationAmount}
                     onChange={(e) => {
                       const val = e.target.value === "" ? "" : Number(e.target.value);

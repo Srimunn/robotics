@@ -26,7 +26,7 @@ export function SmartComboBox({
   category,
   value,
   onChange,
-  placeholder = "Select or type custom...",
+  placeholder = "Select...",
   className,
   disabled = false,
   siteVisitDate,

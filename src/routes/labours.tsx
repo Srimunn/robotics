@@ -1242,7 +1242,6 @@ function LaboursComponent() {
                   <Label className="text-xs font-semibold">Labour Full Name *</Label>
                   <Input
                     required
-                    placeholder="e.g. Ramesh Chandra"
                     value={labourFormData.name}
                     onChange={(e) => setLabourFormData({ ...labourFormData, name: e.target.value })}
                     className="h-9 text-xs rounded-xl bg-background"
@@ -1253,7 +1252,6 @@ function LaboursComponent() {
                   <Label className="text-xs font-semibold">Mobile Phone Number *</Label>
                   <Input
                     required
-                    placeholder="e.g. 9840998877"
                     value={labourFormData.phone}
                     onChange={(e) => setLabourFormData({ ...labourFormData, phone: e.target.value })}
                     className={`h-9 text-xs rounded-xl bg-background ${
@@ -1270,7 +1268,6 @@ function LaboursComponent() {
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">Login ID (Auto-generated if empty)</Label>
                   <Input
-                    placeholder="e.g. Ramesh"
                     value={labourFormData.loginId}
                     onChange={(e) => setLabourFormData({ ...labourFormData, loginId: e.target.value })}
                     className="h-9 text-xs rounded-xl bg-background"
@@ -1280,7 +1277,6 @@ function LaboursComponent() {
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">4-Digit Security PIN (Auto-generated if empty)</Label>
                   <Input
-                    placeholder="e.g. 4827"
                     maxLength={4}
                     value={labourFormData.pin}
                     onChange={(e) => setLabourFormData({ ...labourFormData, pin: e.target.value.replace(/\D/g, "") })}

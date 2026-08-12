@@ -428,7 +428,6 @@ function EngineersPageComponent() {
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Engineer Full Name *</Label>
               <Input
-                placeholder="e.g. Er. Rajesh Kumar"
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 required
@@ -439,7 +438,6 @@ function EngineersPageComponent() {
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Mobile Phone Number *</Label>
               <Input
-                placeholder="e.g. 9876001122"
                 value={formPhone}
                 onChange={(e) => setFormPhone(e.target.value)}
                 required
@@ -457,7 +455,6 @@ function EngineersPageComponent() {
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Technical Specialty / Focus</Label>
               <Input
-                placeholder="e.g. Robotic Welding & Hydraulics Specialist"
                 value={formSpecialty}
                 onChange={(e) => setFormSpecialty(e.target.value)}
                 className="h-9 text-xs rounded-lg"
