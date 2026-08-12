@@ -102,7 +102,7 @@ function EnquiriesComponent() {
     assignedEngineerName: engineers[0]?.name || "Er. Rajesh Kumar",
     siteVisitDate: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10),
     quotationDate: new Date().toISOString().slice(0, 10),
-    quotationAmount: 150000,
+    quotationAmount: 0,
     workCommittedDate: new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10),
     actualWorkStartedDate: "",
     customerStatus: "Prospective",

@@ -149,7 +149,7 @@ function DashboardComponent() {
   const [enqEngineerName, setEnqEngineerName] = useState("Er. Rajesh Kumar");
   const [enqEngineerId, setEnqEngineerId] = useState("");
   const [enqSiteVisitDate, setEnqSiteVisitDate] = useState("2026-08-07");
-  const [enqQuotationAmount, setEnqQuotationAmount] = useState<number>(150000);
+  const [enqQuotationAmount, setEnqQuotationAmount] = useState<number>(0);
   const [enqWorkCommittedDate, setEnqWorkCommittedDate] = useState("2026-08-15");
   const [enqActualWorkStartedDate, setEnqActualWorkStartedDate] = useState("");
   const [enqRemarks, setEnqRemarks] = useState("");
@@ -533,7 +533,7 @@ function DashboardComponent() {
     setEnqCustName("");
     setEnqPhone("");
     setEnqLocation("");
-    setEnqReferredBy("");
+    setEnqQuotationAmount(0);
     setEnqActualWorkStartedDate("");
     setEnqRemarks("");
   };
