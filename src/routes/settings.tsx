@@ -15,6 +15,7 @@ import {
   Bot,
   Database,
   SlidersHorizontal,
+  AlertTriangle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,12 +38,12 @@ function SettingsComponent() {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (currentUser?.role !== "CEO") {
-      toast.error("⚠️ Access Denied: Only Executive / Super Admin can change system configuration settings");
+      toast.error("Access Denied: Only Executive / Super Admin can change system configuration settings");
       return;
     }
     const cleanPhone = formState.phone ? formState.phone.replace(/\D/g, "") : "";
     if (cleanPhone && cleanPhone.length > 10) {
-      toast.error("❌ Official Contact Phone cannot exceed 10 digits");
+      toast.error("Official Contact Phone cannot exceed 10 digits");
       return;
     }
     updateSettings(formState);
@@ -133,7 +134,7 @@ function SettingsComponent() {
                   />
                   {(formState.phone || "").replace(/\D/g, "").length > 10 && (
                     <p className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-1">
-                      ⚠️ Phone number cannot exceed 10 digits ({(formState.phone || "").replace(/\D/g, "").length}/10 digits)
+                      <AlertTriangle className="h-3 w-3 inline text-red-500 shrink-0" /> Phone number cannot exceed 10 digits ({(formState.phone || "").replace(/\D/g, "").length}/10 digits)
                     </p>
                   )}
                 </div>

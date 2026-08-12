@@ -121,7 +121,12 @@ function EnquiriesComponent() {
       e.leakageType.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (e.assignedEngineerName && e.assignedEngineerName.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const matchesDecision = decisionFilter === "ALL" || e.customerDecision === decisionFilter;
+    const matchesDecision =
+      decisionFilter === "ALL"
+        ? true
+        : decisionFilter === "Follow-up" || decisionFilter === "Follow Up"
+        ? e.customerDecision === "Follow Up" || e.customerDecision === "Follow-up" || (e.customerDecision as string) === "FollowUp"
+        : e.customerDecision === decisionFilter;
 
     return matchesSearch && matchesDecision;
   });
@@ -143,23 +148,19 @@ function EnquiriesComponent() {
     }
     const cleanPhone = createData.phone.replace(/\D/g, "");
     if (cleanPhone.length < 10) {
-      toast.error("❌ Phone Number must be at least 10 digits");
+      toast.error("Phone Number must be at least 10 digits");
       return;
     }
     if (cleanPhone.length > 10) {
-      toast.error("❌ Mobile Number cannot exceed 10 digits");
+      toast.error("Mobile Number cannot exceed 10 digits");
       return;
     }
     if (!createData.location.trim()) {
-      toast.error("❌ Location is required");
+      toast.error("Location is required");
       return;
     }
     if (!createData.assignedEngineerId && !createData.assignedEngineerName) {
       toast.error("Engineer assignment is required");
-      return;
-    }
-    if (isNaN(Number(createData.quotationAmount)) || Number(createData.quotationAmount) <= 0) {
-      toast.error("Quotation Amount must be a positive number");
       return;
     }
 
@@ -192,7 +193,7 @@ function EnquiriesComponent() {
         assignedEngineerName: createData.assignedEngineerName,
         siteVisitDate: createData.siteVisitDate,
         quotationDate: createData.quotationDate,
-        quotationAmount: createData.quotationAmount,
+        quotationAmount: (createData.quotationAmount as any) === "" || createData.quotationAmount === null || createData.quotationAmount === undefined ? undefined : Number(createData.quotationAmount),
         workCommittedDate: createData.workCommittedDate,
         actualWorkStartedDate: createData.actualWorkStartedDate,
         customerStatus: createData.customerStatus,
@@ -291,7 +292,7 @@ function EnquiriesComponent() {
           onClick={() => setCreateOpen(true)}
           className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1.5 shadow-xs"
         >
-          <Plus className="h-4 w-4" /> + New Enquiry
+          <Plus className="h-4 w-4" /> New Enquiry
         </Button>
       </div>
 
@@ -312,7 +313,7 @@ function EnquiriesComponent() {
 
         <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
           <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Filter:</span>
-          {["ALL", "Follow-up", "Thinking", "Approved", "Cancelled"].map((dec) => (
+          {["ALL", "Follow-up", "Approved", "Cancelled"].map((dec) => (
             <Button
               key={dec}
               variant={decisionFilter === dec ? "default" : "outline"}
@@ -409,7 +410,7 @@ function EnquiriesComponent() {
                           <div>{enq.id}</div>
                           {linkedProj && (
                             <Badge variant="outline" className="text-[9px] bg-purple-50 text-purple-700 border-purple-200 mt-0.5">
-                              🔗 {linkedProj.id}
+                              {linkedProj.id}
                             </Badge>
                           )}
                         </td>
@@ -418,7 +419,7 @@ function EnquiriesComponent() {
                             {cleanCustomerName}
                           </div>
                           <div className="text-[11px] text-muted-foreground truncate max-w-[190px]" title={`${enq.phone} • ${enq.location}`}>
-                            📞 {enq.phone} {enq.location ? `• 📍 ${enq.location}` : ""}
+                            {enq.phone} {enq.location ? `• ${enq.location}` : ""}
                           </div>
                         </td>
                         <td className="p-3">
@@ -447,10 +448,10 @@ function EnquiriesComponent() {
                           {enq.quotationAmount ? `₹${enq.quotationAmount.toLocaleString("en-IN")}` : "—"}
                         </td>
                         <td className="p-3 font-semibold text-xs text-purple-700 whitespace-nowrap font-mono">
-                          {enq.workCommittedDate ? `📅 ${enq.workCommittedDate}` : "Not Set"}
+                          {enq.workCommittedDate ? enq.workCommittedDate : "Not Set"}
                         </td>
                         <td className="p-3 font-semibold text-xs text-emerald-700 whitespace-nowrap font-mono">
-                          {enq.actualWorkStartedDate ? `⚡ ${enq.actualWorkStartedDate}` : "Pending"}
+                          {enq.actualWorkStartedDate ? enq.actualWorkStartedDate : "Pending"}
                         </td>
                         <td className="p-3" onClick={(e) => e.stopPropagation()}>
                           <Select
@@ -466,8 +467,6 @@ function EnquiriesComponent() {
                                   ? "bg-emerald-50 text-emerald-800 border-emerald-300"
                                   : enq.customerDecision === "Cancelled"
                                   ? "bg-rose-50 text-rose-800 border-rose-300"
-                                  : enq.customerDecision === "Thinking"
-                                  ? "bg-purple-50 text-purple-800 border-purple-300"
                                   : "bg-amber-50 text-amber-800 border-amber-300"
                               )}
                             >
@@ -475,7 +474,6 @@ function EnquiriesComponent() {
                             </SelectTrigger>
                             <SelectContent className="rounded-xl">
                               <SelectItem value="Follow Up">Follow Up</SelectItem>
-                              <SelectItem value="Thinking">Thinking</SelectItem>
                               <SelectItem value="Approved">Approved</SelectItem>
                               <SelectItem value="Cancelled">Cancelled</SelectItem>
                             </SelectContent>
@@ -657,7 +655,7 @@ function EnquiriesComponent() {
                         <Label className="text-xs font-semibold">Referred By / Reference Person</Label>
                         {["Word of Mouth", "Existing Customer", "Builder Reference", "Engineer Reference", "CEO Reference"].includes(activeEnquiry.leadSource) && (
                           <Badge variant="outline" className="text-[9px] bg-purple-50 text-purple-700 border-purple-200">
-                            ★ Recommended
+                            Recommended
                           </Badge>
                         )}
                         {["Website", "Google Search"].includes(activeEnquiry.leadSource) && (
@@ -760,9 +758,9 @@ function EnquiriesComponent() {
                       <Input
                         type="number"
                         placeholder="Enter amount (e.g. 150000)"
-                        value={activeEnquiry.quotationAmount || ""}
+                        value={activeEnquiry.quotationAmount === undefined || activeEnquiry.quotationAmount === null ? "" : activeEnquiry.quotationAmount}
                         onChange={(e) => {
-                          const val = e.target.value === "" ? 0 : Number(e.target.value);
+                          const val = e.target.value === "" ? (null as any) : Number(e.target.value);
                           updateEnquiry(activeEnquiry.id, { quotationAmount: val });
                           setActiveEnquiry({ ...activeEnquiry, quotationAmount: val });
                         }}
@@ -842,7 +840,6 @@ function EnquiriesComponent() {
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
                           <SelectItem value="Follow Up">Follow Up</SelectItem>
-                          <SelectItem value="Thinking">Thinking</SelectItem>
                           <SelectItem value="Approved">Approved</SelectItem>
                           <SelectItem value="Cancelled">Cancelled</SelectItem>
                         </SelectContent>
@@ -979,7 +976,7 @@ function EnquiriesComponent() {
                   />
                   {createData.phone.replace(/\D/g, "").length > 10 && (
                     <p className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-1">
-                      ⚠️ Phone number cannot exceed 10 digits ({createData.phone.replace(/\D/g, "").length}/10 digits)
+                      <AlertTriangle className="h-3 w-3 inline text-red-500 shrink-0" /> Phone number cannot exceed 10 digits ({createData.phone.replace(/\D/g, "").length}/10 digits)
                     </p>
                   )}
                 </div>
@@ -1025,8 +1022,8 @@ function EnquiriesComponent() {
                   <div className="flex items-center justify-between">
                     <Label className="text-xs font-semibold">Referred By</Label>
                     {["Word of Mouth", "Existing Customer", "Builder Reference", "Engineer Reference", "CEO Reference"].includes(createData.leadSource) && (
-                      <Badge variant="outline" className="text-[9px] bg-purple-100 text-purple-700 border-purple-300">
-                        ★ Recommended
+                      <Badge variant="outline" className="text-[9px] bg-purple-50 text-purple-700 border-purple-200">
+                        Recommended
                       </Badge>
                     )}
                   </div>
@@ -1071,10 +1068,10 @@ function EnquiriesComponent() {
                   <Input
                     type="number"
                     placeholder="Amount"
-                    value={createData.quotationAmount || ""}
+                    value={createData.quotationAmount === undefined || createData.quotationAmount === null ? "" : createData.quotationAmount}
                     onChange={(e) => {
-                      const val = e.target.value === "" ? 0 : Number(e.target.value);
-                      setCreateData({ ...createData, quotationAmount: val });
+                      const val = e.target.value === "" ? "" : Number(e.target.value);
+                      setCreateData({ ...createData, quotationAmount: val as any });
                     }}
                     className="h-9 text-xs rounded-xl font-bold text-amber-700 dark:text-amber-400 bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />

@@ -36,7 +36,7 @@ const enquiryCreate = z.object({
   assignedEngineerName: z.string().optional().nullable(),
   siteVisitDate: z.preprocess((v) => (v === "" || v === null || v === undefined ? undefined : v), z.coerce.date().optional().nullable()),
   quotationDate: z.preprocess((v) => (v === "" || v === null || v === undefined ? undefined : v), z.coerce.date().optional().nullable()),
-  quotationAmount: z.number().optional().nullable(),
+  quotationAmount: z.preprocess((v) => (v === "" || v === null || v === undefined || (typeof v === "string" && v.trim() === "") || Number.isNaN(Number(v)) ? undefined : Number(v)), z.number().optional().nullable()),
   quotationPdfUrl: z.string().optional().nullable(),
   remarks: z.string().optional().nullable(),
   workCommittedDate: z.preprocess((v) => (v === "" || v === null || v === undefined ? undefined : v), z.coerce.date().optional().nullable()),
@@ -48,8 +48,12 @@ export const addEnquiry = createServerFn({ method: "POST" })
   .validator((input: unknown) => enquiryCreate.parse(input))
   .handler(async ({ data }) => {
     const year = new Date().getFullYear();
-    const count = await db.enquiry.count();
-    const id = `ENQ-${year}-${String(count + 1).padStart(3, "0")}`;
+    let count = (await db.enquiry.count()) + 1;
+    let id = `ENQ-${year}-${String(count).padStart(3, "0")}`;
+    while (await db.enquiry.findUnique({ where: { id } })) {
+      count++;
+      id = `ENQ-${year}-${String(count).padStart(3, "0")}`;
+    }
 
     let engName = data.assignedEngineerName ?? undefined;
     if (data.assignedEngineerId) {
@@ -161,7 +165,7 @@ export const updateEnquiry = createServerFn({ method: "POST" })
       }
 
       return formatEnquiry(updated);
-    });
+    }, { timeout: 30000, maxWait: 10000 });
   });
 
 export const deleteEnquiry = createServerFn({ method: "POST" })
@@ -185,8 +189,12 @@ export const approveAndConvertEnquiryToProject = createServerFn({ method: "POST"
       }
 
       const year = new Date().getFullYear();
-      const projCount = await tx.project.count();
-      const newProjectId = `PRJ-${year}-${String(projCount + 1).padStart(3, "0")}`;
+      let projCount = (await tx.project.count()) + 1;
+      let newProjectId = `PRJ-${year}-${String(projCount).padStart(3, "0")}`;
+      while (await tx.project.findUnique({ where: { id: newProjectId } })) {
+        projCount++;
+        newProjectId = `PRJ-${year}-${String(projCount).padStart(3, "0")}`;
+      }
       const costValue = enq.quotationAmount ? Number(enq.quotationAmount) : 0;
 
       const project = await tx.project.create({
@@ -228,9 +236,9 @@ export const approveAndConvertEnquiryToProject = createServerFn({ method: "POST"
         { event: "Customer Approved", actor: "Client", details: "Quotation approved by customer" },
         { event: "Project Created", actor: "ERP Workflow Engine", details: `Generated ${newProjectId} inheriting Enquiry details` },
       ];
-      for (const a of activities) {
-        await tx.projectActivity.create({ data: { projectId: newProjectId, ...a } });
-      }
+      await tx.projectActivity.createMany({
+        data: activities.map((a) => ({ projectId: newProjectId, ...a })),
+      });
 
       await tx.projectStatusHistory.create({
         data: {
@@ -242,5 +250,5 @@ export const approveAndConvertEnquiryToProject = createServerFn({ method: "POST"
 
       await tx.enquiry.update({ where: { id: enq.id }, data: { projectId: newProjectId } });
       return formatProject(project);
-    });
+    }, { timeout: 30000, maxWait: 10000 });
   });

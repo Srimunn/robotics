@@ -16,6 +16,7 @@ import {
   FolderKanban,
   ShieldAlert,
   Clock,
+  AlertTriangle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -135,10 +136,6 @@ function EngineersPageComponent() {
   }, [engineerRoster, searchQuery, statusFilter]);
 
   const handleOpenAddModal = () => {
-    if (currentUser?.role !== "CEO") {
-      toast.error("⚠️ Access Denied: Only Executive / Super Admin can add Supervisors & Engineers");
-      return;
-    }
     setEditingEng(null);
     setFormName("");
     setFormPhone("");
@@ -147,10 +144,6 @@ function EngineersPageComponent() {
   };
 
   const handleOpenEditModal = (eng: Engineer) => {
-    if (currentUser?.role !== "CEO") {
-      toast.error("⚠️ Access Denied: Only Executive / Super Admin can edit Supervisors & Engineers");
-      return;
-    }
     setEditingEng(eng);
     setFormName(eng.name);
     setFormPhone(eng.phone);
@@ -160,21 +153,17 @@ function EngineersPageComponent() {
 
   const handleSaveEngineer = (e: React.FormEvent) => {
     e.preventDefault();
-    if (currentUser?.role !== "CEO") {
-      toast.error("⚠️ Access Denied: Only Executive / Super Admin can add Supervisors & Engineers");
-      return;
-    }
     if (!formName.trim()) {
-      toast.error("❌ Engineer Name is required");
+      toast.error("Engineer Name is required");
       return;
     }
     const cleanPhone = formPhone.replace(/\D/g, "");
     if (cleanPhone.length < 10) {
-      toast.error("❌ Phone Number must be at least 10 digits");
+      toast.error("Phone Number must be at least 10 digits");
       return;
     }
     if (cleanPhone.length > 10) {
-      toast.error("❌ Mobile Number cannot exceed 10 digits");
+      toast.error("Mobile Number cannot exceed 10 digits");
       return;
     }
 
@@ -184,14 +173,14 @@ function EngineersPageComponent() {
         phone: formPhone.trim(),
         specialty: formSpecialty.trim(),
       });
-      toast.success("✅ Engineer Details Updated");
+      toast.success("Engineer Details Updated");
     } else {
       addEngineer({
         name: formName.trim(),
         phone: formPhone.trim(),
         specialty: formSpecialty.trim(),
       });
-      toast.success("✅ Engineer Registered Successfully");
+      toast.success("Engineer Registered Successfully");
     }
     setIsAddModalOpen(false);
   };
@@ -211,10 +200,10 @@ function EngineersPageComponent() {
         <div className="flex flex-wrap items-center gap-2">
           <Button
             onClick={handleOpenAddModal}
-            className="text-xs font-semibold h-9 rounded-xl bg-purple-600 hover:bg-purple-700 text-white gap-1.5 shadow-sm"
+            className="text-xs font-semibold h-9 rounded-xl bg-purple-600 hover:bg-purple-700 text-white gap-1.5 shadow-sm cursor-pointer"
           >
             <Plus className="h-4 w-4" />
-            + Add Engineer
+            Add Engineer
           </Button>
         </div>
       </div>
@@ -460,7 +449,7 @@ function EngineersPageComponent() {
               />
               {formPhone.replace(/\D/g, "").length > 10 && (
                 <p className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-1">
-                  ⚠️ Mobile number cannot exceed 10 digits ({formPhone.replace(/\D/g, "").length}/10 digits)
+                  <AlertTriangle className="h-3 w-3 inline text-red-500 shrink-0" /> Mobile number cannot exceed 10 digits ({formPhone.replace(/\D/g, "").length}/10 digits)
                 </p>
               )}
             </div>

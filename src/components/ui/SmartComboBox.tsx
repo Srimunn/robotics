@@ -238,7 +238,7 @@ export function SmartComboBox({
                     className="w-full justify-start text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-800 font-medium gap-1.5 h-7 rounded-md"
                   >
                     <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                    <span className="truncate">⚡ Use One-Time: "<strong>{inputValue}</strong>"</span>
+                    <span className="truncate">Use One-Time: "<strong>{inputValue}</strong>"</span>
                   </Button>
                 </div>
               )}
@@ -297,11 +297,11 @@ export function SmartComboBox({
                           {category === "Engineer Names" && (
                             isBooked ? (
                               <Badge variant="outline" className="text-[9px] bg-rose-50 text-rose-700 border-rose-200 font-bold shrink-0">
-                                🔴 Booked ({bookedReason})
+                                Booked ({bookedReason})
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="text-[9px] bg-emerald-50 text-emerald-700 border-emerald-200 font-bold shrink-0">
-                                🟢 Available
+                                Available
                               </Badge>
                             )
                           )}

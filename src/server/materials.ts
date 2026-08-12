@@ -89,7 +89,7 @@ export const issueMaterialToProject = createServerFn({ method: "POST" })
       });
 
       return formatMaterialIssue(record);
-    });
+    }, { timeout: 30000, maxWait: 10000 });
   });
 
 export const adjustStock = createServerFn({ method: "POST" })
@@ -141,5 +141,5 @@ export const adjustStock = createServerFn({ method: "POST" })
         });
       }
       return { ok: true };
-    });
+    }, { timeout: 30000, maxWait: 10000 });
   });

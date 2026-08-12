@@ -305,7 +305,7 @@ function MachinesPageComponent() {
             className="text-xs font-semibold h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-sm"
           >
             <Plus className="h-4 w-4" />
-            + Add Tool
+            Add Tool
           </Button>
         </div>
       </div>
@@ -934,7 +934,7 @@ function MachinesPageComponent() {
               Complete Inventory Audit Log
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Immutable historical record of every machine & material movement.
+              Immutable historical record of every machine & tool movement.
             </DialogDescription>
           </DialogHeader>
 

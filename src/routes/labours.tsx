@@ -19,6 +19,7 @@ import {
   Calculator,
   Briefcase,
   User,
+  ChevronLeft,
   ChevronRight,
   TrendingUp,
   Award,
@@ -26,6 +27,8 @@ import {
   Sparkles,
   Trash2,
   AlertTriangle,
+  Copy,
+  Wrench,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -119,10 +122,29 @@ function LaboursComponent() {
   const labours = robotics?.labours || [];
   const attendance = robotics?.attendance || {};
   const projects = robotics?.projects || [];
-  const { addLabour, updateLabour, deleteLabour, checkLabourAvailability, addMasterDataItem, updateProjectLabourLog, verifyAttendanceRecord, currentUser } = robotics;
+  const { addLabour, updateLabour, deleteLabour, deactivateLabour, reactivateLabour, deleteLabourPermanently, checkLabourAvailability, addMasterDataItem, updateProjectLabourLog, verifyAttendanceRecord, currentUser } = robotics;
 
   const [activeTab, setActiveTab] = useState<"PROFILE" | "ATTENDANCE" | "MASTER">("PROFILE");
   const [labourTypeFilter, setLabourTypeFilter] = useState<"PERMANENT" | "CONTRACT" | "ALL">("ALL");
+  const [showInactive, setShowInactive] = useState(false);
+
+  const [deactivateConfirmTarget, setDeactivateConfirmTarget] = useState<Labour | null>(null);
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<Labour | null>(null);
+  const [reactivateConfirmTarget, setReactivateConfirmTarget] = useState<Labour | null>(null);
+
+  const hasLabourHistory = (labourId: string) => {
+    const hasAttendance = Object.values(attendance || {}).some((r) => r?.labourId === labourId);
+    const hasProjectLogs = projects.some(
+      (p) =>
+        (p.assignedLabourIds || []).includes(labourId) ||
+        (p.labourLogs || []).some((lg) => lg.labourId === labourId) ||
+        (p.labourAssignments || []).some((la) => la.labourId === labourId)
+    );
+    const labour = labours.find((l) => l.id === labourId);
+    const hasWageHist = (labour?.wageHistory || []).length > 0;
+    return hasAttendance || hasProjectLogs || hasWageHist;
+  };
+
 
   // Mark Attendance Modal state
   const [markAttendanceOpen, setMarkAttendanceOpen] = useState(false);
@@ -183,7 +205,7 @@ function LaboursComponent() {
   const handleAddLabourSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!labourFormData.name.trim()) {
-      toast.error("❌ Labour Name is required");
+      toast.error("Labour Name is required");
       return;
     }
 
@@ -211,35 +233,93 @@ function LaboursComponent() {
     });
   };
 
-  const daysInMonth = 28;
+  // Navigation state for Attendance Matrix
+  const [calendarDate, setCalendarDate] = useState(() => new Date());
+
+  const handlePrevMonth = () => {
+    setCalendarDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCalendarDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  const calendarYear = calendarDate.getFullYear();
+  const calendarMonth = calendarDate.getMonth(); // 0-indexed
+  const monthName = calendarDate.toLocaleString("en-US", { month: "long" });
+  const totalDaysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+
+  // Unified global attendance records (central attendance + project logs)
+  const { allAttendanceRecords, globalAttendanceList } = React.useMemo(() => {
+    const centralLogs = Object.values(attendance || {}).filter((r) => Boolean(r && r.date));
+    const projLogs = (projects || []).flatMap((p) =>
+      (p.labourLogs || []).map((lg) => ({
+        id: `${p.id}_${lg.labourId}_${lg.date}`,
+        labourId: lg.labourId,
+        labourName: lg.labourName,
+        projectId: p.id,
+        projectName: p.customerName,
+        date: lg.date,
+        status: (lg.attendance as any) || (lg.hoursWorked && lg.hoursWorked > 0 ? "Present" : "Absent"),
+        inTime: lg.inTime,
+        outTime: lg.outTime,
+        hoursWorked: lg.hoursWorked,
+        earnedMoney: lg.earnedMoney,
+        workDescription: lg.workDescription,
+        weeklyWage: lg.weeklyWage,
+      }))
+    );
+
+    const map = new Map<string, any>();
+    const list: any[] = [];
+
+    [...centralLogs, ...projLogs].forEach((item) => {
+      if (!item || !item.labourId || !item.date) return;
+      const key = `${item.labourId}_${item.date}`;
+      const existing = map.get(key);
+      if (!existing || item.status === "Present" || (item.hoursWorked && item.hoursWorked > 0)) {
+        map.set(key, item);
+      }
+      list.push(item);
+    });
+
+    list.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+    return { allAttendanceRecords: map, globalAttendanceList: list };
+  }, [attendance, projects]);
 
   const getLabourMonthStats = (labourId: string) => {
     let presentCount = 0;
     let absentCount = 0;
     let leaveCount = 0;
+    let halfDayCount = 0;
     let totalHours = 0;
 
-    for (let d = 1; d <= daysInMonth; d++) {
+    for (let d = 1; d <= totalDaysInMonth; d++) {
       const dayStr = d < 10 ? `0${d}` : `${d}`;
-      const dateKey = `${selectedYear}-07-${dayStr}`;
-      const record = attendance[`${labourId}_${dateKey}`];
+      const monthStr = (calendarMonth + 1) < 10 ? `0${calendarMonth + 1}` : `${calendarMonth + 1}`;
+      const dateKey = `${calendarYear}-${monthStr}-${dayStr}`;
+      const record = allAttendanceRecords.get(`${labourId}_${dateKey}`);
       if (record) {
-        if (record.status === "Present") {
+        if (record.status === "Present" || record.status === "Full Day") {
           presentCount++;
           totalHours += record.hoursWorked || 8.5;
+        } else if (record.status === "Half Day" || record.status === "Half-Day") {
+          halfDayCount++;
+          presentCount += 0.5;
+          totalHours += record.hoursWorked || 4;
         } else if (record.status === "Absent") absentCount++;
         else if (record.status === "Leave") leaveCount++;
       }
     }
 
-    const totalDays = presentCount + absentCount;
+    const totalDays = Math.ceil(presentCount + absentCount + halfDayCount);
     const attendancePct = totalDays > 0 ? Math.round((presentCount / totalDays) * 100) : 100;
 
     const labour = labours.find((l) => l.id === labourId);
     const defaultWage = labour ? labour.defaultWeeklyWage || 1400 : 1400;
 
-    // Payments received calculation (weekly wage scaled by weeks worked)
-    const weeksWorked = Math.ceil(presentCount / 6);
+    const weeksWorked = Math.max(0, Math.ceil(presentCount / 6));
     const paymentsReceived = weeksWorked * defaultWage;
 
     return {
@@ -253,8 +333,9 @@ function LaboursComponent() {
     };
   };
 
-  const permanentCount = (labours || []).filter((l) => l?.type === "Permanent").length;
-  const contractCount = (labours || []).filter((l) => l?.type === "Contract").length;
+  const activeLabours = (labours || []).filter((l) => showInactive || l?.isActive !== false);
+  const permanentCount = activeLabours.filter((l) => l?.type === "Permanent").length;
+  const contractCount = activeLabours.filter((l) => l?.type === "Contract").length;
 
   const filteredLabours = (labours || []).filter((l) => {
     if (!l) return false;
@@ -273,13 +354,10 @@ function LaboursComponent() {
         ? l.type === "Permanent"
         : l.type === "Contract";
 
-    return matchesSearch && matchesType;
-  });
+    const matchesActive = showInactive ? true : l.isActive !== false;
 
-  // Global attendance records
-  const globalAttendanceList = Object.values(attendance || {})
-    .filter((r) => Boolean(r && r.date))
-    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    return matchesSearch && matchesType && matchesActive;
+  });
 
   return (
     <div className="space-y-6">
@@ -303,7 +381,7 @@ function LaboursComponent() {
             onClick={() => setAddOpen(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1.5 shadow-xs"
           >
-            <Plus className="h-4 w-4" /> + Add Worker
+            <Plus className="h-4 w-4" /> Add Worker
           </Button>
         </div>
       </div>
@@ -340,15 +418,29 @@ function LaboursComponent() {
           </Button>
         </div>
 
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search Labour Name, Phone..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 text-xs rounded-lg h-9"
-          />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button
+            type="button"
+            variant={showInactive ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setShowInactive(!showInactive)}
+            className={`text-xs rounded-lg gap-1.5 font-bold ${
+              showInactive ? "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950 dark:text-amber-200" : ""
+            }`}
+          >
+            {showInactive ? "Showing Inactive" : "Show Inactive"}
+          </Button>
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search Labour Name, Phone..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 text-xs rounded-lg h-9"
+            />
+          </div>
         </div>
+
       </div>
 
       {/* TAB 1: LABOUR PROFILE COCKPIT (REDESIGNED FOR PROMPT REQUIREMENTS) */}
@@ -440,12 +532,12 @@ function LaboursComponent() {
                           <div className={`h-8 w-8 rounded-lg grid place-items-center font-bold text-xs shrink-0 ${
                             l.type === "Permanent" ? "bg-blue-100 text-blue-800" : "bg-slate-200 text-slate-800"
                           }`}>
-                            👷
+                            <HardHat className="h-4 w-4 text-blue-600" />
                           </div>
                           <div className="min-w-0 space-y-0.5">
                             <p className="font-extrabold text-xs text-foreground truncate">{l.name}</p>
                             <p className="text-[10px] text-muted-foreground font-medium truncate">
-                              ID: <span className="font-mono font-semibold">{l.id}</span> • 📞 {l.phone}
+                              ID: <span className="font-mono font-semibold">{l.id}</span> • {l.phone}
                             </p>
                           </div>
                         </div>
@@ -495,7 +587,7 @@ function LaboursComponent() {
                   <Card className="rounded-xl border border-border bg-white dark:bg-card">
                     <CardHeader className="p-5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <CardTitle className="text-xl font-extrabold text-foreground">
                             {activeLabour.name}
                           </CardTitle>
@@ -505,15 +597,57 @@ function LaboursComponent() {
                           <Badge className="bg-emerald-100 text-emerald-800 text-xs">
                             {activeLabour.status}
                           </Badge>
+                          {activeLabour.isActive === false && (
+                            <Badge className="bg-amber-100 text-amber-900 border-amber-300 text-xs font-bold">
+                              Inactive / Deactivated
+                            </Badge>
+                          )}
                         </div>
                         <CardDescription className="text-xs mt-1">
                           ID: <strong>{activeLabour.id}</strong> • Mobile: <strong>{activeLabour.phone}</strong>
                         </CardDescription>
                       </div>
-                      <div className="text-left sm:text-right bg-emerald-50 p-3 rounded-xl border border-emerald-100">
-                        <span className="text-[10px] uppercase font-bold text-emerald-900">Default Weekly Wage</span>
-                        <p className="text-xl font-extrabold text-emerald-700">₹{(activeLabour.defaultWeeklyWage || 1400).toLocaleString("en-IN")} / week</p>
+
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          {activeLabour.isActive === false ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setReactivateConfirmTarget(activeLabour)}
+                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300 text-xs font-bold rounded-lg gap-1 shadow-2xs"
+                            >
+                              <UserCheck className="h-3.5 w-3.5" /> Reactivate
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setDeactivateConfirmTarget(activeLabour)}
+                              className="bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300 text-xs font-bold rounded-lg gap-1 shadow-2xs"
+                            >
+                              <AlertTriangle className="h-3.5 w-3.5 text-amber-600" /> Deactivate
+                            </Button>
+                          )}
+
+                          {!hasLabourHistory(activeLabour.id) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setDeleteConfirmTarget(activeLabour)}
+                              className="bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-300 text-xs font-bold rounded-lg gap-1 shadow-2xs"
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-rose-600" /> Delete Permanently
+                            </Button>
+                          )}
+                        </div>
+
+                        <div className="text-left sm:text-right bg-emerald-50 p-3 rounded-xl border border-emerald-100">
+                          <span className="text-[10px] uppercase font-bold text-emerald-900">Default Weekly Wage</span>
+                          <p className="text-xl font-extrabold text-emerald-700">₹{(activeLabour.defaultWeeklyWage || 1400).toLocaleString("en-IN")} / week</p>
+                        </div>
                       </div>
+
                     </CardHeader>
 
                     <CardContent className="p-5 space-y-6">
@@ -559,7 +693,7 @@ function LaboursComponent() {
                             }}
                             className="h-8 text-[11px] font-bold text-purple-700 border-purple-300 hover:bg-purple-100 cursor-pointer rounded-lg gap-1"
                           >
-                            📋 Copy Credentials
+                            <Copy className="h-3.5 w-3.5 inline mr-1" /> Copy Credentials
                           </Button>
                         </div>
 
@@ -567,7 +701,7 @@ function LaboursComponent() {
                         <div className="p-3.5 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-extrabold uppercase text-slate-500 tracking-wider flex items-center gap-1">
-                              🛠️ Technical Skills & Capabilities
+                              <Wrench className="h-3.5 w-3.5 text-slate-500 inline mr-1" /> Technical Skills & Capabilities
                             </span>
                             <span className="text-[10px] text-slate-400 font-semibold">{activeLabour.skills?.length || 0} Specializations</span>
                           </div>
@@ -575,7 +709,7 @@ function LaboursComponent() {
                             {activeLabour.skills && activeLabour.skills.length > 0 ? (
                               activeLabour.skills.map((skill, idx) => (
                                 <Badge key={idx} variant="outline" className="bg-white dark:bg-card text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 font-bold text-[11px] px-2.5 py-0.5">
-                                  ⚡ {skill}
+                                  {skill}
                                 </Badge>
                               ))
                             ) : (
@@ -655,21 +789,21 @@ function LaboursComponent() {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                                       <div className="space-y-1">
                                         <div className="text-muted-foreground flex items-center gap-1">
-                                          <span>📍 Site Location:</span>
+                                          <span>Site Location:</span>
                                           <span className="font-semibold text-foreground">{p.location}</span>
                                         </div>
                                         <div className="text-muted-foreground flex items-center gap-1">
-                                          <span>👨‍🔧 Lead Engineer:</span>
+                                          <span>Lead Engineer:</span>
                                           <span className="font-semibold text-blue-700">{p.assignedEngineerName || "Er. Rajesh Kumar"}</span>
                                         </div>
                                       </div>
                                       <div className="space-y-1">
                                         <div className="text-muted-foreground flex items-center gap-1">
-                                          <span>📅 Work Committed Date:</span>
+                                          <span>Work Committed Date:</span>
                                           <span className="font-bold text-blue-800">{p.workCommittedDate || "Not Specified"}</span>
                                         </div>
                                         <div className="text-muted-foreground flex items-center gap-1">
-                                          <span>⚡ Actual Work Started Date:</span>
+                                          <span>Actual Work Started Date:</span>
                                           <span className="font-bold text-emerald-800">{p.actualWorkStartedDate || "Pending"}</span>
                                         </div>
                                       </div>
@@ -719,7 +853,7 @@ function LaboursComponent() {
                                         </td>
                                         <td className="p-2.5">
                                           <div className="font-medium text-foreground">{p.natureOfWork}</div>
-                                          <div className="text-[10px] text-muted-foreground">📍 {p.location}</div>
+                                          <div className="text-[10px] text-muted-foreground">{p.location}</div>
                                         </td>
                                         <td className="p-2.5 font-bold text-emerald-700">₹{projWage.toLocaleString("en-IN")}/wk</td>
                                         <td className="p-2.5 text-muted-foreground">{assignment?.assignedDate || p.scheduledDate}</td>
@@ -807,33 +941,74 @@ function LaboursComponent() {
                           </div>
                         </div>
 
-                        {/* ATTENDANCE CALENDAR (VISUAL MATRIX FOR JULY 2026) */}
+                        {/* ATTENDANCE CALENDAR (VISUAL MATRIX FOR CURRENT MONTH) */}
                         <div className="space-y-2">
-                          <h4 className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                            <Calendar className="h-3.5 w-3.5 text-emerald-600" /> Monthly Attendance Calendar Matrix (July 2026)
-                          </h4>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-2">
+                            <h4 className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
+                              <Calendar className="h-3.5 w-3.5 text-emerald-600" /> Monthly Attendance Calendar Matrix ({monthName} {calendarYear})
+                            </h4>
+                            <div className="flex items-center gap-1.5">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={handlePrevMonth}
+                                className="h-6 w-6 p-0 rounded-md cursor-pointer"
+                                title="Previous Month"
+                              >
+                                <ChevronLeft className="h-3.5 w-3.5" />
+                              </Button>
+                              <span className="text-xs font-bold px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-md text-foreground">
+                                {monthName} {calendarYear}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={handleNextMonth}
+                                className="h-6 w-6 p-0 rounded-md cursor-pointer"
+                                title="Next Month"
+                              >
+                                <ChevronRight className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
                           <div className="grid grid-cols-7 sm:grid-cols-14 gap-1.5 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border">
-                            {Array.from({ length: 28 }, (_, idx) => {
+                            {Array.from({ length: totalDaysInMonth }, (_, idx) => {
                               const day = idx + 1;
                               const dayStr = day < 10 ? `0${day}` : `${day}`;
-                              const dateKey = `2026-07-${dayStr}`;
-                              const record = (attendance || {})[`${activeLabour.id}_${dateKey}`];
-                              const status = record?.status || "Absent";
+                              const monthStr = (calendarMonth + 1) < 10 ? `0${calendarMonth + 1}` : `${calendarMonth + 1}`;
+                              const dateKey = `${calendarYear}-${monthStr}-${dayStr}`;
+                              const record = allAttendanceRecords.get(`${activeLabour.id}_${dateKey}`);
+                              const status = record?.status;
+
+                              let badgeStyle = "bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700"; // Default: No data (-)
+                              let label = "-";
+
+                              if (record && status) {
+                                if (status === "Present" || status === "Full Day") {
+                                  badgeStyle = "bg-emerald-100 text-emerald-800 border-emerald-300";
+                                  label = "P";
+                                } else if (status === "Half Day" || status === "Half-Day") {
+                                  badgeStyle = "bg-amber-100 text-amber-800 border-amber-300";
+                                  label = "H";
+                                } else if (status === "Absent") {
+                                  badgeStyle = "bg-rose-100 text-rose-800 border-rose-300";
+                                  label = "A";
+                                } else if (status === "Leave") {
+                                  badgeStyle = "bg-blue-100 text-blue-800 border-blue-300";
+                                  label = "L";
+                                }
+                              }
 
                               return (
                                 <div
                                   key={day}
-                                  title={`${dateKey}: ${status} (${record?.hoursWorked || 0} hrs)`}
-                                  className={`p-1.5 text-center rounded-lg border text-[10px] font-bold ${
-                                    status === "Present"
-                                      ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                                      : status === "Leave"
-                                      ? "bg-blue-100 text-blue-800 border-blue-300"
-                                      : "bg-slate-200 text-slate-800 border-slate-300"
-                                  }`}
+                                  title={`${dateKey}: ${status || "No record"} (${record?.hoursWorked || 0} hrs)`}
+                                  className={`p-1.5 text-center rounded-lg border text-[10px] font-bold ${badgeStyle}`}
                                 >
                                   <div>{day}</div>
-                                  <div className="text-[9px] font-semibold">{status === "Present" ? "P" : status === "Leave" ? "L" : "A"}</div>
+                                  <div className="text-[9px] font-semibold">{label}</div>
                                 </div>
                               );
                             })}
@@ -974,13 +1149,21 @@ function LaboursComponent() {
                     <th className="p-3">Labour Type</th>
                     <th className="p-3">Default Weekly Wage</th>
                     <th className="p-3">Status</th>
+                    <th className="p-3 text-right pr-4">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {filteredLabours.map((l) => (
                     <tr key={l.id} className="hover:bg-accent/40">
                       <td className="p-3 pl-4 font-bold text-blue-600">{l.id}</td>
-                      <td className="p-3 font-semibold text-foreground">{l.name}</td>
+                      <td className="p-3 font-semibold text-foreground">
+                        {l.name}
+                        {l.isActive === false && (
+                          <Badge variant="outline" className="ml-1.5 text-[9px] bg-amber-50 text-amber-800 border-amber-300">
+                            Inactive
+                          </Badge>
+                        )}
+                      </td>
                       <td className="p-3 text-muted-foreground">{l.phone}</td>
                       <td className="p-3">
                         <Badge variant="outline" className="text-[10px]">{l.type}</Badge>
@@ -989,9 +1172,43 @@ function LaboursComponent() {
                       <td className="p-3">
                         <Badge className="bg-emerald-100 text-emerald-800 text-[10px]">{l.status}</Badge>
                       </td>
+                      <td className="p-3 text-right pr-4">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {l.isActive === false ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setReactivateConfirmTarget(l)}
+                              className="h-7 text-[11px] font-bold text-emerald-700 border-emerald-300 hover:bg-emerald-50 rounded-lg gap-1"
+                            >
+                              <UserCheck className="h-3 w-3" /> Reactivate
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setDeactivateConfirmTarget(l)}
+                              className="h-7 text-[11px] font-bold text-amber-800 border-amber-300 hover:bg-amber-50 rounded-lg gap-1"
+                            >
+                              <AlertTriangle className="h-3 w-3 text-amber-600" /> Deactivate
+                            </Button>
+                          )}
+                          {!hasLabourHistory(l.id) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setDeleteConfirmTarget(l)}
+                              className="h-7 text-[11px] font-bold text-rose-700 border-rose-300 hover:bg-rose-50 rounded-lg gap-1"
+                            >
+                              <Trash2 className="h-3 w-3 text-rose-600" /> Delete
+                            </Button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
+
               </table>
             </div>
           </CardContent>
@@ -1045,7 +1262,7 @@ function LaboursComponent() {
                   />
                   {labourFormData.phone.replace(/\D/g, "").length > 10 && (
                     <p className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-1">
-                      ⚠️ Mobile number cannot exceed 10 digits ({labourFormData.phone.replace(/\D/g, "").length}/10 digits)
+                      <AlertTriangle className="h-3 w-3 inline text-red-500 shrink-0" /> Mobile number cannot exceed 10 digits ({labourFormData.phone.replace(/\D/g, "").length}/10 digits)
                     </p>
                   )}
                 </div>
@@ -1247,6 +1464,103 @@ function LaboursComponent() {
           </form>
         </DialogContent>
       </Dialog>
+      {/* DEACTIVATE CONFIRM DIALOG */}
+      <Dialog open={Boolean(deactivateConfirmTarget)} onOpenChange={(open) => !open && setDeactivateConfirmTarget(null)}>
+        <DialogContent className="max-w-md rounded-2xl p-6 bg-white dark:bg-card border border-border shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-extrabold text-foreground flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" /> Deactivate Labour Member?
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground mt-1">
+              This will hide <strong>{deactivateConfirmTarget?.name}</strong> from active lists. Their history will be kept. Continue?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 justify-end pt-4">
+            <Button variant="outline" size="sm" onClick={() => setDeactivateConfirmTarget(null)} className="rounded-lg text-xs">
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={async () => {
+                if (deactivateConfirmTarget) {
+                  await deactivateLabour(deactivateConfirmTarget.id);
+                  setDeactivateConfirmTarget(null);
+                }
+              }}
+              className="bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold"
+            >
+              Deactivate Staff
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* REACTIVATE CONFIRM DIALOG */}
+      <Dialog open={Boolean(reactivateConfirmTarget)} onOpenChange={(open) => !open && setReactivateConfirmTarget(null)}>
+        <DialogContent className="max-w-md rounded-2xl p-6 bg-white dark:bg-card border border-border shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-extrabold text-foreground flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-emerald-600" /> Reactivate Labour Member?
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground mt-1">
+              This will restore <strong>{reactivateConfirmTarget?.name}</strong> to the active workforce roster. Continue?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 justify-end pt-4">
+            <Button variant="outline" size="sm" onClick={() => setReactivateConfirmTarget(null)} className="rounded-lg text-xs">
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={async () => {
+                if (reactivateConfirmTarget) {
+                  await reactivateLabour(reactivateConfirmTarget.id);
+                  setReactivateConfirmTarget(null);
+                }
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold"
+            >
+              Reactivate Staff
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DELETE PERMANENTLY CONFIRM DIALOG */}
+      <Dialog open={Boolean(deleteConfirmTarget)} onOpenChange={(open) => !open && setDeleteConfirmTarget(null)}>
+        <DialogContent className="max-w-md rounded-2xl p-6 bg-white dark:bg-card border border-border shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-extrabold text-rose-600 flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-rose-600" /> Permanently Delete Labour?
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground mt-1">
+              This will permanently erase <strong>{deleteConfirmTarget?.name}</strong> and cannot be undone. Continue?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 justify-end pt-4">
+            <Button variant="outline" size="sm" onClick={() => setDeleteConfirmTarget(null)} className="rounded-lg text-xs">
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={async () => {
+                if (deleteConfirmTarget) {
+                  try {
+                    await deleteLabourPermanently(deleteConfirmTarget.id);
+                    setDeleteConfirmTarget(null);
+                  } catch (err: any) {
+                    toast.error(err.message || "Failed to delete labour");
+                  }
+                }
+              }}
+              className="bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold"
+            >
+              Delete Permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+

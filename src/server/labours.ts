@@ -71,3 +71,41 @@ export const deleteLabour = createServerFn({ method: "POST" })
     await db.labour.delete({ where: { id: data.id } });
     return { ok: true };
   });
+
+export const deactivateLabour = createServerFn({ method: "POST" })
+  .validator((input: { id: string }) => input)
+  .handler(async ({ data }) => {
+    return db.labour.update({
+      where: { id: data.id },
+      data: { isActive: false } as any,
+    });
+  });
+
+export const reactivateLabour = createServerFn({ method: "POST" })
+  .validator((input: { id: string }) => input)
+  .handler(async ({ data }) => {
+    return db.labour.update({
+      where: { id: data.id },
+      data: { isActive: true } as any,
+    });
+  });
+
+export const deleteLabourPermanently = createServerFn({ method: "POST" })
+  .validator((input: { id: string }) => input)
+  .handler(async ({ data }) => {
+    const { id } = data;
+    const [attCount, logCount, assignCount, wageCount] = await Promise.all([
+      db.attendanceRecord.count({ where: { labourId: id } }),
+      db.projectLabourLog.count({ where: { labourId: id } }),
+      db.projectLabourAssignment.count({ where: { labourId: id } }),
+      db.labourWageHistory.count({ where: { labourId: id } }),
+    ]);
+
+    if (attCount > 0 || logCount > 0 || assignCount > 0 || wageCount > 0) {
+      throw new Error("Cannot permanently delete: this labour has history. Deactivate instead.");
+    }
+
+    await db.labour.delete({ where: { id } });
+    return { ok: true };
+  });
+

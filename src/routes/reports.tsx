@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState, useMemo } from "react";
 import { useRobotics } from "@/lib/robotics-context";
 import {
   BarChart3,
@@ -23,6 +23,7 @@ import {
   MapPin,
   ExternalLink,
   Camera,
+  Activity,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,17 +39,107 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { generateProjectsReport, generateAttendanceReport } from "~/server/reports";
+import { Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/reports")({
   component: ReportsComponent,
 });
 
 function ReportsComponent() {
-  const { enquiries, projects, payments, labours, attendance, customers, machines, machineIssues } = useRobotics();
+  const { enquiries, projects, payments, labours, attendance, customers, machines, machineIssues, currentUser } = useRobotics();
 
   const [activeReport, setActiveReport] = useState<
     "REVENUE" | "PROJECTS" | "PENDING" | "ENQUIRIES" | "ATTENDANCE" | "NATURE" | "CUSTOMER" | "REFERRALS"
   >("REVENUE");
+
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  const downloadPdfBlob = (base64: string, filename: string) => {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [myActivityStartDate, setMyActivityStartDate] = useState(todayStr);
+  const [myActivityEndDate, setMyActivityEndDate] = useState(todayStr);
+  const [myActivityActorFilter, setMyActivityActorFilter] = useState("CURRENT_USER");
+  const [myActivitySearchQuery, setMyActivitySearchQuery] = useState("");
+
+  const allActivities = useMemo(() => {
+    const list: {
+      id: string;
+      timestamp: string;
+      date: string;
+      event: string;
+      actor: string;
+      details: string;
+      projectId?: string;
+      customerName?: string;
+    }[] = [];
+
+    (projects || []).forEach((p) => {
+      (p.activities || []).forEach((a) => {
+        list.push({
+          id: a.id,
+          timestamp: a.timestamp,
+          date: a.timestamp.slice(0, 10),
+          event: a.event,
+          actor: a.actor,
+          details: a.details,
+          projectId: p.id,
+          customerName: p.customerName,
+        });
+      });
+    });
+
+    return list.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  }, [projects]);
+
+  const currentUserName = currentUser?.name || "CEO Executive";
+
+  const filteredMyActivities = useMemo(() => {
+    return allActivities.filter((act) => {
+      if (myActivityActorFilter === "CURRENT_USER") {
+        const actActor = act.actor.toLowerCase().trim();
+        const currName = currentUserName.toLowerCase().trim();
+        if (actActor !== currName && !currName.includes(actActor) && !actActor.includes(currName)) {
+          return false;
+        }
+      } else if (myActivityActorFilter !== "ALL") {
+        if (act.actor.toLowerCase() !== myActivityActorFilter.toLowerCase()) return false;
+      }
+
+      if (myActivityStartDate && act.date < myActivityStartDate) return false;
+      if (myActivityEndDate && act.date > myActivityEndDate) return false;
+
+      if (myActivitySearchQuery.trim()) {
+        const q = myActivitySearchQuery.toLowerCase().trim();
+        const matchEvent = act.event.toLowerCase().includes(q);
+        const matchDetails = act.details.toLowerCase().includes(q);
+        const matchProj = act.projectId ? act.projectId.toLowerCase().includes(q) : false;
+        const matchCust = act.customerName ? act.customerName.toLowerCase().includes(q) : false;
+        const matchActor = act.actor.toLowerCase().includes(q);
+        if (!matchEvent && !matchDetails && !matchProj && !matchCust && !matchActor) return false;
+      }
+
+      return true;
+    });
+  }, [allActivities, currentUserName, myActivityActorFilter, myActivityStartDate, myActivityEndDate, myActivitySearchQuery]);
 
   // View Work Done Details Modal state
   const [selectedWorkDoneItem, setSelectedWorkDoneItem] = useState<any | null>(null);
@@ -413,8 +504,57 @@ function ReportsComponent() {
       };
     });
 
+  const handleDownloadProjectsPdfReport = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      const res = await generateProjectsReport({
+        data: {
+          status: projectStatusFilter,
+          startDate: startDateFilter || undefined,
+          endDate: endDateFilter || undefined,
+        },
+      });
+      if (res?.base64) {
+        downloadPdfBlob(res.base64, res.filename || "projects-report.pdf");
+        toast.success("Downloaded Projects Report PDF with photo thumbnails!");
+      } else {
+        toast.error("Failed to generate Projects PDF");
+      }
+    } catch (err: any) {
+      console.error("Projects PDF Error:", err);
+      toast.error("Failed to generate Projects PDF report");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleDownloadAttendancePdfReport = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      const res = await generateAttendanceReport({
+        data: {
+          startDate: attStartDateFilter || undefined,
+          endDate: attEndDateFilter || undefined,
+          labourId: attMemberFilter,
+        },
+      });
+      if (res?.base64) {
+        downloadPdfBlob(res.base64, res.filename || "attendance-report.pdf");
+        toast.success("Downloaded Attendance Report PDF with photo thumbnails!");
+      } else {
+        toast.error("Failed to generate Attendance PDF");
+      }
+    } catch (err: any) {
+      console.error("Attendance PDF Error:", err);
+      toast.error("Failed to generate Attendance PDF report");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   // Export CSV Helper
   const handleExportCSV = (filename: string, headers: string[], rows: (string | number)[][]) => {
+
     const csvContent =
       "data:text/csv;charset=utf-8," +
       [headers.join(","), ...rows.map((e) => e.map((x) => `"${x}"`).join(","))].join("\n");
@@ -529,7 +669,7 @@ function ReportsComponent() {
           { id: "PENDING", label: "Pending", icon: Coins },
           { id: "ENQUIRIES", label: "Enquiries", icon: FileText },
           { id: "ATTENDANCE", label: "Attendance", icon: Calendar },
-          { id: "NATURE", label: "Work", icon: Wrench },
+          { id: "NATURE", label: "My Activity", icon: Activity },
           { id: "CUSTOMER", label: "Ledger", icon: Users },
         ].map((tab) => (
           <Button
@@ -739,7 +879,11 @@ function ReportsComponent() {
                   ) : (
                     filteredRevenueReport.map((p) => (
                       <tr key={p.id} className="hover:bg-accent/40">
-                        <td className="p-3 pl-4 font-bold text-blue-600">{p.id}</td>
+                        <td className="p-3 pl-4 font-bold text-blue-600">
+                          <Link to="/projects" search={{ openId: p.id }} className="hover:underline text-blue-600 hover:text-blue-700">
+                            {p.id}
+                          </Link>
+                        </td>
                         <td className="p-3 font-semibold text-foreground">{p.customerName}</td>
                         <td className="p-3 font-mono text-muted-foreground">{p.scheduledDate || "N/A"}</td>
                         <td className="p-3 font-bold text-foreground">₹{p.projectValue.toLocaleString("en-IN")}</td>
@@ -812,29 +956,14 @@ function ReportsComponent() {
 
                 <Button
                   size="sm"
-                  onClick={() => {
-                    const statusLabel = projectStatusFilter === "ALL" ? "All_Statuses" : projectStatusFilter;
-                    const dateLabel = startDateFilter || endDateFilter ? ` (${startDateFilter} to ${endDateFilter})` : "";
-                    handleExportPDF(
-                      `Custom Projects Deployment Report - ${statusLabel}${dateLabel}`,
-                      ["Project ID", "Customer Name", "Work Description", "Lead Engineer", "Scheduled Date", "Location", "Contract Value (₹)", "Payment Status", "Status"],
-                      filteredProjectsReport.map((p) => [
-                        p.id,
-                        p.customerName,
-                        p.natureOfWork,
-                        p.assignedEngineerName || "Er. Rajesh Kumar",
-                        p.scheduledDate || "N/A",
-                        p.location || "N/A",
-                        `₹${(p.projectValue || 0).toLocaleString("en-IN")}`,
-                        p.paymentStatus,
-                        p.status,
-                      ])
-                    );
-                  }}
+                  disabled={isGeneratingPdf}
+                  onClick={handleDownloadProjectsPdfReport}
                   className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
                 >
-                  <FileText className="h-3.5 w-3.5" /> Download PDF Report
+                  {isGeneratingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+                  Download Projects Report (PDF)
                 </Button>
+
               </div>
             </div>
 
@@ -961,7 +1090,11 @@ function ReportsComponent() {
                   ) : (
                     filteredProjectsReport.map((p) => (
                       <tr key={p.id} className="hover:bg-accent/40">
-                        <td className="p-3 pl-4 font-bold text-blue-600">{p.id}</td>
+                        <td className="p-3 pl-4 font-bold text-blue-600">
+                          <Link to="/projects" search={{ openId: p.id }} className="hover:underline text-blue-600 hover:text-blue-700">
+                            {p.id}
+                          </Link>
+                        </td>
                         <td className="p-3 font-semibold text-foreground">{p.customerName}</td>
                         <td className="p-3 font-medium text-foreground">{p.natureOfWork}</td>
                         <td className="p-3 font-semibold text-purple-700">{p.assignedEngineerName || "Er. Rajesh Kumar"}</td>
@@ -1190,9 +1323,13 @@ function ReportsComponent() {
                   ) : (
                     filteredPendingReport.map((p) => (
                       <tr key={p.id} className="hover:bg-accent/40">
-                        <td className="p-3 pl-4 font-bold text-blue-600">{p.id}</td>
+                        <td className="p-3 pl-4 font-bold text-blue-600">
+                          <Link to="/projects" search={{ openId: p.id }} className="hover:underline text-blue-600 hover:text-blue-700">
+                            {p.id}
+                          </Link>
+                        </td>
                         <td className="p-3 font-semibold text-foreground">{p.customerName}</td>
-                        <td className="p-3 text-muted-foreground font-mono">📞 {p.phone || "N/A"}</td>
+                        <td className="p-3 text-muted-foreground font-mono">{p.phone || "N/A"}</td>
                         <td className="p-3 font-mono text-muted-foreground">{p.scheduledDate || "N/A"}</td>
                         <td className="p-3 font-medium">₹{p.projectValue.toLocaleString("en-IN")}</td>
                         <td className="p-3 font-bold text-emerald-600">₹{p.receivedAmount.toLocaleString("en-IN")}</td>
@@ -1243,16 +1380,32 @@ function ReportsComponent() {
                     const dateLabel = enquiryStartDateFilter || enquiryEndDateFilter ? `_${enquiryStartDateFilter}_to_${enquiryEndDateFilter}` : "";
                     handleExportCSV(
                       `Custom_Enquiries_Report_${decLabel}${dateLabel}`,
-                      ["Enquiry ID", "Customer Name", "Phone", "Leakage / Service Need", "Quotation Amount (INR)", "Lead Source", "Referred By", "Date", "Customer Decision"],
+                      [
+                        "Enquiry ID",
+                        "Customer Name",
+                        "Phone",
+                        "Location",
+                        "Leakage / Service Need",
+                        "Assigned Engineer",
+                        "Quotation Amount (INR)",
+                        "Site Visit Date",
+                        "Work Committed Date",
+                        "Actual Work Started Date",
+                        "Lead Source",
+                        "Customer Decision",
+                      ],
                       filteredEnquiriesReport.map((e) => [
                         e.id,
                         e.customerName,
                         e.phone || "N/A",
+                        e.location || "N/A",
                         e.leakageType || "N/A",
+                        e.assignedEngineerName || "Unassigned",
                         e.quotationAmount || 0,
+                        e.siteVisitDate || "N/A",
+                        e.workCommittedDate || "Not Set",
+                        e.actualWorkStartedDate || "Pending",
                         e.leadSource || "N/A",
-                        e.referredBy || "N/A",
-                        e.createdAt?.slice(0, 10) || "N/A",
                         e.customerDecision || "Follow Up",
                       ])
                     );
@@ -1269,16 +1422,32 @@ function ReportsComponent() {
                     const dateLabel = enquiryStartDateFilter || enquiryEndDateFilter ? ` (${enquiryStartDateFilter} to ${enquiryEndDateFilter})` : "";
                     handleExportPDF(
                       `Custom Enquiries & Quotations Funnel Report - ${decLabel}${dateLabel}`,
-                      ["Enquiry ID", "Customer Name", "Phone", "Leakage / Need", "Quotation (₹)", "Lead Source", "Referred By", "Date", "Customer Decision"],
+                      [
+                        "Enquiry ID",
+                        "Customer Name",
+                        "Phone",
+                        "Location",
+                        "Leakage / Need",
+                        "Engineer",
+                        "Quotation (INR)",
+                        "Site Visit Date",
+                        "Start Date",
+                        "Work Started",
+                        "Lead Source",
+                        "Decision",
+                      ],
                       filteredEnquiriesReport.map((e) => [
                         e.id,
                         e.customerName,
                         e.phone || "N/A",
+                        e.location || "N/A",
                         e.leakageType || "N/A",
-                        `₹${(e.quotationAmount || 0).toLocaleString("en-IN")}`,
+                        e.assignedEngineerName || "Unassigned",
+                        `INR ${(e.quotationAmount || 0).toLocaleString("en-IN")}`,
+                        e.siteVisitDate || "N/A",
+                        e.workCommittedDate || "Not Set",
+                        e.actualWorkStartedDate || "Pending",
                         e.leadSource || "N/A",
-                        e.referredBy || "N/A",
-                        e.createdAt?.slice(0, 10) || "N/A",
                         e.customerDecision || "Follow Up",
                       ])
                     );
@@ -1392,18 +1561,24 @@ function ReportsComponent() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-muted/40 text-muted-foreground border-b font-medium">
                   <tr>
-                    <th className="p-3 pl-4">Enquiry #</th>
-                    <th className="p-3">Customer Name</th>
-                    <th className="p-3">Leakage / Service Need</th>
-                    <th className="p-3">Quotation Amount</th>
-                    <th className="p-3">Lead Source</th>
-                    <th className="p-3 text-right pr-4">Customer Decision</th>
+                    <th className="p-3 pl-4 whitespace-nowrap">Enquiry #</th>
+                    <th className="p-3 whitespace-nowrap">Customer Name</th>
+                    <th className="p-3 whitespace-nowrap">Phone</th>
+                    <th className="p-3 whitespace-nowrap">Location</th>
+                    <th className="p-3 whitespace-nowrap">Leakage / Service Need</th>
+                    <th className="p-3 whitespace-nowrap">Engineer</th>
+                    <th className="p-3 whitespace-nowrap">Quotation Amount</th>
+                    <th className="p-3 whitespace-nowrap">Site Visit Date</th>
+                    <th className="p-3 whitespace-nowrap">Start Date</th>
+                    <th className="p-3 whitespace-nowrap">Work Started</th>
+                    <th className="p-3 whitespace-nowrap">Lead Source</th>
+                    <th className="p-3 text-right pr-4 whitespace-nowrap">Customer Decision</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {filteredEnquiriesReport.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="p-8 text-center text-muted-foreground font-medium">
+                      <td colSpan={12} className="p-8 text-center text-muted-foreground font-medium">
                         No enquiry records match the selected decision or date filters.
                       </td>
                     </tr>
@@ -1416,15 +1591,18 @@ function ReportsComponent() {
 
                       return (
                         <tr key={e.id} className="hover:bg-accent/40">
-                          <td className="p-3 pl-4 font-bold text-blue-600">{e.id}</td>
-                          <td className="p-3 font-semibold text-foreground">
-                            {e.customerName}
-                            {e.phone && <span className="block text-[10px] text-muted-foreground font-normal">📞 {e.phone}</span>}
-                          </td>
-                          <td className="p-3 text-muted-foreground font-medium">{e.leakageType}</td>
-                          <td className="p-3 font-bold text-foreground">₹{(e.quotationAmount || 0).toLocaleString("en-IN")}</td>
-                          <td className="p-3 text-muted-foreground">{e.leadSource}</td>
-                          <td className="p-3 text-right pr-4">
+                          <td className="p-3 pl-4 font-bold text-blue-600 whitespace-nowrap">{e.id}</td>
+                          <td className="p-3 font-semibold text-foreground whitespace-nowrap">{e.customerName}</td>
+                          <td className="p-3 font-mono text-muted-foreground whitespace-nowrap">{e.phone || "N/A"}</td>
+                          <td className="p-3 text-muted-foreground whitespace-nowrap">{e.location || "N/A"}</td>
+                          <td className="p-3 text-muted-foreground font-medium whitespace-nowrap">{e.leakageType}</td>
+                          <td className="p-3 font-semibold text-purple-700 whitespace-nowrap">{e.assignedEngineerName || "Unassigned"}</td>
+                          <td className="p-3 font-bold text-foreground whitespace-nowrap">₹{(e.quotationAmount || 0).toLocaleString("en-IN")}</td>
+                          <td className="p-3 font-mono text-muted-foreground whitespace-nowrap">{e.siteVisitDate || "N/A"}</td>
+                          <td className="p-3 font-mono text-purple-700 whitespace-nowrap">{e.workCommittedDate || "Not Set"}</td>
+                          <td className="p-3 font-mono text-emerald-700 whitespace-nowrap">{e.actualWorkStartedDate || "Pending"}</td>
+                          <td className="p-3 text-muted-foreground whitespace-nowrap">{e.leadSource}</td>
+                          <td className="p-3 text-right pr-4 whitespace-nowrap">
                             <Badge
                               className={`text-[10px] ${
                                 isApproved
@@ -1521,53 +1699,14 @@ function ReportsComponent() {
 
                 <Button
                   size="sm"
-                  onClick={() => {
-                    const memberObj = labours.find((l) => l.id === attMemberFilter);
-                    const memberLabel = memberObj ? memberObj.name : "All Staff Members";
-                    const dateLabel = attStartDateFilter || attEndDateFilter ? ` (${attStartDateFilter} to ${attEndDateFilter})` : "";
-
-                    if (attMemberFilter !== "ALL") {
-                      const logsToExport = allProjectLogs.filter((log) => {
-                        if (log.labourId !== attMemberFilter) return false;
-                        if (attStartDateFilter && log.date < attStartDateFilter) return false;
-                        if (attEndDateFilter && log.date > attEndDateFilter) return false;
-                        return true;
-                      });
-
-                      handleExportPDF(
-                        `Attendance & Timesheet Report - ${memberLabel}${dateLabel}`,
-                        ["Date", "Labour Name", "Project / Customer", "Work Done Description", "In - Out Time", "Hours Logged", "Earned Wage (₹)", "Verification"],
-                        logsToExport.map((log) => [
-                          log.date,
-                          log.labourName,
-                          log.customerName || "N/A",
-                          log.workDescription || "On-site servicing",
-                          `${log.inTime || "N/A"} - ${log.outTime || "N/A"}`,
-                          `${log.hoursWorked || 0}h`,
-                          `₹${Math.round(log.earnedMoney || 0).toLocaleString("en-IN")}`,
-                          log.verificationStatus || "Verified",
-                        ])
-                      );
-                    } else {
-                      handleExportPDF(
-                        `Staff Payroll & Attendance Summary Report - ${memberLabel}${dateLabel}`,
-                        ["Labour ID", "Labour Name", "Labour Type", "Weekly Wage Rate (₹)", "Present Days", "Total Hours Worked", "Earned Payroll (₹)"],
-                        filteredLaboursSummary.map((item) => [
-                          item.labour.id,
-                          item.labour.name,
-                          item.labour.type,
-                          `₹${item.weeklyRate.toLocaleString("en-IN")}`,
-                          item.presentDays,
-                          `${item.totalHours.toFixed(1)}h`,
-                          `₹${Math.round(item.earnedWages).toLocaleString("en-IN")}`,
-                        ])
-                      );
-                    }
-                  }}
+                  disabled={isGeneratingPdf}
+                  onClick={handleDownloadAttendancePdfReport}
                   className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
                 >
-                  <FileText className="h-3.5 w-3.5" /> Download PDF Report
+                  {isGeneratingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+                  Download Attendance Report (PDF)
                 </Button>
+
               </div>
             </div>
 
@@ -1581,10 +1720,10 @@ function ReportsComponent() {
                   onChange={(e) => setAttMemberFilter(e.target.value)}
                   className="w-full h-8 text-xs font-medium rounded-lg border border-border bg-white dark:bg-card px-2.5 text-foreground focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
-                  <option value="ALL">👥 All Staff Members ({labours.length})</option>
+                  <option value="ALL">All Staff Members ({labours.length})</option>
                   {labours.map((l) => (
                     <option key={l.id} value={l.id}>
-                      👤 {l.name} ({l.type} - ₹{l.defaultWeeklyWage || 1400}/wk)
+                      {l.name} ({l.type} - ₹{l.defaultWeeklyWage || 1400}/wk)
                     </option>
                   ))}
                 </select>
@@ -1674,7 +1813,7 @@ function ReportsComponent() {
                       <div className="p-4 bg-blue-50/60 border border-blue-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                         <div>
                           <h3 className="text-sm font-extrabold text-blue-900 flex items-center gap-2">
-                            <span>👤 {selLabour?.name || attMemberFilter}</span>
+                            <span>{selLabour?.name || attMemberFilter}</span>
                             <Badge className="bg-blue-600 text-white text-[10px]">{selLabour?.type || "Staff"}</Badge>
                           </h3>
                           <p className="text-[11px] text-blue-700 mt-0.5">
@@ -1802,18 +1941,18 @@ function ReportsComponent() {
         </Card>
       )}
 
-      {/* 6. WORK REPORT (1 ROW PER PROJECT WITH TILL-DATE WORK HISTORY MODAL) */}
+      {/* 6. MY ACTIVITY LOG TAB */}
       {activeReport === "NATURE" && (
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
           <CardHeader className="p-4 border-b space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
-                  <Wrench className="h-4 w-4 text-blue-600" />
-                  Work Report & Projects Progress (Till Date)
+                  <Activity className="h-4 w-4 text-blue-600" />
+                  My Activity Log
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Summary of projects undertaken, work done till date, and complete shift activity histories.
+                  Daily log of actions executed by <strong>{currentUser?.name || "Current User"}</strong> read from project activities.
                 </CardDescription>
               </div>
 
@@ -1821,289 +1960,142 @@ function ReportsComponent() {
                 <Button
                   size="sm"
                   onClick={() => {
-                    const catLabel = workCategoryFilter === "ALL" ? "All_Categories" : workCategoryFilter.replace(/\s+/g, "_");
-                    const dateLabel = workStartDateFilter || workEndDateFilter ? `_${workStartDateFilter}_to_${workEndDateFilter}` : "";
-                    handleExportCSV(
-                      `Projects_Work_Summary_Till_Date_${catLabel}${dateLabel}`,
-                      ["Project ID", "Customer Name", "Work Category", "Lead Engineer", "Location", "Latest Shift Date", "Total Shifts", "Total Hours Logged", "Latest Work Summary Till Date", "Status"],
-                      filteredWorkProjects.map((item) => [
-                        item.projectId,
-                        item.customerName,
-                        item.workCategory,
-                        item.engineerName,
-                        item.location,
-                        item.latestDate,
-                        item.totalShifts,
-                        item.totalHours,
-                        item.latestWorkSummary,
-                        item.status,
-                      ])
-                    );
-                  }}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
-                >
-                  <Download className="h-3.5 w-3.5" /> Download Projects Summary ({filteredWorkProjects.length})
-                </Button>
-
-                <Button
-                  onClick={() => {
-                    const catLabel = workCategoryFilter === "ALL" ? "All_Categories" : workCategoryFilter.replace(/\s+/g, "_");
-                    const dateLabel = workStartDateFilter || workEndDateFilter ? `_${workStartDateFilter}_to_${workEndDateFilter}` : "";
-                    const allTimelineLogs = filteredWorkProjects.flatMap((proj) =>
-                      proj.logs.length > 0
-                        ? proj.logs.map((log: any) => [
-                            log.date,
-                            proj.projectId,
-                            proj.customerName,
-                            proj.workCategory,
-                            proj.engineerName,
-                            log.labourName || "Staff Member",
-                            log.workDescription || "On-site operations",
-                            log.inTime || "09:00 AM",
-                            log.outTime || "17:00 PM",
-                            log.hoursWorked || 8,
-                            log.verificationStatus || "Verified",
-                            proj.location,
-                          ])
-                        : [[
-                            proj.latestDate,
-                            proj.projectId,
-                            proj.customerName,
-                            proj.workCategory,
-                            proj.engineerName,
-                            "Unassigned",
-                            proj.latestWorkSummary,
-                            "N/A",
-                            "N/A",
-                            0,
-                            proj.status,
-                            proj.location,
-                          ]]
-                    );
-
-                    handleExportCSV(
-                      `Detailed_Work_Timeline_Logs_${catLabel}${dateLabel}`,
-                      ["Shift Date", "Project ID", "Customer Name", "Work Category", "Lead Engineer", "Staff On Duty", "Work Done Description", "In Time", "Out Time", "Hours Worked", "Verification", "Location"],
-                      allTimelineLogs
-                    );
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
-                >
-                  <Download className="h-3.5 w-3.5" /> Download Detailed Work Timeline Logs (CSV)
-                </Button>
-
-                <Button
-                  onClick={() => {
-                    const catLabel = workCategoryFilter === "ALL" ? "All_Categories" : workCategoryFilter;
-                    const dateLabel = workStartDateFilter || workEndDateFilter ? ` (${workStartDateFilter} to ${workEndDateFilter})` : "";
-                    const allTimelineLogs = filteredWorkProjects.flatMap((proj) =>
-                      proj.logs.length > 0
-                        ? proj.logs.map((log: any) => [
-                            log.date,
-                            proj.projectId,
-                            proj.customerName,
-                            proj.workCategory,
-                            proj.engineerName,
-                            log.labourName || "Staff Member",
-                            log.workDescription || "On-site operations",
-                            `${log.inTime || "09:00"} - ${log.outTime || "17:00"}`,
-                            `${log.hoursWorked || 8}h`,
-                            log.verificationStatus || "Verified",
-                          ])
-                        : [[
-                            proj.latestDate,
-                            proj.projectId,
-                            proj.customerName,
-                            proj.workCategory,
-                            proj.engineerName,
-                            "Unassigned",
-                            proj.latestWorkSummary,
-                            "N/A",
-                            "0h",
-                            proj.status,
-                          ]]
-                    );
-
+                    const dateLabel = myActivityStartDate || myActivityEndDate ? ` (${myActivityStartDate} to ${myActivityEndDate})` : "";
                     handleExportPDF(
-                      `Detailed Work Timeline & Execution Report - ${catLabel}${dateLabel}`,
-                      ["Shift Date", "Project ID", "Customer Name", "Work Category", "Lead Engineer", "Staff On Duty", "Work Done Description", "In - Out Time", "Hours", "Status"],
-                      allTimelineLogs
+                      `My Activity Log Report - ${currentUser?.name || "User"}${dateLabel}`,
+                      ["Date / Time", "Action (Event)", "Project", "Details", "Actor"],
+                      filteredMyActivities.map((act) => [
+                        act.timestamp,
+                        act.event,
+                        act.projectId || "N/A",
+                        act.details,
+                        act.actor,
+                      ])
                     );
                   }}
                   className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
                 >
-                  <FileText className="h-3.5 w-3.5" /> Download PDF Report
+                  <FileText className="h-3.5 w-3.5" /> Download My Activity Report (PDF)
                 </Button>
               </div>
             </div>
 
-            {/* Category Quick Filter Tabs */}
-            <div className="flex flex-wrap items-center gap-1.5 pt-1">
-              <span className="text-[11px] font-bold text-muted-foreground mr-1">Work Category:</span>
-              <button
-                type="button"
-                onClick={() => setWorkCategoryFilter("ALL")}
-                className={`text-[11px] font-bold px-2.5 py-1 rounded-full border transition-all duration-150 cursor-pointer ${
-                  workCategoryFilter === "ALL"
-                    ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                    : "bg-background text-foreground border-border hover:bg-accent"
-                }`}
-              >
-                All Categories ({projects.length})
-              </button>
-              {uniqueWorkCategories.map((cat) => {
-                const count = projects.filter((p) => p.natureOfWork === cat).length;
-                return (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setWorkCategoryFilter(cat)}
-                    className={`text-[11px] font-bold px-2.5 py-1 rounded-full border transition-all duration-150 cursor-pointer ${
-                      workCategoryFilter === cat
-                        ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                        : "bg-background text-foreground border-border hover:bg-accent"
-                    }`}
-                  >
-                    {cat} ({count})
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Interactive Filters Panel: Date-to-Date & Search */}
+            {/* Actor Filter & Date Range Panel */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-2 bg-slate-50 dark:bg-muted/30 p-3 rounded-xl border border-slate-200 dark:border-border">
+              {/* User Actor Filter */}
+              <div className="sm:col-span-3 space-y-1">
+                <Label className="text-[11px] font-bold text-muted-foreground">User Filter</Label>
+                <select
+                  value={myActivityActorFilter}
+                  onChange={(e) => setMyActivityActorFilter(e.target.value)}
+                  className="w-full h-8 text-xs font-semibold rounded-lg border border-border bg-white dark:bg-card px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="CURRENT_USER">My Logins Only ({currentUser?.name || "Current User"})</option>
+                  <option value="ALL">All Operations Users</option>
+                </select>
+              </div>
+
               {/* Date From */}
               <div className="sm:col-span-3 space-y-1">
-                <Label className="text-[11px] font-bold text-muted-foreground">Latest Shift From (Date)</Label>
+                <Label className="text-[11px] font-bold text-muted-foreground">Activity Date From</Label>
                 <Input
                   type="date"
-                  value={workStartDateFilter}
-                  onChange={(e) => setWorkStartDateFilter(e.target.value)}
-                  className="h-8 text-xs rounded-lg border-border bg-white dark:bg-card"
+                  value={myActivityStartDate}
+                  onChange={(e) => setMyActivityStartDate(e.target.value)}
+                  className="h-8 text-xs rounded-lg border-border bg-white dark:bg-card font-mono"
                 />
               </div>
 
               {/* Date To */}
               <div className="sm:col-span-3 space-y-1">
-                <Label className="text-[11px] font-bold text-muted-foreground">Latest Shift To (Date)</Label>
+                <Label className="text-[11px] font-bold text-muted-foreground">Activity Date To</Label>
                 <Input
                   type="date"
-                  value={workEndDateFilter}
-                  onChange={(e) => setWorkEndDateFilter(e.target.value)}
-                  className="h-8 text-xs rounded-lg border-border bg-white dark:bg-card"
+                  value={myActivityEndDate}
+                  onChange={(e) => setMyActivityEndDate(e.target.value)}
+                  className="h-8 text-xs rounded-lg border-border bg-white dark:bg-card font-mono"
                 />
               </div>
 
               {/* Search input */}
-              <div className="sm:col-span-4 space-y-1">
-                <Label className="text-[11px] font-bold text-muted-foreground">Search Projects & Work</Label>
+              <div className="sm:col-span-3 space-y-1">
+                <Label className="text-[11px] font-bold text-muted-foreground">Search Log Details</Label>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                   <Input
                     type="text"
-                    placeholder="Customer, Project ID, Engineer, Work..."
-                    value={workSearchQuery}
-                    onChange={(e) => setWorkSearchQuery(e.target.value)}
+                    placeholder="Search action, project, details..."
+                    value={myActivitySearchQuery}
+                    onChange={(e) => setMyActivitySearchQuery(e.target.value)}
                     className="pl-8 h-8 text-xs rounded-lg border-border bg-white dark:bg-card"
                   />
                 </div>
-              </div>
-
-              {/* Clear Filters Button */}
-              <div className="sm:col-span-2 flex items-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setWorkCategoryFilter("ALL");
-                    setWorkStartDateFilter("");
-                    setWorkEndDateFilter("");
-                    setWorkSearchQuery("");
-                  }}
-                  className="w-full h-8 text-xs rounded-lg font-semibold gap-1 border-slate-200 text-slate-600 hover:bg-slate-100"
-                >
-                  <RotateCcw className="h-3 w-3" /> Reset
-                </Button>
               </div>
             </div>
           </CardHeader>
 
           <CardContent className="p-0">
-            {/* Live Financial & Activity Summary Metrics Bar */}
-            <div className="p-3 bg-muted/20 border-b flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="p-3 bg-muted/20 border-b flex items-center justify-between gap-2 text-xs">
               <span className="font-semibold text-muted-foreground">
-                Showing <b className="text-foreground">{filteredWorkProjects.length}</b> Projects
-                {workCategoryFilter !== "ALL" && ` (Category: ${workCategoryFilter})`}
-                {workStartDateFilter && ` (From: ${workStartDateFilter})`}
-                {workEndDateFilter && ` (To: ${workEndDateFilter})`}
+                Showing <b className="text-foreground">{filteredMyActivities.length}</b> activity log entries
+                {myActivityStartDate && ` (From: ${myActivityStartDate})`}
+                {myActivityEndDate && ` (To: ${myActivityEndDate})`}
               </span>
-              <span className="font-bold text-blue-700">
-                Total Cumulative Hours Logged:{" "}
-                {filteredWorkProjects.reduce((acc, item) => acc + (item.totalHours || 0), 0).toFixed(1)} hrs
-              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setMyActivityStartDate(todayStr);
+                  setMyActivityEndDate(todayStr);
+                  setMyActivityActorFilter("CURRENT_USER");
+                  setMyActivitySearchQuery("");
+                }}
+                className="h-6 px-2 text-[10px] rounded font-semibold border-slate-200 text-slate-600 hover:bg-slate-100"
+              >
+                Reset to Today
+              </Button>
             </div>
 
-            {/* Project Work Done Summary Table (1 Row per Project) */}
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-muted/40 text-muted-foreground border-b font-medium">
                   <tr>
-                    <th className="p-3 pl-4">Project ID</th>
-                    <th className="p-3">Customer Name</th>
-                    <th className="p-3">Work Category</th>
-                    <th className="p-3">Lead Engineer</th>
-                    <th className="p-3">Latest Activity Date</th>
-                    <th className="p-3 text-center">Shifts & Hours</th>
-                    <th className="p-3 text-center">Status</th>
-                    <th className="p-3 text-right pr-4">Action</th>
+                    <th className="p-3 pl-4 whitespace-nowrap">Date / Time</th>
+                    <th className="p-3 whitespace-nowrap">Action (Event)</th>
+                    <th className="p-3 whitespace-nowrap">Project</th>
+                    <th className="p-3">Details</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {filteredWorkProjects.length === 0 ? (
+                  {filteredMyActivities.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-muted-foreground font-medium">
-                        No project work records match the selected category or date filters.
+                      <td colSpan={4} className="p-8 text-center text-muted-foreground font-medium">
+                        No activity logs recorded for the selected user and date range ({myActivityStartDate || "today"}).
                       </td>
                     </tr>
                   ) : (
-                    filteredWorkProjects.map((item) => (
-                      <tr key={item.projectId} className="hover:bg-accent/40">
-                        <td className="p-3 pl-4 font-bold text-blue-600">{item.projectId}</td>
-                        <td className="p-3 font-semibold text-foreground">{item.customerName}</td>
-                        <td className="p-3">
-                          <Badge variant="outline" className="text-[10px] font-bold">
-                            {item.workCategory}
+                    filteredMyActivities.map((act) => (
+                      <tr key={act.id} className="hover:bg-accent/40">
+                        <td className="p-3 pl-4 font-mono text-muted-foreground whitespace-nowrap">
+                          {act.timestamp}
+                        </td>
+                        <td className="p-3 whitespace-nowrap">
+                          <Badge variant="outline" className="text-[10px] font-bold bg-blue-50 text-blue-700 border-blue-200">
+                            {act.event}
                           </Badge>
                         </td>
-                        <td className="p-3 font-semibold text-purple-700">{item.engineerName}</td>
-                        <td className="p-3 font-mono text-muted-foreground">{item.latestDate}</td>
-                        <td className="p-3 text-center">
-                          <span className="font-bold text-foreground block">{item.totalShifts} shifts</span>
-                          <span className="text-[10px] text-muted-foreground block">{item.totalHours.toFixed(1)} hrs logged</span>
+                        <td className="p-3 font-bold text-blue-600 whitespace-nowrap">
+                          {act.projectId ? (
+                            <Link to="/projects" search={{ openId: act.projectId }} className="hover:underline text-blue-600">
+                              {act.projectId}
+                            </Link>
+                          ) : (
+                            "—"
+                          )}
                         </td>
-                        <td className="p-3 text-center">
-                          <Badge
-                            className={`text-[10px] ${
-                              item.status === "Ongoing"
-                                ? "bg-amber-100 text-amber-800 border border-amber-200"
-                                : item.status === "Completed"
-                                ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                                : "bg-blue-100 text-blue-800 border border-blue-200"
-                            }`}
-                          >
-                            {item.status}
-                          </Badge>
-                        </td>
-                        <td className="p-3 text-right pr-4">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setSelectedWorkProject(item)}
-                            className="text-[10px] h-6 px-2.5 text-blue-600 border-blue-200 hover:bg-blue-50 font-bold rounded-lg cursor-pointer gap-1"
-                          >
-                            <Eye className="h-3 w-3" /> View Work Done (Till Date)
-                          </Button>
+                        <td className="p-3 font-medium text-foreground">
+                          {act.details}
                         </td>
                       </tr>
                     ))
@@ -2164,16 +2156,16 @@ function ReportsComponent() {
                     const dateLabel = custStartDateFilter || custEndDateFilter ? ` (${custStartDateFilter} to ${custEndDateFilter})` : "";
                     handleExportPDF(
                       `Customer Account Ledger & Lifetime Statements - ${statusLabel}${dateLabel}`,
-                      ["Customer ID", "Customer Name", "Contact Phone", "Location", "Projects", "Lifetime Value (₹)", "Cash Received (₹)", "Outstanding Due (₹)", "Status"],
+                      ["Customer ID", "Customer Name", "Contact Phone", "Location", "Projects", "Lifetime Value (INR)", "Cash Received (INR)", "Outstanding Due (INR)", "Status"],
                       filteredCustomerLedgers.map((item) => [
                         item.customer.id,
                         item.customer.name,
                         item.customer.phone || "N/A",
                         item.customer.location || "N/A",
                         item.projectCount,
-                        `₹${item.totalVal.toLocaleString("en-IN")}`,
-                        `₹${item.totalRec.toLocaleString("en-IN")}`,
-                        `₹${item.balanceDue.toLocaleString("en-IN")}`,
+                        `INR ${item.totalVal.toLocaleString("en-IN")}`,
+                        `INR ${item.totalRec.toLocaleString("en-IN")}`,
+                        `INR ${item.balanceDue.toLocaleString("en-IN")}`,
                         item.balanceDue > 0 ? "Outstanding Due" : "Settled",
                       ])
                     );
@@ -2331,8 +2323,8 @@ function ReportsComponent() {
                     filteredCustomerLedgers.map((item) => (
                       <tr key={item.customer.id} className="hover:bg-accent/40">
                         <td className="p-3 pl-4 font-bold text-foreground">{item.customer.name}</td>
-                        <td className="p-3 text-muted-foreground font-mono">📞 {item.customer.phone || "N/A"}</td>
-                        <td className="p-3 text-muted-foreground">📍 {item.customer.location || "N/A"}</td>
+                        <td className="p-3 text-muted-foreground font-mono">{item.customer.phone || "N/A"}</td>
+                        <td className="p-3 text-muted-foreground">{item.customer.location || "N/A"}</td>
                         <td className="p-3 text-center font-bold text-blue-600">{item.projectCount}</td>
                         <td className="p-3 font-bold text-foreground">₹{item.totalVal.toLocaleString("en-IN")}</td>
                         <td className="p-3 font-bold text-emerald-600">₹{item.totalRec.toLocaleString("en-IN")}</td>
@@ -2483,7 +2475,7 @@ function ReportsComponent() {
 
                         return (
                           <tr key={ref} className="hover:bg-accent/40">
-                            <td className="p-3 pl-4 font-bold text-purple-700 dark:text-purple-400">👤 {ref}</td>
+                            <td className="p-3 pl-4 font-bold text-purple-700 dark:text-purple-400">{ref}</td>
                             <td className="p-3 text-center font-semibold text-blue-600">{refEnqs.length}</td>
                             <td className="p-3 text-center font-semibold text-emerald-600">{refProjs.length}</td>
                             <td className="p-3 text-right pr-4 font-extrabold text-foreground">₹{rev.toLocaleString("en-IN")}</td>
@@ -2513,7 +2505,9 @@ function ReportsComponent() {
                     <div>
                       <span>Work Done Verification Log</span>
                       <p className="text-xs font-normal text-muted-foreground">
-                        {selectedWorkDoneItem.projectId} • {selectedWorkDoneItem.customerName}
+                        <Link to="/projects" search={{ openId: selectedWorkDoneItem.projectId }} className="hover:underline text-blue-600 hover:text-blue-700 font-semibold">
+                          {selectedWorkDoneItem.projectId}
+                        </Link> • {selectedWorkDoneItem.customerName}
                       </p>
                     </div>
                   </div>
@@ -2625,7 +2619,7 @@ function ReportsComponent() {
                     <div>
                       <span>Client Lifetime Account Statement</span>
                       <p className="text-xs font-normal text-muted-foreground">
-                        {selectedCustomerLedger.customer.name} • 📞 {selectedCustomerLedger.customer.phone || "N/A"}
+                        {selectedCustomerLedger.customer.name} • {selectedCustomerLedger.customer.phone || "N/A"}
                       </p>
                     </div>
                   </div>
@@ -2662,7 +2656,7 @@ function ReportsComponent() {
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold text-foreground flex items-center justify-between">
                     <span>Client Projects Ledger ({selectedCustomerLedger.projects.length})</span>
-                    <span className="text-[11px] font-normal text-muted-foreground">📍 Location: {selectedCustomerLedger.customer.location || "N/A"}</span>
+                    <span className="text-[11px] font-normal text-muted-foreground">Location: {selectedCustomerLedger.customer.location || "N/A"}</span>
                   </h4>
 
                   <div className="overflow-x-auto rounded-xl border border-border">
@@ -2687,7 +2681,11 @@ function ReportsComponent() {
                         ) : (
                           selectedCustomerLedger.projects.map((p: any) => (
                             <tr key={p.id} className="hover:bg-accent/40">
-                              <td className="p-2.5 pl-3 font-bold text-blue-600">{p.id}</td>
+                              <td className="p-2.5 pl-3 font-bold text-blue-600">
+                                <Link to="/projects" search={{ openId: p.id }} className="hover:underline text-blue-600 hover:text-blue-700">
+                                  {p.id}
+                                </Link>
+                              </td>
                               <td className="p-2.5 font-medium text-foreground">{p.natureOfWork}</td>
                               <td className="p-2.5 font-mono text-muted-foreground">{p.scheduledDate || "N/A"}</td>
                               <td className="p-2.5 font-semibold">₹{(p.projectValue || 0).toLocaleString("en-IN")}</td>
@@ -2754,7 +2752,9 @@ function ReportsComponent() {
                     <div>
                       <span>Complete Work History Till Date</span>
                       <p className="text-xs font-normal text-muted-foreground">
-                        {selectedWorkProject.projectId} • {selectedWorkProject.customerName} ({selectedWorkProject.workCategory})
+                        <Link to="/projects" search={{ openId: selectedWorkProject.projectId }} className="hover:underline text-blue-600 hover:text-blue-700 font-semibold">
+                          {selectedWorkProject.projectId}
+                        </Link> • {selectedWorkProject.customerName} ({selectedWorkProject.workCategory})
                       </p>
                     </div>
                   </div>
@@ -2809,7 +2809,7 @@ function ReportsComponent() {
                         <div className="flex flex-wrap gap-1.5">
                           {projMachines.map((mi) => (
                             <span key={mi.id} className="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200 flex items-center gap-1">
-                              ⚙️ {mi.machineName} ({mi.issueDate})
+                              {mi.machineName} ({mi.issueDate})
                             </span>
                           ))}
                         </div>
@@ -2836,7 +2836,7 @@ function ReportsComponent() {
                         <div className="flex flex-wrap gap-1.5">
                           {assignedCrew.map((lab) => (
                             <span key={lab.id} className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-purple-50 text-purple-800 border border-purple-200 flex items-center gap-1">
-                              👷 {lab.name} ({lab.type} • ₹{lab.defaultWeeklyWage}/wk)
+                              {lab.name} ({lab.type} • ₹{lab.defaultWeeklyWage}/wk)
                             </span>
                           ))}
                         </div>
@@ -2849,7 +2849,7 @@ function ReportsComponent() {
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold text-foreground flex items-center justify-between">
                     <span>Shift Execution Logs & Work Done (Till Date)</span>
-                    <span className="text-[11px] font-normal text-muted-foreground">📍 Location: {selectedWorkProject.location}</span>
+                    <span className="text-[11px] font-normal text-muted-foreground">Location: {selectedWorkProject.location}</span>
                   </h4>
 
                   <div className="overflow-x-auto rounded-xl border border-border max-h-64">
@@ -2861,13 +2861,12 @@ function ReportsComponent() {
                           <th className="p-2.5">Work Done Description</th>
                           <th className="p-2.5 text-center">In - Out Time</th>
                           <th className="p-2.5 text-center">Hours</th>
-                          <th className="p-2.5 text-right pr-3">Verification</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
                         {selectedWorkProject.logs.length === 0 ? (
                           <tr>
-                            <td colSpan={6} className="p-6 text-center text-muted-foreground">
+                            <td colSpan={5} className="p-6 text-center text-muted-foreground">
                               No individual shift logs logged for this project yet. Project initialized on {selectedWorkProject.latestDate}.
                             </td>
                           </tr>
@@ -2882,11 +2881,6 @@ function ReportsComponent() {
                               </td>
                               <td className="p-2.5 text-center font-bold text-slate-700">
                                 {log.hoursWorked ? `${log.hoursWorked}h` : "8h"}
-                              </td>
-                              <td className="p-2.5 text-right pr-3">
-                                <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">
-                                  {log.verificationStatus || "Verified"}
-                                </Badge>
                               </td>
                             </tr>
                           ))

@@ -59,23 +59,36 @@ import type {
 const isoDate = (d: Date | string | null | undefined): string | undefined => {
   if (!d) return undefined;
   if (typeof d === "string") return d.slice(0, 10);
-  return d.toISOString().slice(0, 10);
+  try {
+    const dt = d instanceof Date ? d : new Date(d);
+    if (isNaN(dt.getTime())) return undefined;
+    return dt.toISOString().slice(0, 10);
+  } catch {
+    return undefined;
+  }
 };
 
 const isoDateTime = (d: Date | string | null | undefined): string | undefined => {
   if (!d) return undefined;
   if (typeof d === "string") return d;
-  return d.toISOString();
+  try {
+    const dt = d instanceof Date ? d : new Date(d);
+    if (isNaN(dt.getTime())) return undefined;
+    return dt.toISOString();
+  } catch {
+    return undefined;
+  }
 };
 
-const num = (v: any): number => (v == null ? 0 : typeof v === "number" ? v : Number(v.toString()));
+const num = (v: any): number => (v == null ? 0 : typeof v === "number" ? v : isNaN(Number(v)) ? 0 : Number(v.toString()));
 const optNum = (v: any): number | undefined => (v == null ? undefined : num(v));
 
 // ============================================================
 // ENUM MAPPERS  (DB PascalCase ↔ UI display strings)
 // ============================================================
 
-const customerDecisionFromDb = (d: string): CustomerDecision => {
+const customerDecisionFromDb = (d: string | null | undefined): CustomerDecision => {
+  if (!d) return "Follow Up";
   switch (d) {
     case "FollowUp": return "Follow Up";
     case "Thinking": return "Thinking";
@@ -91,7 +104,8 @@ const customerDecisionToDb = (d: CustomerDecision | string): "FollowUp" | "Think
   return "Cancelled";
 };
 
-const attendanceStatusFromDb = (s: string): AttendanceStatus => {
+const attendanceStatusFromDb = (s: string | null | undefined): AttendanceStatus => {
+  if (!s) return "Present";
   if (s === "HalfDay") return "Half Day";
   return s as AttendanceStatus;
 };
@@ -100,7 +114,8 @@ const attendanceStatusToDb = (s: AttendanceStatus | string): "Present" | "Absent
   return s as any;
 };
 
-const machineConditionFromDb = (c: string): MachineCondition => {
+const machineConditionFromDb = (c: string | null | undefined): MachineCondition => {
+  if (!c) return "Good";
   if (c === "RepairRequired") return "Repair Required";
   return c as MachineCondition;
 };
@@ -109,13 +124,15 @@ const machineConditionToDb = (c: MachineCondition | string): "Good" | "Damaged" 
   return c as any;
 };
 
-const machineIssueStatusFromDb = (s: string): "Issued" | "Returned" | "Partially Returned" | "Under Repair" | "Lost" => {
+const machineIssueStatusFromDb = (s: string | null | undefined): "Issued" | "Returned" | "Partially Returned" | "Under Repair" | "Lost" => {
+  if (!s) return "Issued";
   if (s === "PartiallyReturned") return "Partially Returned";
   if (s === "UnderRepair") return "Under Repair";
   return s as any;
 };
 
-const stockActionTypeFromDb = (s: string): StockActionType => {
+const stockActionTypeFromDb = (s: string | null | undefined): StockActionType => {
+  if (!s) return "Stock Addition";
   if (s === "RepairMove") return "Repair Move";
   if (s === "LostMove") return "Lost Move";
   if (s === "StockAddition") return "Stock Addition";
@@ -189,6 +206,7 @@ export function mapLabourFromDb(l: DbLabour & { wageHistory?: DbLabourWageHistor
     defaultWeeklyWage: l.defaultWeeklyWage,
     dailyWage: l.dailyWage ?? undefined,
     status: l.status as LabourStatus,
+    isActive: (l as any).isActive ?? true,
     skills: l.skills,
     loginId: l.loginId,
     pin: l.pin,
@@ -202,6 +220,7 @@ export function mapLabourFromDb(l: DbLabour & { wageHistory?: DbLabourWageHistor
     })),
   };
 }
+
 
 export function mapCustomerFromDb(c: { id: string; name: string; phone: string; location: string; createdAt: Date | string }): { id: string; name: string; phone: string; location: string; createdAt: string } {
   return {
@@ -291,13 +310,14 @@ export function mapProjectFromDb(
     actualWorkStartedDate: isoDate(p.actualWorkStartedDate),
     customerDecision: p.customerDecision ? customerDecisionFromDb(p.customerDecision) : undefined,
     cancellationReason: p.cancellationReason ?? undefined,
-    assignedLabourIds: (p.labourAssignments ?? []).map((a) => a.labourId),
+    assignedLabourIds: (p.labourAssignments ?? []).filter((a) => (a as any).isActive !== false).map((a) => a.labourId),
     labourAssignments: (p.labourAssignments ?? []).map((a) => ({
       labourId: a.labourId,
       labourName: a.labourName,
       labourType: a.labourType as LabourType,
       weeklyWage: a.weeklyWage,
       assignedDate: isoDate(a.assignedDate)!,
+      isActive: (a as any).isActive ?? true,
     })),
     remarks: p.remarks,
     status: p.status as ProjectStatus,
@@ -307,6 +327,7 @@ export function mapProjectFromDb(
     beforeWorkPhotoUrl: p.beforeWorkPhotoUrl ?? undefined,
     afterWorkPhotoUrl: p.afterWorkPhotoUrl ?? undefined,
     internalNotes: p.internalNotes,
+    followUpTag: ((p as any).followUpTag as "MD" | "Team" | null) ?? undefined,
     createdAt: isoDateTime(p.createdAt)!,
     statusHistory: (p.statusHistory ?? []).map((s) => ({
       status: s.status as ProjectStatus,

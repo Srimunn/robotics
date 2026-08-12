@@ -22,18 +22,20 @@ const importedProjectSchema = z.object({
   status: z.enum(["Waiting", "Scheduled", "Ongoing", "Completed", "Closed"]).default("Completed"),
   remarks: z.string().optional().nullable(),
   internalNotes: z.string().optional().nullable(),
+  followUpTag: z.string().optional().nullable(),
 });
 
 const importProjectsInput = z.object({
   projects: z.array(importedProjectSchema),
+  dedupeByNameOnly: z.boolean().optional().default(false),
 });
 
 export const importProjects = createServerFn({ method: "POST" })
-  .validator((input: { projects: z.infer<typeof importedProjectSchema>[] }) =>
+  .validator((input: { projects: z.infer<typeof importedProjectSchema>[]; dedupeByNameOnly?: boolean }) =>
     importProjectsInput.parse(input)
   )
   .handler(async ({ data }) => {
-    const { projects } = data;
+    const { projects, dedupeByNameOnly } = data;
     if (!projects || projects.length === 0) {
       return { inserted: 0, skipped: 0 };
     }
@@ -63,6 +65,10 @@ export const importProjects = createServerFn({ method: "POST" })
       )
     );
 
+    const existingNamesSet = new Set(
+      existingProjects.map((p) => p.customerName.trim().toLowerCase())
+    );
+
     let currentCount = await db.project.count();
     let skippedCount = 0;
 
@@ -76,13 +82,22 @@ export const importProjects = createServerFn({ method: "POST" })
           ? item.scheduledDate
           : new Date();
 
-      const key = makeKey(item.customerName, dateObj, item.projectValue);
-      if (existingSet.has(key)) {
-        skippedCount++;
-        continue;
-      }
+      const trimmedLowerName = item.customerName.trim().toLowerCase();
 
-      existingSet.add(key);
+      if (dedupeByNameOnly) {
+        if (existingNamesSet.has(trimmedLowerName)) {
+          skippedCount++;
+          continue;
+        }
+        existingNamesSet.add(trimmedLowerName);
+      } else {
+        const key = makeKey(item.customerName, dateObj, item.projectValue);
+        if (existingSet.has(key)) {
+          skippedCount++;
+          continue;
+        }
+        existingSet.add(key);
+      }
       currentCount++;
 
       const id = `PRJ-${year}-${String(currentCount).padStart(3, "0")}`;
@@ -103,6 +118,7 @@ export const importProjects = createServerFn({ method: "POST" })
         scheduledDate: dateObj,
         remarks: item.remarks || "Excel Import Record",
         internalNotes: item.internalNotes || "Imported via CEO Excel Utility",
+        followUpTag: item.followUpTag || null,
       });
 
       statusHistoriesToInsert.push({

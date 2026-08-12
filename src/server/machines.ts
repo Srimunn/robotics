@@ -27,8 +27,12 @@ export const issueMachineToProject = createServerFn({ method: "POST" })
       if (!project) throw new Error("Project not found");
 
       const year = new Date().getFullYear();
-      const count = await tx.machineIssueRecord.count();
-      const id = `MIR-${year}-${String(count + 1).padStart(3, "0")}`;
+      let count = (await tx.machineIssueRecord.count()) + 1;
+      let id = `MIR-${year}-${String(count).padStart(3, "0")}`;
+      while (await tx.machineIssueRecord.findUnique({ where: { id } })) {
+        count++;
+        id = `MIR-${year}-${String(count).padStart(3, "0")}`;
+      }
 
       const record = await tx.machineIssueRecord.create({
         data: {
@@ -86,7 +90,7 @@ export const issueMachineToProject = createServerFn({ method: "POST" })
       });
 
       return record;
-    });
+    }, { timeout: 30000, maxWait: 10000 });
   });
 
 export const returnMachineFromProject = createServerFn({ method: "POST" })
@@ -180,5 +184,5 @@ export const returnMachineFromProject = createServerFn({ method: "POST" })
       });
 
       return { ok: true };
-    });
+    }, { timeout: 30000, maxWait: 10000 });
   });

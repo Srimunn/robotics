@@ -19,6 +19,8 @@ export const recordAttendance = createServerFn({ method: "POST" })
       workDescription?: string;
       weeklyWage?: number;
       remarks?: string;
+      inPhotoUrl?: string;
+      outPhotoUrl?: string;
     }) => input
   )
   .handler(async ({ data }) => {
@@ -42,6 +44,8 @@ export const recordAttendance = createServerFn({ method: "POST" })
         workDescription: data.workDescription,
         weeklyWage: data.weeklyWage,
         remarks: data.remarks,
+        inPhotoUrl: data.inPhotoUrl,
+        outPhotoUrl: data.outPhotoUrl,
       },
       update: {
         status: data.status,
@@ -54,9 +58,12 @@ export const recordAttendance = createServerFn({ method: "POST" })
         workDescription: data.workDescription,
         weeklyWage: data.weeklyWage,
         remarks: data.remarks,
+        inPhotoUrl: data.inPhotoUrl !== undefined ? data.inPhotoUrl : undefined,
+        outPhotoUrl: data.outPhotoUrl !== undefined ? data.outPhotoUrl : undefined,
       },
     });
   });
+
 
 export const verifyAttendanceRecord = createServerFn({ method: "POST" })
   .validator(

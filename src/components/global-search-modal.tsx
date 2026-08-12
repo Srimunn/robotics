@@ -110,7 +110,7 @@ export function GlobalSearchModal({ open, onOpenChange }: GlobalSearchModalProps
           type: "engineer",
           id: item.id,
           title: `${item.id} - ${item.name}`,
-          subtitle: `${item.specialty} • 📞 ${item.phone}`,
+          subtitle: `${item.specialty} • ${item.phone}`,
           badge: item.status || "Available",
           url: `/engineers`,
           details: item.currentProjectName ? `Assigned to: ${item.currentProjectName}` : "Ready for Field Assignment",

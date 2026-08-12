@@ -358,10 +358,10 @@ export function ProjectsTable({
         onSubmit={(data) => {
           if (editing) {
             updateProject(editing.id, data);
-            toast.success("✅ Project Updated Successfully");
+            toast.success("Project Updated Successfully");
           } else {
             addProject(data);
-            toast.success("✅ Project Added Successfully");
+            toast.success("Project Added Successfully");
           }
           setModalOpen(false);
         }}
@@ -375,7 +375,7 @@ export function ProjectsTable({
         onConfirm={() => {
           if (deleteId) {
             deleteProject(deleteId);
-            toast.success("🗑 Project Deleted Successfully");
+            toast.success("Project Deleted Successfully");
             setDeleteId(null);
           }
         }}

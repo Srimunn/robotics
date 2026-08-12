@@ -91,6 +91,7 @@ export const Route = createFileRoute("/")({
 
 function DashboardComponent() {
   const {
+    currentUser,
     enquiries,
     projects,
     payments,
@@ -113,6 +114,8 @@ function DashboardComponent() {
     addMasterDataItem,
     updateProjectLabourLog,
   } = useRobotics();
+
+  console.log({ role: currentUser?.role, enquiriesCount: enquiries.length, projectsCount: projects.length });
 
   const navigate = useNavigate();
 
@@ -165,11 +168,13 @@ function DashboardComponent() {
   // ---------------------------------------------------------------------------
   // TODAY'S CALCULATED METRICS
   // ---------------------------------------------------------------------------
-  const todayStr = "2026-07-28";
+  const realTodayStr = new Date().toISOString().slice(0, 10);
+  const seedTodayStr = "2026-07-28";
+  const todayStr = realTodayStr;
 
   // Card 1: Today's Site Visits (Enquiries with siteVisitDate or assigned engineer)
   const todaysSiteVisits = enquiries.filter(
-    (e) => e.siteVisitStatus !== "Completed" || e.siteVisitDate === todayStr
+    (e) => e.siteVisitStatus !== "Completed" || e.siteVisitDate === todayStr || e.siteVisitDate === seedTodayStr
   );
 
   // Card 2: Today's Scheduled / Ongoing Projects
@@ -180,7 +185,7 @@ function DashboardComponent() {
   // Card 3: Permanent Labour Yet To Check In (Assigned today, type === "Permanent", no In Time logged)
   const permanentLabourPendingCheckIn = labours.filter((l) => {
     if (l.type !== "Permanent") return false;
-    const attRecord = attendance[`${l.id}_${todayStr}`];
+    const attRecord = attendance[`${l.id}_${todayStr}`] || attendance[`${l.id}_${seedTodayStr}`];
     const isCheckedIn = attRecord && attRecord.status === "Present" && Boolean(attRecord.inTime);
     return !isCheckedIn;
   });
@@ -195,7 +200,13 @@ function DashboardComponent() {
 
   // Today's Summary Right Side Panel Indicators
   const newEnquiriesToday = enquiries.filter(
-    (e) => e.enquiryDate === todayStr || e.customerDecision === "Thinking" || e.customerDecision === "Follow-up"
+    (e) =>
+      e.enquiryDate === todayStr ||
+      e.enquiryDate === seedTodayStr ||
+      e.customerDecision === "Thinking" ||
+      e.customerDecision === "Follow-up" ||
+      e.customerDecision === "Follow Up" ||
+      e.customerStatus === "Prospective"
   ).length;
 
   const siteVisitsCompletedCount = enquiries.filter(
@@ -210,9 +221,9 @@ function DashboardComponent() {
   const kpiLowStockMaterials = materials.filter((m) => m.currentStock <= m.minimumStock).length;
   const kpiTotalInventoryValuation = materials.reduce((acc, m) => acc + m.currentStock * m.purchaseCost, 0);
   const kpiTodaysMaterialConsumption = materialIssues
-    .filter((mi) => mi.issueDate === todayStr)
+    .filter((mi) => mi.issueDate === todayStr || mi.issueDate === seedTodayStr)
     .reduce((acc, mi) => acc + (mi.totalCost || 0), 0);
-  const kpiTodaysMachineIssues = machineIssues.filter((mi) => mi.issueDate === todayStr).length;
+  const kpiTodaysMachineIssues = machineIssues.filter((mi) => mi.issueDate === todayStr || mi.issueDate === seedTodayStr).length;
 
   const projectsStartedCount = projects.filter(
     (p) => p.status === "Ongoing"
@@ -228,13 +239,13 @@ function DashboardComponent() {
 
   const permanentLabourWorkingCount = labours.filter((l) => {
     if (l.type !== "Permanent") return false;
-    const rec = attendance[`${l.id}_${todayStr}`];
+    const rec = attendance[`${l.id}_${todayStr}`] || attendance[`${l.id}_${seedTodayStr}`];
     return rec && rec.status === "Present";
   }).length;
 
   const contractLabourWorkingCount = labours.filter((l) => {
     if (l.type !== "Contract") return false;
-    const rec = attendance[`${l.id}_${todayStr}`];
+    const rec = attendance[`${l.id}_${todayStr}`] || attendance[`${l.id}_${seedTodayStr}`];
     return rec && rec.status === "Present";
   }).length;
 
@@ -491,11 +502,11 @@ function DashboardComponent() {
     }
     const cleanEnqPhone = enqPhone.replace(/\D/g, "");
     if (cleanEnqPhone.length < 10) {
-      toast.error("❌ Phone Number must be at least 10 digits");
+      toast.error("Phone Number must be at least 10 digits");
       return;
     }
     if (cleanEnqPhone.length > 10) {
-      toast.error("❌ Mobile Number cannot exceed 10 digits");
+      toast.error("Mobile Number cannot exceed 10 digits");
       return;
     }
 
@@ -512,7 +523,7 @@ function DashboardComponent() {
       assignedEngineerId: eng?.id || undefined,
       assignedEngineerName: eng?.name || enqEngineerName || "Er. Rajesh Kumar",
       siteVisitDate: enqSiteVisitDate || "2026-08-07",
-      quotationAmount: enqQuotationAmount || 0,
+      quotationAmount: (enqQuotationAmount as any) === "" || enqQuotationAmount === undefined || enqQuotationAmount === null ? undefined : Number(enqQuotationAmount),
       workCommittedDate: enqWorkCommittedDate || "2026-08-15",
       actualWorkStartedDate: enqActualWorkStartedDate || "",
       remarks: enqRemarks || "",
@@ -610,11 +621,11 @@ function DashboardComponent() {
     }
     const cleanLabourPhone = labourPhone.replace(/\D/g, "");
     if (cleanLabourPhone.length < 10) {
-      toast.error("❌ Phone Number must be at least 10 digits");
+      toast.error("Phone Number must be at least 10 digits");
       return;
     }
     if (cleanLabourPhone.length > 10) {
-      toast.error("❌ Mobile Number cannot exceed 10 digits");
+      toast.error("Mobile Number cannot exceed 10 digits");
       return;
     }
 
@@ -654,16 +665,7 @@ function DashboardComponent() {
           </h1>
         </div>
 
-        {/* Header Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            size="sm"
-            onClick={() => setNewEnqOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1 shadow-2xs cursor-pointer"
-          >
-            <Plus className="h-3.5 w-3.5" /> New Enquiry
-          </Button>
-        </div>
+
       </div>
 
       {/* ===========================================================================
@@ -982,14 +984,14 @@ function DashboardComponent() {
       })()}
 
       {/* ===========================================================================
-          MACHINE & MATERIAL INVENTORY COMMAND CENTER (8 REQUESTED KPIS)
+          MACHINE & TOOL INVENTORY (5 KPI CARDS)
           =========================================================================== */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Wrench className="h-4 w-4 text-blue-600" />
             <h2 className="text-xs font-bold tracking-wider text-foreground uppercase">
-              Machine & Material Inventory Control
+              Machine & Tool Inventory
             </h2>
             <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
               Live Automated Stock
@@ -997,16 +999,12 @@ function DashboardComponent() {
           </div>
           <div className="flex items-center gap-2">
             <Link to="/machines" className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline">
-              Manage Machines →
-            </Link>
-            <span className="text-slate-300">|</span>
-            <Link to="/materials" className="text-xs font-semibold text-purple-600 hover:text-purple-700 hover:underline">
-              Manage Materials →
+              Manage Machines & Tools →
             </Link>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
           {/* Card 1: Total Machines */}
           <Card className="rounded-xl border border-border bg-white shadow-xs">
             <CardContent className="p-3">
@@ -1055,43 +1053,7 @@ function DashboardComponent() {
             </CardContent>
           </Card>
 
-          {/* Card 5: Low Stock Materials */}
-          <Card className="rounded-xl border border-rose-200/80 bg-rose-50/30 dark:bg-rose-950/20 shadow-xs">
-            <CardContent className="p-3">
-              <div className="flex items-center justify-between text-rose-700 mb-1">
-                <span className="text-[10px] font-bold uppercase">Low Materials</span>
-                <AlertCircle className="h-3.5 w-3.5 text-rose-600" />
-              </div>
-              <div className="text-lg font-extrabold text-rose-700">{kpiLowStockMaterials}</div>
-              <p className="text-[9px] text-rose-600 font-medium">Below threshold</p>
-            </CardContent>
-          </Card>
-
-          {/* Card 6: Inventory Value */}
-          <Card className="rounded-xl border border-blue-200/80 bg-blue-50/30 dark:bg-blue-950/20 shadow-xs">
-            <CardContent className="p-3">
-              <div className="flex items-center justify-between text-blue-700 mb-1">
-                <span className="text-[10px] font-bold uppercase">Inventory Value</span>
-                <Boxes className="h-3.5 w-3.5 text-blue-600" />
-              </div>
-              <div className="text-base font-extrabold text-blue-700">₹{(kpiTotalInventoryValuation / 1000).toFixed(0)}k</div>
-              <p className="text-[9px] text-blue-600 font-medium">Stock valuation</p>
-            </CardContent>
-          </Card>
-
-          {/* Card 7: Today's Material Consumption */}
-          <Card className="rounded-xl border border-border bg-white shadow-xs">
-            <CardContent className="p-3">
-              <div className="flex items-center justify-between text-muted-foreground mb-1">
-                <span className="text-[10px] font-bold uppercase">Material Expense</span>
-                <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
-              </div>
-              <div className="text-base font-extrabold text-emerald-600">₹{kpiTodaysMaterialConsumption.toLocaleString("en-IN")}</div>
-              <p className="text-[9px] text-muted-foreground">Today's site use</p>
-            </CardContent>
-          </Card>
-
-          {/* Card 8: Today's Machine Issues */}
+          {/* Card 5: Today's Machine Issues */}
           <Card className="rounded-xl border border-border bg-white shadow-xs">
             <CardContent className="p-3">
               <div className="flex items-center justify-between text-muted-foreground mb-1">
@@ -1172,8 +1134,8 @@ function DashboardComponent() {
                               <span className="text-[10px] text-blue-600 font-semibold">{visit.id}</span>
                             </div>
                             <div className="text-[11px] text-muted-foreground flex items-center gap-2">
-                              <span>📍 {visit.location}</span>
-                              <span>• 👷 {visit.assignedEngineerName || "Unassigned"}</span>
+                              <span>{visit.location}</span>
+                              <span>• {visit.assignedEngineerName || "Unassigned"}</span>
                             </div>
                           </div>
 
@@ -1249,9 +1211,9 @@ function DashboardComponent() {
                               <span className="font-semibold text-slate-700 truncate">{proj.customerName}</span>
                             </div>
                             <div className="text-[11px] text-muted-foreground flex items-center gap-2">
-                              <span>📍 {proj.location}</span>
-                              <span>• 👷 {proj.assignedLabourIds.length} Labour</span>
-                              <span>• 📅 {proj.workCommittedDate || proj.scheduledDate}</span>
+                              <span>{proj.location}</span>
+                              <span>• {proj.assignedLabourIds.length} Labour</span>
+                              <span>• {proj.workCommittedDate || proj.scheduledDate}</span>
                             </div>
                           </div>
 
@@ -1465,9 +1427,9 @@ function DashboardComponent() {
                               <span className="text-muted-foreground font-normal">• {proj.natureOfWork}</span>
                             </div>
                             <div className="text-[11px] text-muted-foreground flex items-center gap-3">
-                              <span>👷 Engineer: {proj.assignedEngineerName || "Er. Rajesh Kumar"}</span>
-                              <span>• 👥 {proj.assignedLabourIds.length} Workers</span>
-                              <span>• 💰 Collected: ₹{proj.receivedAmount.toLocaleString("en-IN")}</span>
+                              <span>Engineer: {proj.assignedEngineerName || "Er. Rajesh Kumar"}</span>
+                              <span>• {proj.assignedLabourIds.length} Workers</span>
+                              <span>• Collected: ₹{proj.receivedAmount.toLocaleString("en-IN")}</span>
                             </div>
                           </div>
 
@@ -1565,14 +1527,14 @@ function DashboardComponent() {
                           }`}
                         >
                           <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <div className={`h-8 w-8 rounded-xl grid place-items-center shrink-0 border text-sm font-extrabold shadow-2xs ${
+                            <div className={`h-8 w-8 rounded-xl grid place-items-center shrink-0 border text-xs font-extrabold shadow-2xs ${
                               item.type === "checkin" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
                               item.type === "payment" ? "bg-emerald-100 text-emerald-900 border-emerald-300" :
                               item.type === "completed" ? "bg-blue-50 text-blue-700 border-blue-200" :
                               item.type === "machine" ? "bg-indigo-50 text-indigo-700 border-indigo-200" :
                               "bg-amber-50 text-amber-800 border-amber-200"
                             }`}>
-                              {item.type === "checkin" ? "👷" : item.type === "payment" ? "💰" : item.type === "machine" ? "⚙️" : item.type === "completed" ? "✅" : "🚀"}
+                              {item.type === "checkin" ? <HardHat className="h-4 w-4" /> : item.type === "payment" ? <Wallet className="h-4 w-4" /> : item.type === "machine" ? <Wrench className="h-4 w-4" /> : item.type === "completed" ? <CheckCircle2 className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
                             </div>
 
                             <div className="min-w-0 space-y-0.5 flex-1 pr-2">
@@ -1735,7 +1697,7 @@ function DashboardComponent() {
                   />
                   {enqPhone.replace(/\D/g, "").length > 10 && (
                     <p className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-1">
-                      ⚠️ Mobile number cannot exceed 10 digits ({enqPhone.replace(/\D/g, "").length}/10 digits)
+                      <AlertTriangle className="h-3 w-3 inline text-red-500 shrink-0" /> Mobile number cannot exceed 10 digits ({enqPhone.replace(/\D/g, "").length}/10 digits)
                     </p>
                   )}
                 </div>
@@ -1961,11 +1923,11 @@ function DashboardComponent() {
                           </div>
                           {isBooked ? (
                             <Badge variant="outline" className="text-[10px] bg-rose-50 text-rose-700 border-rose-200 font-bold shrink-0">
-                              🔴 Booked
+                              Booked
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 font-bold shrink-0">
-                              🟢 Available
+                              Available
                             </Badge>
                           )}
                         </div>
@@ -2190,7 +2152,7 @@ function DashboardComponent() {
                   />
                   {labourPhone.replace(/\D/g, "").length > 10 && (
                     <p className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-1">
-                      ⚠️ Mobile number cannot exceed 10 digits ({labourPhone.replace(/\D/g, "").length}/10 digits)
+                      <AlertTriangle className="h-3 w-3 inline text-red-500 shrink-0" /> Mobile number cannot exceed 10 digits ({labourPhone.replace(/\D/g, "").length}/10 digits)
                     </p>
                   )}
                 </div>
@@ -2258,7 +2220,7 @@ function DashboardComponent() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Phone:</span>
-                <span className="font-semibold">📞 {activeSiteVisitEnquiry.phone}</span>
+                <span className="font-semibold">{activeSiteVisitEnquiry.phone}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Leakage / Service:</span>

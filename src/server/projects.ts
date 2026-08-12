@@ -2,8 +2,10 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import type { VerificationStatus } from "@prisma/client";
 import { db } from "~/lib/db";
 import { cleanPhone, toNumber, toNullableNumber } from "./utils";
+
 import { calculateHoursFromTimes, calculateEarnedWage } from "./calculations";
 
 function formatProject<T extends Record<string, any>>(p: T | null) {
@@ -93,7 +95,7 @@ export const updateProject = createServerFn({ method: "POST" })
       }
 
       return formatProject(updated);
-    });
+    }, { timeout: 30000, maxWait: 10000 });
   });
 
 export const deleteProject = createServerFn({ method: "POST" })
@@ -131,7 +133,7 @@ export const updateProjectStatus = createServerFn({ method: "POST" })
         },
       });
       return formatProject(updated);
-    });
+    }, { timeout: 30000, maxWait: 10000 });
   });
 
 /** Assign labours to a project (with per-labour weekly wage, conflict-checked). */
@@ -152,12 +154,13 @@ export const assignLaboursToProject = createServerFn({ method: "POST" })
           continue;
         }
 
-        // Conflict check: labour on another active project
+        // Conflict check: labour on another active project with active assignment
         const conflict = await tx.projectLabourAssignment.findFirst({
           where: {
             labourId: asgn.labourId,
             NOT: { projectId: data.projectId },
             project: { status: { in: ["Ongoing", "Scheduled"] } },
+            isActive: true,
           },
           include: { project: true },
         });
@@ -176,8 +179,9 @@ export const assignLaboursToProject = createServerFn({ method: "POST" })
             labourType: lab.type,
             weeklyWage: asgn.weeklyWage,
             assignedDate: today,
+            isActive: true,
           },
-          update: { weeklyWage: asgn.weeklyWage, assignedDate: today },
+          update: { weeklyWage: asgn.weeklyWage, assignedDate: today, isActive: true },
         });
 
         await tx.labourWageHistory.create({
@@ -198,31 +202,85 @@ export const assignLaboursToProject = createServerFn({ method: "POST" })
         data: {
           projectId: data.projectId,
           event: "Labour Assigned",
-          actor: "Project Manager",
+          actor: "System",
           details: `Assigned ${results.filter((r) => r.ok).length}/${data.assignments.length} labours`,
         },
       });
 
       return { results };
-    });
+    }, { timeout: 30000, maxWait: 10000 });
   });
+
+/** Unassign a labour from a project without deleting the ProjectLabourAssignment record (sets isActive: false). */
+export const unassignLabourFromProject = createServerFn({ method: "POST" })
+  .validator((input: { projectId: string; labourId: string }) => input)
+  .handler(async ({ data }) => {
+    return db.$transaction(async (tx) => {
+      const existing = await tx.projectLabourAssignment.findFirst({
+        where: { projectId: data.projectId, labourId: data.labourId },
+      });
+      if (!existing) throw new Error("Labour assignment not found");
+
+      await tx.projectLabourAssignment.update({
+        where: { id: existing.id },
+        data: { isActive: false },
+      });
+
+      // Check if labour has any remaining active assignments across all projects
+      const activeCount = await tx.projectLabourAssignment.count({
+        where: { labourId: data.labourId, isActive: true },
+      });
+
+      if (activeCount === 0) {
+        await tx.labour.update({
+          where: { id: data.labourId },
+          data: { status: "Available" },
+        });
+      }
+
+      await tx.projectActivity.create({
+        data: {
+          projectId: data.projectId,
+          event: "Labour Unassigned",
+          actor: "System",
+          details: `Unassigned labour ${existing.labourName} (${data.labourId}) from project`,
+        },
+      });
+
+      return { ok: true };
+    }, { timeout: 30000, maxWait: 10000 });
+  });
+
+const updateLabourLogInput = z.object({
+  projectId: z.string().min(1, "Project ID is required"),
+  log: z.object({
+    labourId: z.string().min(1, "Labour ID is required"),
+    date: z.string().min(1, "Date is required"),
+    inTime: z.string().optional().nullable(),
+    outTime: z.string().optional().nullable(),
+    weeklyWage: z.number().int().min(0, "Weekly wage must be a non-negative integer"),
+    workDescription: z.string().default("On-site servicing"),
+    remarks: z.string().optional().nullable(),
+    inPhotoUrl: z.string().optional().nullable(),
+    outPhotoUrl: z.string().optional().nullable(),
+    inLocation: z.any().optional().nullable(),
+    outLocation: z.any().optional().nullable(),
+    verificationStatus: z.string().optional().nullable(),
+    isGpsWarning: z.boolean().optional().nullable(),
+  }),
+});
+
+const mapVerStatusToDb = (v?: string | null): VerificationStatus | undefined => {
+  if (!v) return undefined;
+  if (v === "Pending Verification" || v === "PendingVerification") return "PendingVerification";
+  if (v === "Verified") return "Verified";
+  if (v === "Rejected") return "Rejected";
+  return undefined;
+};
 
 /** Record/update a labour's daily log — auto-derives attendance, hours, earnings; also syncs central AttendanceRecord. */
 export const updateProjectLabourLog = createServerFn({ method: "POST" })
-  .validator(
-    (input: {
-      projectId: string;
-      log: {
-        labourId: string;
-        date: string;
-        inTime?: string;
-        outTime?: string;
-        weeklyWage: number;
-        workDescription: string;
-        remarks?: string;
-      };
-    }) => input
-  )
+  .validator((input: unknown) => updateLabourLogInput.parse(input))
   .handler(async ({ data }) => {
     return db.$transaction(async (tx) => {
       const proj = await tx.project.findUnique({ where: { id: data.projectId } });
@@ -236,6 +294,11 @@ export const updateProjectLabourLog = createServerFn({ method: "POST" })
       const attendance = hasIn ? "Present" : "Absent";
       const date = new Date(data.log.date);
 
+      const verStatus = mapVerStatusToDb(data.log.verificationStatus);
+
+      const safeInLocation = data.log.inLocation ? JSON.parse(JSON.stringify(data.log.inLocation)) : undefined;
+      const safeOutLocation = data.log.outLocation ? JSON.parse(JSON.stringify(data.log.outLocation)) : undefined;
+
       const logRec = await tx.projectLabourLog.upsert({
         where: { projectId_labourId_date: { projectId: data.projectId, labourId: data.log.labourId, date } },
         create: {
@@ -243,26 +306,38 @@ export const updateProjectLabourLog = createServerFn({ method: "POST" })
           labourId: data.log.labourId,
           labourName: lab.name,
           labourType: lab.type,
-          weeklyWage: data.log.weeklyWage,
-          dailyWage: Math.round(data.log.weeklyWage / 6),
+          weeklyWage: Math.round(Number(data.log.weeklyWage)),
+          dailyWage: Math.round(Number(data.log.weeklyWage) / 6),
           date,
-          inTime: data.log.inTime,
-          outTime: data.log.outTime,
+          inTime: data.log.inTime ?? undefined,
+          outTime: data.log.outTime ?? undefined,
           attendance,
-          hoursWorked: hours,
-          earnedMoney: earned,
+          hoursWorked: Number(hours),
+          earnedMoney: Math.round(Number(earned)),
           workDescription: data.log.workDescription,
-          remarks: data.log.remarks,
+          remarks: data.log.remarks ?? undefined,
+          inPhotoUrl: data.log.inPhotoUrl ?? undefined,
+          outPhotoUrl: data.log.outPhotoUrl ?? undefined,
+          inLocation: safeInLocation,
+          outLocation: safeOutLocation,
+          verificationStatus: verStatus,
+          isGpsWarning: data.log.isGpsWarning ?? undefined,
         },
         update: {
-          inTime: data.log.inTime,
-          outTime: data.log.outTime,
+          inTime: data.log.inTime ?? undefined,
+          outTime: data.log.outTime ?? undefined,
           attendance,
-          hoursWorked: hours,
-          earnedMoney: earned,
+          hoursWorked: Number(hours),
+          earnedMoney: Math.round(Number(earned)),
           workDescription: data.log.workDescription,
-          remarks: data.log.remarks,
-          weeklyWage: data.log.weeklyWage,
+          remarks: data.log.remarks ?? undefined,
+          weeklyWage: Math.round(Number(data.log.weeklyWage)),
+          inPhotoUrl: data.log.inPhotoUrl ? data.log.inPhotoUrl : undefined,
+          outPhotoUrl: data.log.outPhotoUrl ? data.log.outPhotoUrl : undefined,
+          inLocation: safeInLocation,
+          outLocation: safeOutLocation,
+          verificationStatus: verStatus,
+          isGpsWarning: data.log.isGpsWarning ?? undefined,
         },
       });
 
@@ -277,24 +352,43 @@ export const updateProjectLabourLog = createServerFn({ method: "POST" })
           projectName: proj.customerName,
           date,
           status: attendance,
-          inTime: data.log.inTime,
-          outTime: data.log.outTime,
-          hoursWorked: hours,
-          earnedMoney: earned,
+          inTime: data.log.inTime ?? undefined,
+          outTime: data.log.outTime ?? undefined,
+          hoursWorked: Number(hours),
+          earnedMoney: Math.round(Number(earned)),
           workDescription: data.log.workDescription,
-          weeklyWage: data.log.weeklyWage,
-          remarks: data.log.remarks,
+          weeklyWage: Math.round(Number(data.log.weeklyWage)),
+          remarks: data.log.remarks ?? undefined,
+          inPhotoUrl: data.log.inPhotoUrl ?? undefined,
+          outPhotoUrl: data.log.outPhotoUrl ?? undefined,
+          inLocation: safeInLocation,
+          outLocation: safeOutLocation,
+          verificationStatus: verStatus,
+          isGpsWarning: data.log.isGpsWarning ?? undefined,
         },
         update: {
-          inTime: data.log.inTime,
-          outTime: data.log.outTime,
+          inTime: data.log.inTime ?? undefined,
+          outTime: data.log.outTime ?? undefined,
           status: attendance,
-          hoursWorked: hours,
-          earnedMoney: earned,
+          hoursWorked: Number(hours),
+          earnedMoney: Math.round(Number(earned)),
           workDescription: data.log.workDescription,
-          weeklyWage: data.log.weeklyWage,
-          remarks: data.log.remarks,
+          weeklyWage: Math.round(Number(data.log.weeklyWage)),
+          remarks: data.log.remarks ?? undefined,
+          inPhotoUrl: data.log.inPhotoUrl ? data.log.inPhotoUrl : undefined,
+          outPhotoUrl: data.log.outPhotoUrl ? data.log.outPhotoUrl : undefined,
+          inLocation: safeInLocation,
+          outLocation: safeOutLocation,
+          verificationStatus: verStatus,
+          isGpsWarning: data.log.isGpsWarning ?? undefined,
         },
+      });
+
+      console.log(`[DB SUCCESS] Persisted ProjectLabourLog & synced AttendanceRecord for ${data.log.labourId} on ${data.log.date}:`, {
+        projectId: data.projectId,
+        inPhotoUrl: logRec.inPhotoUrl || null,
+        outPhotoUrl: logRec.outPhotoUrl || null,
+        verificationStatus: logRec.verificationStatus || null,
       });
 
       await tx.projectActivity.create({
@@ -307,5 +401,21 @@ export const updateProjectLabourLog = createServerFn({ method: "POST" })
       });
 
       return logRec;
-    });
+    }, { timeout: 30000, maxWait: 10000 });
   });
+
+export const updateFollowUpTag = createServerFn({ method: "POST" })
+  .validator((input: { projectId: string; followUpTag?: string | null }) =>
+    z.object({
+      projectId: z.string(),
+      followUpTag: z.string().optional().nullable(),
+    }).parse(input)
+  )
+  .handler(async ({ data }) => {
+    const updated = await db.project.update({
+      where: { id: data.projectId },
+      data: { followUpTag: data.followUpTag || null },
+    });
+    return formatProject(updated);
+  });
+

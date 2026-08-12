@@ -178,10 +178,10 @@ export function OngoingTable({ readOnly = false }: { readOnly?: boolean }) {
         onSubmit={(data) => {
           if (editing) {
             updateOngoing(editing.id, data);
-            toast.success("✅ Work Updated Successfully");
+            toast.success("Work Updated Successfully");
           } else {
             addOngoing(data);
-            toast.success("✅ Work Added Successfully");
+            toast.success("Work Added Successfully");
           }
           setModalOpen(false);
         }}
@@ -193,7 +193,7 @@ export function OngoingTable({ readOnly = false }: { readOnly?: boolean }) {
         onConfirm={() => {
           if (deleteId) {
             deleteOngoing(deleteId);
-            toast.success("🗑 Work Deleted Successfully");
+            toast.success("Work Deleted Successfully");
             setDeleteId(null);
           }
         }}

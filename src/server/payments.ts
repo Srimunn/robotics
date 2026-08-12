@@ -19,8 +19,8 @@ const paymentInput = z.object({
   paymentDate: z.coerce.date(),
   amount: z.number().positive(),
   mode: z.string(),
-  referenceNumber: z.string().default(""),
-  remarks: z.string().default(""),
+  referenceNumber: z.string().optional().nullable().default(""),
+  remarks: z.string().optional().nullable().default(""),
   stageId: z.string().optional().nullable(),
   stageName: z.string().optional().nullable(),
   receivedBy: z.string().optional().nullable(),
@@ -56,8 +56,12 @@ export const addPayment = createServerFn({ method: "POST" })
 
     return db.$transaction(async (tx) => {
       const year = new Date().getFullYear();
-      const count = await tx.payment.count();
-      const id = `PAY-${year}-${String(count + 1).padStart(3, "0")}`;
+      let count = (await tx.payment.count()) + 1;
+      let id = `PAY-${year}-${String(count).padStart(3, "0")}`;
+      while (await tx.payment.findUnique({ where: { id } })) {
+        count++;
+        id = `PAY-${year}-${String(count).padStart(3, "0")}`;
+      }
 
       const payment = await tx.payment.create({
         data: {
@@ -66,8 +70,8 @@ export const addPayment = createServerFn({ method: "POST" })
           paymentDate: data.paymentDate,
           amount: data.amount,
           mode: data.mode,
-          referenceNumber: data.referenceNumber,
-          remarks: data.remarks,
+          referenceNumber: data.referenceNumber ?? "",
+          remarks: data.remarks ?? "",
           stageId: data.stageId ?? undefined,
           stageName: data.stageName ?? undefined,
           receivedBy: data.receivedBy ?? "Accounts & Credit Desk",
@@ -96,7 +100,7 @@ export const addPayment = createServerFn({ method: "POST" })
 
       await recalculateProject(tx, data.projectId);
       return formatPayment(payment);
-    });
+    }, { timeout: 30000, maxWait: 10000 });
   });
 
 export const deletePayment = createServerFn({ method: "POST" })
@@ -108,7 +112,7 @@ export const deletePayment = createServerFn({ method: "POST" })
       await tx.payment.delete({ where: { id: data.id } });
       await recalculateProject(tx, pay.projectId);
       return { ok: true };
-    });
+    }, { timeout: 30000, maxWait: 10000 });
   });
 
 export const addPaymentStage = createServerFn({ method: "POST" })
@@ -134,7 +138,7 @@ export const addPaymentStage = createServerFn({ method: "POST" })
       });
       await recalculateProject(tx, data.projectId);
       return { id: stageId };
-    });
+    }, { timeout: 30000, maxWait: 10000 });
   });
 
 export const updatePaymentStage = createServerFn({ method: "POST" })
@@ -156,7 +160,7 @@ export const updatePaymentStage = createServerFn({ method: "POST" })
       });
       await recalculateProject(tx, data.projectId);
       return { ok: true };
-    });
+    }, { timeout: 30000, maxWait: 10000 });
   });
 
 export const deletePaymentStage = createServerFn({ method: "POST" })
@@ -166,7 +170,7 @@ export const deletePaymentStage = createServerFn({ method: "POST" })
       await tx.paymentStageItem.delete({ where: { id: data.stageId } });
       await recalculateProject(tx, data.projectId);
       return { ok: true };
-    });
+    }, { timeout: 30000, maxWait: 10000 });
   });
 
 export const applyPresetPaymentPlan = createServerFn({ method: "POST" })
@@ -225,5 +229,5 @@ export const applyPresetPaymentPlan = createServerFn({ method: "POST" })
       }
       await recalculateProject(tx, data.projectId);
       return { count: stages.length };
-    });
+    }, { timeout: 30000, maxWait: 10000 });
   });

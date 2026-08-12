@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useRobotics } from "@/lib/robotics-context";
 import type { PaymentMode, PaymentStatus, Project } from "@/lib/robotics-types";
@@ -83,12 +83,13 @@ function getDaysOverdue(dueDate: string, balance: number) {
 }
 
 function PaymentsComponent() {
-  const { payments, projects, customers, addPayment, deletePayment } = useRobotics();
+  const { payments, projects, customers, addPayment, deletePayment, updateFollowUpTag } = useRobotics();
 
   const [activeTab, setActiveTab] = useState<"RECEIVABLES" | "HISTORY" | "CUSTOMER">("RECEIVABLES");
   const [searchQuery, setSearchQuery] = useState("");
   const [creditFilter, setCreditFilter] = useState<string>("ALL");
   const [selectedCustomerFilter, setSelectedCustomerFilter] = useState<string>("ALL");
+  const [followUpTagFilter, setFollowUpTagFilter] = useState<"ALL" | "MD" | "Team">("ALL");
 
   const [currentPageReceivables, setCurrentPageReceivables] = useState(1);
   const [pageSizeReceivables, setPageSizeReceivables] = useState(10);
@@ -105,6 +106,7 @@ function PaymentsComponent() {
   const [payRef, setPayRef] = useState("");
   const [payRemarks, setPayRemarks] = useState("");
   const [payReceivedBy, setPayReceivedBy] = useState("Accounts & Credit Desk");
+  const [payProofName, setPayProofName] = useState("");
 
   const totalContractValue = projects.reduce((acc, p) => acc + p.projectValue, 0);
   const totalCollectedSum = payments.reduce((sum, p) => sum + p.amount, 0);
@@ -139,7 +141,12 @@ function PaymentsComponent() {
         selectedCustomerFilter === "ALL" ||
         p.customerName.toLowerCase() === selectedCustomerFilter.toLowerCase();
 
-      if (!matchesSearch || !matchesCustomer) return false;
+      const matchesTag =
+        followUpTagFilter === "ALL" ||
+        (followUpTagFilter === "MD" && p.followUpTag === "MD") ||
+        (followUpTagFilter === "Team" && p.followUpTag === "Team");
+
+      if (!matchesSearch || !matchesCustomer || !matchesTag) return false;
 
       const nextDue = getProjectNextDue(p);
       const daysOver = getDaysOverdue(nextDue.dueDate, p.balanceAmount);
@@ -153,7 +160,7 @@ function PaymentsComponent() {
 
       return true;
     });
-  }, [projects, searchQuery, creditFilter, selectedCustomerFilter, todayStr, sevenDaysLaterStr]);
+  }, [projects, searchQuery, creditFilter, selectedCustomerFilter, followUpTagFilter, todayStr, sevenDaysLaterStr]);
 
   // Immutable Payment History
   const filteredPaymentHistory = useMemo(() => {
@@ -208,13 +215,13 @@ function PaymentsComponent() {
       return;
     }
     if (payAmount <= 0) {
-      toast.error("❌ Payment amount must be greater than zero");
+      toast.error("Payment amount must be greater than zero");
       return;
     }
 
     const targetProj = projects.find((p) => p.id === selectedProjectId);
     if (targetProj && Number(payAmount) > targetProj.balanceAmount) {
-      toast.error(`❌ Payment Amount cannot exceed project balance (₹${targetProj.balanceAmount.toLocaleString("en-IN")})`);
+      toast.error(`Payment Amount cannot exceed project balance (₹${targetProj.balanceAmount.toLocaleString("en-IN")})`);
       return;
     }
 
@@ -228,7 +235,7 @@ function PaymentsComponent() {
       receivedBy: payReceivedBy || "Accounts & Credit Desk",
     });
 
-    toast.success(`✅ Payment Added Successfully`);
+    toast.success(`Payment Added Successfully`);
     setReceiveOpen(false);
   };
 
@@ -252,7 +259,7 @@ function PaymentsComponent() {
             className="text-xs font-semibold h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-sm"
           >
             <Plus className="h-4 w-4" />
-            + Receive Payment
+            Receive Payment
           </Button>
         </div>
       </div>
@@ -374,6 +381,28 @@ function PaymentsComponent() {
                   ))}
                 </SelectContent>
               </Select>
+
+              {/* Follow-up Tag Filter Buttons */}
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl shrink-0">
+                <span className="text-[11px] font-bold text-slate-500 px-1.5">Tag:</span>
+                {(["ALL", "MD", "Team"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setFollowUpTagFilter(t)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                      followUpTagFilter === t
+                        ? t === "MD"
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : t === "Team"
+                          ? "bg-slate-700 text-white shadow-xs"
+                          : "bg-white dark:bg-card text-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {t === "ALL" ? "All" : t}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -460,20 +489,48 @@ function PaymentsComponent() {
                     return (
                       <TableRow key={proj.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/30 transition-colors">
                         <TableCell className="whitespace-nowrap">
-                          <div className="font-bold text-xs text-foreground flex items-center gap-1">
-                            <User className="h-3 w-3 text-muted-foreground shrink-0" /> {proj.customerName}
+                          <div className="flex items-center gap-2">
+                            <div className="font-bold text-xs text-foreground flex items-center gap-1">
+                              <User className="h-3 w-3 text-muted-foreground shrink-0" /> {proj.customerName}
+                            </div>
+                            <Select
+                              value={proj.followUpTag || "NONE"}
+                              onValueChange={async (val) => {
+                                const newTag = val === "NONE" ? null : (val as "MD" | "Team");
+                                await updateFollowUpTag(proj.id, newTag);
+                              }}
+                            >
+                              <SelectTrigger className="h-5 text-[10px] px-1.5 py-0 font-bold rounded border-0 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 shadow-none w-auto gap-0.5">
+                                {proj.followUpTag === "MD" ? (
+                                  <Badge className="bg-blue-100 text-blue-800 border-blue-200 font-extrabold text-[10px] px-1.5 py-0">MD</Badge>
+                                ) : proj.followUpTag === "Team" ? (
+                                  <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-extrabold text-[10px] px-1.5 py-0">Team</Badge>
+                                ) : (
+                                  <span className="text-slate-400 font-medium text-[10px] hover:underline">+ Tag</span>
+                                )}
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="NONE" className="text-xs font-medium">No Tag</SelectItem>
+                                <SelectItem value="MD" className="text-xs font-bold text-blue-700">MD</SelectItem>
+                                <SelectItem value="Team" className="text-xs font-bold text-slate-700">Team</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                           <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                            <span>📞 {proj.phone}</span>
+                            <span>{proj.phone}</span>
                             <span>•</span>
-                            <span>📍 {proj.location}</span>
+                            <span>{proj.location}</span>
                           </div>
                         </TableCell>
 
                         <TableCell className="min-w-[180px] max-w-[240px]">
-                          <div className="font-mono text-xs font-bold text-purple-600 dark:text-purple-400 whitespace-nowrap">
+                          <Link
+                            to="/projects"
+                            search={{ openId: proj.id }}
+                            className="font-mono font-bold text-xs text-blue-600 hover:text-blue-700 hover:underline cursor-pointer whitespace-nowrap"
+                          >
                             {proj.id}
-                          </div>
+                          </Link>
                           <div className="text-[11px] text-muted-foreground truncate" title={proj.natureOfWork}>{proj.natureOfWork}</div>
                         </TableCell>
 
@@ -490,7 +547,7 @@ function PaymentsComponent() {
                         </TableCell>
 
                         <TableCell className="text-xs font-semibold text-purple-700 dark:text-purple-400 whitespace-nowrap">
-                          <div className="whitespace-nowrap flex items-center gap-1">📅 {nextDue.dueDate}</div>
+                          <div className="whitespace-nowrap flex items-center gap-1">{nextDue.dueDate}</div>
                           <div className="text-[10px] text-muted-foreground truncate max-w-[130px]">{nextDue.stageName}</div>
                         </TableCell>
 
@@ -616,7 +673,13 @@ function PaymentsComponent() {
                         </TableCell>
 
                         <TableCell>
-                          <div className="font-bold text-xs text-purple-700 dark:text-purple-300">{pay.projectId}</div>
+                          <Link
+                            to="/projects"
+                            search={{ openId: pay.projectId }}
+                            className="font-bold text-xs text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                          >
+                            {pay.projectId}
+                          </Link>
                           <div className="text-[10px] text-muted-foreground">{proj?.customerName}</div>
                         </TableCell>
 
@@ -710,7 +773,7 @@ function PaymentsComponent() {
                       <TableRow key={c.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/30 transition-colors">
                         <TableCell>
                           <div className="font-bold text-xs text-foreground">{c.name}</div>
-                          <div className="text-[10px] text-muted-foreground">📞 {c.phone} • 📍 {c.location}</div>
+                          <div className="text-[10px] text-muted-foreground">{c.phone} • {c.location}</div>
                         </TableCell>
 
                         <TableCell className="text-center font-bold text-blue-600">
@@ -834,16 +897,6 @@ function PaymentsComponent() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Reference / UTR / Cheque #</Label>
-                <Input
-                  placeholder="e.g. UTR-HDFC982347192"
-                  value={payRef}
-                  onChange={(e) => setPayRef(e.target.value)}
-                  className="h-9 text-xs rounded-lg font-mono"
-                />
-              </div>
-
-              <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Received By</Label>
                 <Input
                   value={payReceivedBy}
@@ -851,17 +904,20 @@ function PaymentsComponent() {
                   className="h-9 text-xs rounded-lg"
                 />
               </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Remarks</Label>
-              <Textarea
-                placeholder="Payment collection notes..."
-                value={payRemarks}
-                onChange={(e) => setPayRemarks(e.target.value)}
-                rows={2}
-                className="text-xs rounded-lg resize-none"
-              />
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Upload Payment Proof</Label>
+                <Input
+                  type="file"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setPayProofName(e.target.files[0].name);
+                      toast.success(`Attached proof file: ${e.target.files[0].name}`);
+                    }
+                  }}
+                  className="h-9 text-xs rounded-lg cursor-pointer"
+                />
+              </div>
             </div>
 
             <DialogFooter className="pt-2">

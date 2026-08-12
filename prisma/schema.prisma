@@ -182,6 +182,7 @@ model Labour {
   defaultWeeklyWage  Int
   dailyWage          Int?
   status             LabourStatus        @default(Available)
+  isActive           Boolean             @default(true)
   skills             String[]
   loginId            String              @unique
   pin                String
@@ -193,6 +194,7 @@ model Labour {
   attendance         AttendanceRecord[]
   user               User?
 }
+
 
 model LabourWageHistory {
   id           String   @id @default(cuid())
@@ -283,6 +285,7 @@ model Project {
   beforeWorkPhotoUrl       String?
   afterWorkPhotoUrl        String?
   internalNotes            String
+  followUpTag              String?
   createdAt                DateTime           @default(now())
   statusHistory            ProjectStatusHistory[]
   activities               ProjectActivity[]
@@ -332,6 +335,7 @@ model ProjectLabourAssignment {
   labourType   LabourType
   weeklyWage   Int
   assignedDate DateTime
+  isActive     Boolean    @default(true)
 
   @@unique([projectId, labourId])
   @@index([projectId])

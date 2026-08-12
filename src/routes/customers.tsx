@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useRobotics } from "@/lib/robotics-context";
 import type { Customer } from "@/lib/robotics-types";
@@ -108,9 +108,9 @@ function CustomersComponent() {
                     <div>
                       <CardTitle className="text-base font-bold text-foreground">{cust.name}</CardTitle>
                       <CardDescription className="text-xs flex items-center gap-2 mt-1">
-                        <span>📞 {cust.phone}</span>
+                        <span>{cust.phone}</span>
                         <span>•</span>
-                        <span>📍 {cust.location}</span>
+                        <span>{cust.location}</span>
                       </CardDescription>
                     </div>
                     <Badge variant="outline" className="text-[10px] font-mono">
@@ -189,7 +189,7 @@ function CustomersComponent() {
                           {selectedCustomer.name}
                         </DialogTitle>
                         <p className="text-xs text-muted-foreground mt-1">
-                          📞 {selectedCustomer.phone} • 📍 {selectedCustomer.location}
+                          {selectedCustomer.phone} • {selectedCustomer.location}
                         </p>
                       </div>
                       <Badge className="bg-blue-100 text-blue-800 border-blue-200">
@@ -240,7 +240,15 @@ function CustomersComponent() {
                           ) : (
                             custProjects.map((p) => (
                               <tr key={p.id} className="hover:bg-accent/40">
-                                <td className="p-2.5 pl-3 font-bold text-blue-600">{p.id}</td>
+                                <td className="p-2.5 pl-3 font-bold text-blue-600">
+                                  <Link
+                                    to="/projects"
+                                    search={{ openId: p.id }}
+                                    className="hover:underline text-blue-600 hover:text-blue-700"
+                                  >
+                                    {p.id}
+                                  </Link>
+                                </td>
                                 <td className="p-2.5 font-medium">{p.natureOfWork}</td>
                                 <td className="p-2.5">₹{p.projectValue.toLocaleString("en-IN")}</td>
                                 <td className="p-2.5 font-bold text-rose-600">₹{p.balanceAmount.toLocaleString("en-IN")}</td>
@@ -325,7 +333,15 @@ function CustomersComponent() {
                             custPayments.map((pay) => (
                               <tr key={pay.id} className="hover:bg-accent/40">
                                 <td className="p-2.5 pl-3 font-medium">{pay.paymentDate}</td>
-                                <td className="p-2.5 font-semibold text-blue-600">{pay.projectId}</td>
+                                <td className="p-2.5 font-semibold text-blue-600">
+                                  <Link
+                                    to="/projects"
+                                    search={{ openId: pay.projectId }}
+                                    className="hover:underline text-blue-600 hover:text-blue-700"
+                                  >
+                                    {pay.projectId}
+                                  </Link>
+                                </td>
                                 <td className="p-2.5">
                                   <Badge variant="outline" className="text-[10px]">
                                     {pay.mode}

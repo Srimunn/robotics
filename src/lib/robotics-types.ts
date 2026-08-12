@@ -163,6 +163,7 @@ export interface ProjectLabourAssignment {
   labourType: LabourType;
   weeklyWage: number;
   assignedDate: string;
+  isActive?: boolean;
 }
 
 export interface GeoLocation {
@@ -257,6 +258,7 @@ export interface Project {
   beforeWorkPhotoUrl?: string;
   afterWorkPhotoUrl?: string;
   internalNotes: string;
+  followUpTag?: "MD" | "Team" | null;
   createdAt: string;
   statusHistory: {
     status: ProjectStatus;
@@ -393,6 +395,7 @@ export interface Labour {
   defaultWeeklyWage: number;
   dailyWage?: number; // legacy fallback
   status: LabourStatus;
+  isActive?: boolean;
   skills: string[];
   wageHistory?: LabourWageHistory[];
   loginId: string;
@@ -400,6 +403,7 @@ export interface Labour {
   photoUrl?: string;
   address?: string;
 }
+
 
 export interface AttendanceRecord {
   id: string; // labourId_YYYY-MM-DD

@@ -45,6 +45,7 @@ interface ParsedRow {
   scheduledDate: Date;
   remarks: string;
   internalNotes: string;
+  followUpTag?: "MD" | "Team" | null;
   isValid: boolean;
   errorMessage?: string;
 }
@@ -154,6 +155,57 @@ function parseDateCell(val: any): Date {
   const parsed = new Date(val);
   if (!isNaN(parsed.getTime())) return parsed;
   return new Date();
+}
+
+function extractNamesFromWorkbookSheet(wb: XLSX.WorkBook, sheetTarget: string): Set<string> {
+  const nameSet = new Set<string>();
+  const matchSheet = wb.SheetNames.find(
+    (name) => name.trim().toLowerCase() === sheetTarget.toLowerCase()
+  );
+  if (!matchSheet) return nameSet;
+  const worksheet = wb.Sheets[matchSheet];
+  if (!worksheet) return nameSet;
+
+  const grid: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+  if (!grid || grid.length === 0) return nameSet;
+
+  let nameColIdx = 0;
+  for (let r = 0; r < Math.min(10, grid.length); r++) {
+    const rowCells = grid[r];
+    if (Array.isArray(rowCells)) {
+      const idx = rowCells.findIndex((cell) => {
+        if (cell === undefined || cell === null) return false;
+        const s = String(cell).trim().toLowerCase();
+        return s.includes("client.name") || s.includes("client name") || s.includes("customer name") || s.includes("client") || s.includes("customer");
+      });
+      if (idx !== -1) {
+        nameColIdx = idx;
+        break;
+      }
+    }
+  }
+
+  for (let r = 0; r < grid.length; r++) {
+    const row = grid[r];
+    if (!Array.isArray(row)) continue;
+    const val = row[nameColIdx];
+    if (val !== undefined && val !== null) {
+      const str = String(val).trim();
+      const lower = str.toLowerCase();
+      if (
+        str &&
+        !lower.includes("client.name") &&
+        !lower.includes("client name") &&
+        !lower.includes("customer name") &&
+        !lower.includes("total") &&
+        !lower.includes("s.no")
+      ) {
+        nameSet.add(lower);
+      }
+    }
+  }
+
+  return nameSet;
 }
 
 function ImportComponent() {
@@ -450,6 +502,16 @@ function ImportComponent() {
               ? String(rawRemarks).trim()
               : `${tab === "HISTORICAL" ? "Historical Project Import" : "Outstanding Ledger Record"} (${sheetName})`;
 
+          const mdNamesSet = extractNamesFromWorkbookSheet(wb, "MD Follows");
+          const teamNamesSet = extractNamesFromWorkbookSheet(wb, "Other Follows");
+
+          let followUpTag: "MD" | "Team" | null = null;
+          if (mdNamesSet.has(clientLower)) {
+            followUpTag = "MD";
+          } else if (teamNamesSet.has(clientLower)) {
+            followUpTag = "Team";
+          }
+
           rows.push({
             rowNum: rows.length + 1,
             customerName,
@@ -465,6 +527,7 @@ function ImportComponent() {
             scheduledDate,
             remarks,
             internalNotes: `Sheet: ${sheetName}`,
+            followUpTag,
             isValid: true,
           });
         }
@@ -495,9 +558,18 @@ function ImportComponent() {
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: "binary", cellDates: true });
         setWorkbook(wb);
-        setSheetNames(wb.SheetNames);
-        if (wb.SheetNames.length > 0) {
-          const initialSheet = wb.SheetNames[0];
+        const validSheetNames = wb.SheetNames.filter((s) =>
+          activeTab === "OUTSTANDING" ? s.trim().toLowerCase() !== "bad debits" : true
+        );
+        setSheetNames(validSheetNames);
+        if (validSheetNames.length > 0) {
+          let initialSheet = validSheetNames[0];
+          if (activeTab === "OUTSTANDING") {
+            const collectionSheet = validSheetNames.find(
+              (s) => s.trim().toLowerCase() === "collection list"
+            );
+            if (collectionSheet) initialSheet = collectionSheet;
+          }
           setSelectedSheet(initialSheet);
           parseSheetData(wb, initialSheet, activeTab);
         }
@@ -518,8 +590,25 @@ function ImportComponent() {
   const handleTabChange = (tabStr: string) => {
     const tab = tabStr as "HISTORICAL" | "OUTSTANDING" | "MACHINES";
     setActiveTab(tab);
-    if (workbook && selectedSheet) {
-      parseSheetData(workbook, selectedSheet, tab);
+    if (workbook) {
+      const validSheetNames = workbook.SheetNames.filter((s) =>
+        tab === "OUTSTANDING" ? s.trim().toLowerCase() !== "bad debits" : true
+      );
+      setSheetNames(validSheetNames);
+      let targetSheet = selectedSheet;
+      if (!validSheetNames.includes(targetSheet)) {
+        targetSheet = validSheetNames[0] || "";
+      }
+      if (tab === "OUTSTANDING") {
+        const collectionSheet = validSheetNames.find(
+          (s) => s.trim().toLowerCase() === "collection list"
+        );
+        if (collectionSheet) targetSheet = collectionSheet;
+      }
+      setSelectedSheet(targetSheet);
+      if (targetSheet) {
+        parseSheetData(workbook, targetSheet, tab);
+      }
     }
   };
 
@@ -577,13 +666,27 @@ function ImportComponent() {
         status: r.status,
         remarks: r.remarks,
         internalNotes: r.internalNotes,
+        followUpTag: r.followUpTag || null,
       }));
 
-      const res = await importProjects({ data: { projects: payload } });
+      const isOutstanding = activeTab === "OUTSTANDING";
+      const res = await importProjects({
+        data: {
+          projects: payload,
+          dedupeByNameOnly: isOutstanding,
+        },
+      });
       setImportResult(res);
-      toast.success(
-        `Import summary: ${res.inserted} project(s) imported, ${res.skipped} duplicate(s) skipped.`
-      );
+
+      if (isOutstanding) {
+        toast.success(
+          `Imported ${res.inserted} new outstanding records, Skipped ${res.skipped} existing customers`
+        );
+      } else {
+        toast.success(
+          `Import summary: ${res.inserted} project(s) imported, ${res.skipped} duplicate(s) skipped.`
+        );
+      }
     } catch (err: any) {
       toast.error(`Import failed: ${err.message || "Server error"}`);
     } finally {
@@ -612,7 +715,7 @@ function ImportComponent() {
   }
 
   const totalCount = activeTab === "MACHINES" ? parsedMachineRows.length : parsedRows.length;
-  const validCount = activeTab === "MACHINES" ? parsedMachineRows.filter((r) => r.isValid).length : parsedRows.filter((r) => !r.isValid && false).length;
+  const validCount = activeTab === "MACHINES" ? parsedMachineRows.filter((r) => r.isValid).length : parsedRows.filter((r) => r.isValid).length;
   const invalidCount = activeTab === "MACHINES" ? parsedMachineRows.filter((r) => !r.isValid).length : parsedRows.filter((r) => !r.isValid).length;
 
   return (
@@ -679,7 +782,7 @@ function ImportComponent() {
                     {activeTab === "HISTORICAL"
                       ? "Upload .xlsx or .xls file containing 'Completed projects' or 'Ongoing works' worksheets."
                       : activeTab === "OUTSTANDING"
-                      ? "Upload .xlsx file with sheets like 'BAD Debits', 'Collection list', or 'MD Follows'."
+                      ? "Upload .xlsx file containing 'Collection list' worksheet."
                       : "Upload Machine.xlsx containing grouped machine categories, descriptions, locations & condition."}
                   </CardDescription>
                 </div>
@@ -746,7 +849,9 @@ function ImportComponent() {
                     <div>
                       <h4 className="text-sm font-extrabold text-emerald-900">Batch Import Successfully Processed</h4>
                       <p className="text-xs font-bold text-emerald-700">
-                        Imported <span className="underline">{importResult.inserted}</span> record(s) &bull; Skipped <span className="underline">{importResult.skipped}</span> duplicate record(s)
+                        {activeTab === "OUTSTANDING"
+                          ? `Imported ${importResult.inserted} new outstanding records, Skipped ${importResult.skipped} existing customers`
+                          : `Imported ${importResult.inserted} record(s) • Skipped ${importResult.skipped} duplicate record(s)`}
                       </p>
                     </div>
                   </div>
@@ -887,7 +992,17 @@ function ImportComponent() {
                                   </Badge>
                                 )}
                               </TableCell>
-                              <TableCell className="font-bold text-slate-900 text-xs">{row.customerName || "-"}</TableCell>
+                              <TableCell className="font-bold text-slate-900 text-xs">
+                                <div className="flex items-center gap-1.5">
+                                  <span>{row.customerName || "-"}</span>
+                                  {row.followUpTag === "MD" && (
+                                    <Badge className="bg-blue-100 text-blue-800 border-blue-200 font-bold text-[10px]">MD</Badge>
+                                  )}
+                                  {row.followUpTag === "Team" && (
+                                    <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-bold text-[10px]">Team</Badge>
+                                  )}
+                                </div>
+                              </TableCell>
                               <TableCell className="font-semibold text-slate-600 text-xs">{row.phone || "-"}</TableCell>
                               <TableCell className="font-medium text-slate-600 text-xs">{row.location || "-"}</TableCell>
                               <TableCell className="font-medium text-slate-700 text-xs max-w-[180px] truncate">

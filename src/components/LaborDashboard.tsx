@@ -20,12 +20,15 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
-  ShieldAlert
+  ShieldAlert,
+  RotateCw
 } from "lucide-react";
 import { toast } from "sonner";
 import type { ProjectLabourLog, AttendanceRecord, GeoLocation } from "@/lib/robotics-types";
+import { uploadImage } from "~/server/upload";
 
 export function LaborDashboard() {
+
   const { currentUser, logout, projects, updateProjectLabourLog, labours } = useRobotics();
   const laborId = currentUser?.id || "";
   
@@ -34,10 +37,10 @@ export function LaborDashboard() {
   const laborName = laborProfile?.name || currentUser?.name || "Field Crew Member";
   const defaultWeeklyWage = laborProfile?.defaultWeeklyWage || 1400;
 
-  // Filter projects assigned to this labour
+  // Filter projects assigned to this labour (only active assignments)
   const assignedProjects = projects.filter(p => 
     p.assignedLabourIds.includes(laborId) || 
-    p.labourAssignments?.some(la => la.labourId === laborId)
+    p.labourAssignments?.some(la => la.labourId === laborId && la.isActive !== false)
   );
 
   // States
@@ -71,11 +74,8 @@ export function LaborDashboard() {
   const isClockedIn = todayLog && todayLog.inTime && !todayLog.outTime;
   const isClockedOut = todayLog && todayLog.inTime && todayLog.outTime;
   
-  // Auto-detect assigned or active project
-  const autoAssignedProject =
-    assignedProjects[0] ||
-    projects.find((p) => p.status === "Ongoing" || p.status === "Scheduled") ||
-    projects[0];
+  // Auto-detect assigned active project (MUST be formally assigned in assignedProjects)
+  const autoAssignedProject = assignedProjects.length > 0 ? assignedProjects[0] : null;
 
   const activeProjectObj =
     projects.find((p) => p.id === (isClockedIn ? activeProjectWithTodayLog?.id : selectedProjectId)) ||
@@ -88,10 +88,15 @@ export function LaborDashboard() {
   useEffect(() => {
     getGpsLocation();
 
-    if (autoAssignedProject) {
-      setSelectedProjectId(autoAssignedProject.id);
+    if (assignedProjects.length > 0) {
+      if (!selectedProjectId || !assignedProjects.some((p) => p.id === selectedProjectId)) {
+        setSelectedProjectId(assignedProjects[0].id);
+      }
+    } else {
+      setSelectedProjectId("");
     }
   }, [laborId, projects]);
+
 
   // Clock-in timer calculator
   useEffect(() => {
@@ -176,7 +181,7 @@ export function LaborDashboard() {
         placeName: fallbackPlace,
       });
       setGpsLoading(false);
-      toast.success(`📍 Worksite Location Verified: ${fallbackPlace}`);
+      toast.success(`Worksite Location Verified: ${fallbackPlace}`);
       return;
     }
 
@@ -222,7 +227,7 @@ export function LaborDashboard() {
           placeName: place,
         });
         setGpsLoading(false);
-        toast.success(`📍 High Accuracy Location Verified: ${place}`);
+        toast.success(`High Accuracy Location Verified: ${place}`);
       } else {
         // Fallback to high accuracy coordinates if blocked
         const defaultLat = 11.44759;
@@ -235,7 +240,7 @@ export function LaborDashboard() {
           placeName: place || "Kullankadu, Kulathukkadu, Kumarapalayam",
         });
         setGpsLoading(false);
-        toast.success("📍 High Accuracy Location Captured!");
+        toast.success("High Accuracy Location Captured!");
       }
     }, 2000);
   };
@@ -381,17 +386,33 @@ export function LaborDashboard() {
   };
 
   // Action: Clock In / Start Shift Time (Requires Photo first)
-  const handleClockInSubmit = (e: React.FormEvent) => {
+  const handleClockInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!capturedPhoto) {
-      toast.error("📷 Please capture or upload a check-in photo before starting your shift!");
+      toast.error("Please capture or upload a check-in photo before starting your shift!");
       return;
     }
 
-    const targetProjId = selectedProjectId || (assignedProjects.length > 0 ? assignedProjects[0].id : projects[0]?.id || "");
+    if (assignedProjects.length === 0) {
+      toast.error("You are not assigned to any active project. Contact your manager.");
+      return;
+    }
+
+    const targetProjId = selectedProjectId || (assignedProjects.length > 0 ? assignedProjects[0].id : "");
     if (!targetProjId) {
       toast.error("Please select an assigned project to start shift");
       return;
+    }
+
+
+    let cloudInPhotoUrl = capturedPhoto;
+    if (capturedPhoto.startsWith("data:")) {
+      try {
+        const res = await uploadImage({ data: { image: capturedPhoto, folder: "attendance" } });
+        if (res?.url) cloudInPhotoUrl = res.url;
+      } catch (err) {
+        console.error("Cloudinary upload failed during clock-in, using local photo", err);
+      }
     }
 
     const currentFormattedTime = new Date().toLocaleTimeString("en-US", {
@@ -409,7 +430,7 @@ export function LaborDashboard() {
       placeName: "Plot 42, Industrial Park, HITEC City, Hyderabad"
     };
 
-    updateProjectLabourLog(targetProjId, {
+    const clockInPayload = {
       labourId: laborId,
       labourName: laborName,
       labourType: laborProfile?.type || "Permanent",
@@ -417,23 +438,27 @@ export function LaborDashboard() {
       date: todayStr,
       inTime: currentFormattedTime,
       outTime: "",
-      attendance: "Present",
+      attendance: "Present" as const,
       hoursWorked: 0,
       workDescription: "Checked-in on site & active shift started",
-      inPhotoUrl: capturedPhoto,
+      inPhotoUrl: cloudInPhotoUrl,
       inLocation: activeGps,
-      verificationStatus: "Verified",
+      verificationStatus: "Verified" as const,
       isGpsWarning: false
-    });
+    };
+
+    console.log("[LabourPortal] Clock-In submission payload:", clockInPayload);
+
+    updateProjectLabourLog(targetProjId, clockInPayload);
 
     setCapturedPhoto(null);
     stopCamera();
     
-    toast.success(`🚀 Shift Started at ${currentFormattedTime}! Live work timer is now running.`);
+    toast.success(`Shift Started at ${currentFormattedTime}! Live work timer is now running.`);
   };
 
   // Action: Clock Out
-  const handleClockOutSubmit = (e: React.FormEvent) => {
+  const handleClockOutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!todayLog) {
       toast.error("Invalid Shift record");
@@ -448,6 +473,16 @@ export function LaborDashboard() {
       return;
     }
 
+    let cloudOutPhotoUrl = capturedPhoto;
+    if (capturedPhoto.startsWith("data:")) {
+      try {
+        const res = await uploadImage({ data: { image: capturedPhoto, folder: "attendance" } });
+        if (res?.url) cloudOutPhotoUrl = res.url;
+      } catch (err) {
+        console.error("Cloudinary upload failed during clock-out, using local photo", err);
+      }
+    }
+
     const isLowAccuracy = gpsLocation.accuracy ? gpsLocation.accuracy > 100 : false;
     const currentFormattedTime = new Date().toLocaleTimeString("en-US", {
       hour: "2-digit",
@@ -457,21 +492,28 @@ export function LaborDashboard() {
 
     const projectOfTodayLog = activeProjectWithTodayLog?.id || selectedProjectId;
 
-    updateProjectLabourLog(projectOfTodayLog, {
+    const clockOutPayload = {
       ...todayLog,
       outTime: currentFormattedTime,
       workDescription: workDescription.trim(),
       remarks: remarks.trim(),
-      outPhotoUrl: capturedPhoto,
+      outPhotoUrl: cloudOutPhotoUrl,
       outLocation: gpsLocation,
-      verificationStatus: "Pending Verification",
+      verificationStatus: "Pending Verification" as const,
       isGpsWarning: isLowAccuracy
-    });
+    };
+
+    console.log("[LabourPortal] Clock-Out submission payload:", clockOutPayload);
+
+    updateProjectLabourLog(projectOfTodayLog, clockOutPayload);
+
+
 
     setCapturedPhoto(null);
     stopCamera();
-    toast.success(`Clocked out at ${currentFormattedTime}! Sent for verification.`);
+    toast.success(`Clocked out at ${currentFormattedTime}!`);
   };
+
 
   // Monthly statistics calculations - ONLY VERIFIED SHIFTS COUNT FOR WAGES
   const monthlyLogs = projects.flatMap(p => 
@@ -590,29 +632,62 @@ export function LaborDashboard() {
 
               <form onSubmit={isClockedIn ? handleClockOutSubmit : handleClockInSubmit} className="space-y-3">
                 {/* AUTO-ASSIGNED ACTIVE PROJECT SITE (LOCKED CARD, NO MANUAL SELECT) */}
+                {/* AUTO-ASSIGNED ACTIVE PROJECT SITE (LOCKED CARD OR SELECTOR FOR ASSIGNED PROJECTS ONLY) */}
                 {!isClockedIn && (
-                  <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200/80 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-800 flex items-center gap-1">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" /> Assigned Active Worksite
-                      </span>
-                      <span className="text-[9px] font-extrabold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full border border-blue-200">
-                        Auto-Assigned
-                      </span>
+                  assignedProjects.length === 0 ? (
+                    <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold flex items-center gap-2.5">
+                      <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
+                      <div>
+                        <p className="font-extrabold text-xs text-amber-950">No Active Project Assignment</p>
+                        <p className="text-[11px] text-amber-800 mt-0.5">You are not assigned to any active project. Contact your manager.</p>
+                      </div>
                     </div>
-                    <div className="pt-0.5">
-                      <p className="text-xs font-extrabold text-slate-900">
-                        {activeProjectObj?.customerName || "Robotics Servicing Worksite"}
-                      </p>
-                      <p className="text-[10px] font-semibold text-slate-600 mt-0.5 flex items-center gap-1">
-                        <span>{activeProjectObj?.id || "PRJ-101"}</span>
-                        <span>•</span>
-                        <span>{activeProjectObj?.natureOfWork || "Site Operations"}</span>
-                        <span>•</span>
-                        <span className="text-blue-700 font-bold">📍 {activeProjectObj?.location || "Kullankadu Site"}</span>
-                      </p>
+                  ) : assignedProjects.length === 1 ? (
+                    <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200/80 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-800 flex items-center gap-1">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" /> Assigned Active Worksite
+                        </span>
+                        <span className="text-[9px] font-extrabold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full border border-blue-200">
+                          Formally Assigned
+                        </span>
+                      </div>
+                      <div className="pt-0.5">
+                        <p className="text-xs font-extrabold text-slate-900">
+                          {autoAssignedProject?.customerName}
+                        </p>
+                        <p className="text-[10px] font-semibold text-slate-600 mt-0.5 flex items-center gap-1">
+                          <span>{autoAssignedProject?.id}</span>
+                          <span>•</span>
+                          <span>{autoAssignedProject?.natureOfWork}</span>
+                          <span>•</span>
+                          <span className="text-blue-700 font-bold flex items-center gap-0.5"><MapPin className="h-3 w-3 inline" /> {autoAssignedProject?.location}</span>
+                        </p>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200/80 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-800 flex items-center gap-1">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" /> Select Assigned Worksite
+                        </span>
+                        <span className="text-[9px] font-extrabold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full border border-blue-200">
+                          {assignedProjects.length} Assigned Projects
+                        </span>
+                      </div>
+                      <select
+                        value={selectedProjectId}
+                        onChange={(e) => setSelectedProjectId(e.target.value)}
+                        className="w-full h-9 text-xs font-extrabold rounded-lg border border-blue-200 bg-white px-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        {assignedProjects.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.id} — {p.customerName} ({p.location || "Site"})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )
                 )}
 
                   {/* GPS Worksite Location Card */}
@@ -655,7 +730,7 @@ export function LaborDashboard() {
                     {gpsLocation ? (
                       <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 space-y-1.5">
                         <div className="flex items-start gap-1.5">
-                          <span className="text-xs shrink-0 mt-0.5">📍</span>
+                          <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                           <p className="text-xs font-extrabold text-slate-900 leading-snug break-words">
                             {gpsLocation.placeName || "Kullankadu, Kulathukkadu, Kumarapalayam"}
                           </p>
@@ -720,7 +795,7 @@ export function LaborDashboard() {
                             onClick={toggleCameraLens}
                             className="h-7 rounded-lg text-[10px] font-bold border-white/30 text-white bg-black/60 hover:bg-black/80"
                           >
-                            🔄 Flip Lens
+                            <RotateCw className="h-3 w-3 mr-1 inline" /> Flip Lens
                           </Button>
                           
                           <Button
@@ -812,10 +887,12 @@ export function LaborDashboard() {
                   {/* Submit Action Button */}
                   <Button
                     type="submit"
-                    disabled={gpsLoading || (!isClockedIn && !capturedPhoto)}
+                    disabled={gpsLoading || (!isClockedIn && (!capturedPhoto || assignedProjects.length === 0))}
                     className={`w-full h-12 rounded-2xl text-xs font-extrabold gap-1.5 shadow-md transition-all duration-200 ${
                       isClockedIn 
                         ? "bg-rose-600 hover:bg-rose-700 text-white cursor-pointer active:scale-98" 
+                        : assignedProjects.length === 0
+                        ? "bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed"
                         : capturedPhoto
                         ? "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-98"
                         : "bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed"
@@ -824,6 +901,10 @@ export function LaborDashboard() {
                     {isClockedIn ? (
                       <>
                         <HardHat className="h-4.5 w-4.5" /> End Shift & Clock Out
+                      </>
+                    ) : assignedProjects.length === 0 ? (
+                      <>
+                        <AlertCircle className="h-4.5 w-4.5 text-amber-500" /> Not Assigned to Active Project
                       </>
                     ) : capturedPhoto ? (
                       <>
@@ -835,6 +916,7 @@ export function LaborDashboard() {
                       </>
                     )}
                   </Button>
+
                 </form>
               </CardContent>
             </Card>
@@ -846,7 +928,7 @@ export function LaborDashboard() {
               <div>
                 <h2 className="text-sm font-extrabold text-slate-900">Shift Completed & Submitted!</h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Clocked out at <span className="font-bold text-slate-800">{todayLog?.outTime}</span>. Sent for Supervisor verification.
+                  Clocked out at <span className="font-bold text-slate-800">{todayLog?.outTime}</span>.
                 </p>
               </div>
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 grid grid-cols-2 gap-2 text-left text-xs">
@@ -856,8 +938,8 @@ export function LaborDashboard() {
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase">Status</p>
-                  <span className="inline-block mt-0.5 text-[10px] font-extrabold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                    Pending Verification
+                  <span className="inline-block mt-0.5 text-[10px] font-extrabold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                    Completed
                   </span>
                 </div>
               </div>
@@ -883,7 +965,6 @@ export function LaborDashboard() {
                   const gMapsLink = log.inLocation 
                     ? `https://www.google.com/maps/search/?api=1&query=${log.inLocation.latitude},${log.inLocation.longitude}`
                     : null;
-                  const vStatus = log.verificationStatus || "Pending Verification";
 
                   return (
                     <div key={`${log.date}_${log.labourId}`} className="bg-slate-50/50 p-2.5 rounded-xl border border-slate-200/80 space-y-1.5 text-xs">
@@ -892,13 +973,6 @@ export function LaborDashboard() {
                           <span className="font-extrabold text-slate-900 text-xs block">{log.date}</span>
                           <span className="text-[10px] font-semibold text-slate-500 truncate block max-w-[180px]">{log.workDescription}</span>
                         </div>
-                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                          vStatus === "Verified" ? "bg-emerald-100 text-emerald-800" :
-                          vStatus === "Rejected" ? "bg-rose-100 text-rose-800" :
-                          "bg-amber-100 text-amber-800"
-                        }`}>
-                          {vStatus}
-                        </span>
                       </div>
 
                       <div className="flex items-center gap-3 text-[10px] font-semibold text-slate-500">

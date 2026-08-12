@@ -1,10 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRobotics, calculateHoursFromTimes, calculateEarnedWage } from "@/lib/robotics-context";
 import type { Project, ProjectStatus, ProjectLabourLog, LabourType, MachineCondition, MachineIssueRecord, PaymentStageItem, PaymentStatus, ProjectLabourAssignment } from "@/lib/robotics-types";
 import { SmartComboBox } from "@/components/ui/SmartComboBox";
 import { DataPagination } from "@/components/ui/DataPagination";
 import { DeleteConfirm } from "@/components/delete-confirm";
+import { PhotoCapture } from "@/components/PhotoCapture";
+
 import {
   FolderKanban,
   Plus,
@@ -46,6 +48,9 @@ import {
   Save,
   Camera,
   Upload,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -68,10 +73,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { generateSingleProjectReport } from "~/server/reports";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 
+interface ProjectsSearch {
+  openId?: string;
+}
+
 export const Route = createFileRoute("/projects")({
+  validateSearch: (search: Record<string, unknown>): ProjectsSearch => {
+    return {
+      openId: typeof search.openId === "string" ? search.openId : undefined,
+    };
+  },
   component: ProjectsComponent,
 });
 
@@ -81,6 +96,7 @@ interface LabourAssignmentState {
 }
 
 function ProjectsComponent() {
+  const { openId } = Route.useSearch();
   const {
     projects,
     labours,
@@ -94,6 +110,7 @@ function ProjectsComponent() {
     deleteProject,
     updateProjectStatus,
     assignLaboursToProject,
+    unassignLabourFromProject,
     updateProjectLabourLog,
     addPayment,
     issueMachineToProject,
@@ -116,6 +133,77 @@ function ProjectsComponent() {
 
   // Project Details Cockpit Modal state
   const [activeProject, setActiveProject] = useState<Project | null>(null);
+
+  useEffect(() => {
+    if (openId && projects.length > 0) {
+      const found = projects.find((p) => p.id === openId);
+      if (found) {
+        setActiveProject(found);
+      }
+    }
+  }, [openId, projects]);
+
+  // Inline editing state for Project detail cockpit (phone & location)
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const [phoneInput, setPhoneInput] = useState("");
+  const [isEditingLocation, setIsEditingLocation] = useState(false);
+  const [locationInput, setLocationInput] = useState("");
+  const [isDownloadingReport, setIsDownloadingReport] = useState(false);
+
+  const handleDownloadSingleReport = async (projectId: string) => {
+    try {
+      setIsDownloadingReport(true);
+      const res = await generateSingleProjectReport({ data: { projectId } });
+      if (res?.base64) {
+        const byteCharacters = atob(res.base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = res.filename || `project-report-${projectId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success("Downloaded Single Project Completion Report PDF!");
+      } else {
+        toast.error("Failed to generate project report PDF");
+      }
+    } catch (err: any) {
+      console.error("Error generating project report:", err);
+      toast.error(err?.message || "Failed to download project report");
+    } finally {
+      setIsDownloadingReport(false);
+    }
+  };
+
+  useEffect(() => {
+    setIsEditingPhone(false);
+    setIsEditingLocation(false);
+  }, [activeProject?.id]);
+
+  const handleSavePhone = async () => {
+    if (!activeProject) return;
+    const val = phoneInput.trim();
+    await updateProject(activeProject.id, { phone: val });
+    setActiveProject({ ...activeProject, phone: val });
+    setIsEditingPhone(false);
+    toast.success("Phone number updated");
+  };
+
+  const handleSaveLocation = async () => {
+    if (!activeProject) return;
+    const val = locationInput.trim();
+    await updateProject(activeProject.id, { location: val });
+    setActiveProject({ ...activeProject, location: val });
+    setIsEditingLocation(false);
+    toast.success("Location updated");
+  };
 
   // Collapsible Payment & Credit section state
   const [isPaymentCreditOpen, setIsPaymentCreditOpen] = useState(true);
@@ -155,81 +243,87 @@ function ProjectsComponent() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [labourAssignmentsState, setLabourAssignmentsState] = useState<LabourAssignmentState[]>([]);
 
-  // Inline Add Labour modal state inside Project Master page
+  // Assign Labour modal state (selector for existing labours)
   const [addLabourModalOpen, setAddLabourModalOpen] = useState(false);
-  const [inlineLabourName, setInlineLabourName] = useState("");
-  const [inlineLabourPhone, setInlineLabourPhone] = useState("");
-  const [inlineLabourType, setInlineLabourType] = useState<LabourType>("Permanent");
-  const [inlineLabourWage, setInlineLabourWage] = useState<number>(1400);
-  const [inlineLabourSkillsStr, setInlineLabourSkillsStr] = useState("Robotics Servicing, Hydraulics");
+  const [assignSearchQuery, setAssignSearchQuery] = useState("");
+  const [selectedLabourIds, setSelectedLabourIds] = useState<string[]>([]);
+  const [customWeeklyWages, setCustomWeeklyWages] = useState<Record<string, number>>({});
+  const [customAssignedDates, setCustomAssignedDates] = useState<Record<string, string>>({});
 
-  const handleInlineAddLabourSubmit = async (e: React.FormEvent) => {
+  const handleSaveNewAssignments = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inlineLabourName.trim()) {
-      toast.error("Please enter Labour Name");
-      return;
-    }
-    const cleanPhone = inlineLabourPhone.replace(/\D/g, "");
-    if (cleanPhone.length < 10) {
-      toast.error("❌ Phone Number must be at least 10 digits");
-      return;
-    }
-    if (cleanPhone.length > 10) {
-      toast.error("❌ Mobile Number cannot exceed 10 digits");
+    if (!activeProject) return;
+    if (selectedLabourIds.length === 0) {
+      toast.error("Please select at least one labour staff to assign");
       return;
     }
 
-    const newL = await addLabour({
-      name: inlineLabourName,
-      phone: inlineLabourPhone,
-      type: inlineLabourType,
-      defaultWeeklyWage: inlineLabourWage,
-      status: "Available",
-      skills: [],
-      wageHistory: [],
-      loginId: "",
-      pin: "0000",
+    const assignmentsToSubmit = selectedLabourIds.map((id) => {
+      const l = labours.find((x) => x.id === id);
+      return {
+        labourId: id,
+        weeklyWage: customWeeklyWages[id] ?? l?.defaultWeeklyWage ?? 1400,
+      };
     });
 
-    // If activeProject is open, automatically assign newly created labour to this active project immediately!
-    if (activeProject) {
-      const updatedAssignments = [
-        ...labourAssignmentsState,
-        { labourId: newL.id, weeklyWage: newL.defaultWeeklyWage },
-      ];
-      setLabourAssignmentsState(updatedAssignments);
+    await assignLaboursToProject(activeProject.id, assignmentsToSubmit);
 
-      assignLaboursToProject(activeProject.id, updatedAssignments);
+    const existingAssignments = activeProject.labourAssignments || [];
+    const updatedAssignments = [...existingAssignments];
 
-      const newAssignmentsList: ProjectLabourAssignment[] = updatedAssignments.map((a) => {
-        const isNew = a.labourId === newL.id;
-        const labName = isNew
-          ? newL.name
-          : activeProject.labourAssignments?.find((x) => x.labourId === a.labourId)?.labourName || a.labourId;
-        const labType = isNew
-          ? newL.type
-          : activeProject.labourAssignments?.find((x) => x.labourId === a.labourId)?.labourType || "Permanent";
-        return {
-          labourId: a.labourId,
-          labourName: labName,
-          labourType: labType,
-          weeklyWage: a.weeklyWage,
-          assignedDate: new Date().toISOString().slice(0, 10),
-        };
-      });
-
-      setActiveProject({
-        ...activeProject,
-        assignedLabourIds: updatedAssignments.map((a) => a.labourId),
-        labourAssignments: newAssignmentsList,
-      });
+    for (const asgn of assignmentsToSubmit) {
+      const l = labours.find((x) => x.id === asgn.labourId);
+      const date = customAssignedDates[asgn.labourId] || new Date().toISOString().slice(0, 10);
+      const idx = updatedAssignments.findIndex((a) => a.labourId === asgn.labourId);
+      const newItem: ProjectLabourAssignment = {
+        labourId: asgn.labourId,
+        labourName: l?.name || asgn.labourId,
+        labourType: l?.type || "Permanent",
+        weeklyWage: asgn.weeklyWage,
+        assignedDate: date,
+        isActive: true,
+      };
+      if (idx >= 0) {
+        updatedAssignments[idx] = newItem;
+      } else {
+        updatedAssignments.push(newItem);
+      }
     }
 
-    toast.success(`✅ Labour Staff "${newL.name}" (${inlineLabourType}) added & assigned successfully!`);
+    const newActiveIds = Array.from(
+      new Set([...activeProject.assignedLabourIds, ...selectedLabourIds])
+    );
+
+    setActiveProject({
+      ...activeProject,
+      assignedLabourIds: newActiveIds,
+      labourAssignments: updatedAssignments,
+    });
+
+    toast.success(`Successfully assigned ${selectedLabourIds.length} labour staff`);
     setAddLabourModalOpen(false);
-    setInlineLabourName("");
-    setInlineLabourPhone("");
-    setInlineLabourSkillsStr("Robotics Servicing, Hydraulics");
+    setSelectedLabourIds([]);
+    setCustomWeeklyWages({});
+    setCustomAssignedDates({});
+    setAssignSearchQuery("");
+  };
+
+  const handleUnassignLabour = async (labourId: string) => {
+    if (!activeProject) return;
+    await unassignLabourFromProject(activeProject.id, labourId);
+
+    const updatedAssignments = (activeProject.labourAssignments || []).map((a) =>
+      a.labourId === labourId ? { ...a, isActive: false } : a
+    );
+    const updatedActiveIds = activeProject.assignedLabourIds.filter((id) => id !== labourId);
+
+    setActiveProject({
+      ...activeProject,
+      assignedLabourIds: updatedActiveIds,
+      labourAssignments: updatedAssignments,
+    });
+
+    toast.success("Labour unassigned from project");
   };
 
   const handleSaveActiveProject = () => {
@@ -356,16 +450,11 @@ function ProjectsComponent() {
       return;
     }
     if (payAmount > activeProject.balanceAmount) {
-      toast.error(`❌ Payment amount cannot exceed project balance (₹${activeProject.balanceAmount.toLocaleString("en-IN")})`);
+      toast.error(`Payment amount cannot exceed project balance (₹${activeProject.balanceAmount.toLocaleString("en-IN")})`);
       return;
     }
 
-    let computedRef = payRef;
-    if (payMode === "Cash" && payReceiptNum) computedRef = payReceiptNum;
-    else if ((payMode === "Google Pay / UPI" || payMode === "UPI" || payMode === "PhonePe" || payMode === "Paytm") && payTransactionId) computedRef = payTransactionId;
-    else if (payMode === "Bank Transfer" && payUtrNum) computedRef = payUtrNum;
-    else if (payMode === "Cheque" && payChequeNum) computedRef = payChequeNum;
-    if (!computedRef) computedRef = `PAY-REF-${Math.floor(Math.random() * 1000000)}`;
+    let computedRef = `PAY-REF-${Math.floor(Math.random() * 1000000)}`;
 
     const newReceived = (activeProject.receivedAmount || 0) + payAmount;
     const newBalance = Math.max(0, activeProject.projectValue - newReceived);
@@ -384,15 +473,6 @@ function ProjectsComponent() {
       referenceNumber: computedRef,
       remarks: payRemarksInput || `Collection received for project ${activeProject.id}`,
       receivedBy: payReceivedByInput || "Accounts & Credit Desk",
-      receiptNumber: payReceiptNum,
-      upiApp: payUpiApp,
-      transactionId: payTransactionId,
-      upiReferenceNumber: payUpiRefNum,
-      utrNumber: payUtrNum,
-      bankName: payBankName,
-      accountReceived: payAccountReceived,
-      chequeNumber: payChequeNum,
-      chequeDate: payChequeDate,
       proofName: payProofName,
     });
 
@@ -406,10 +486,6 @@ function ProjectsComponent() {
     setPaymentOpen(false);
     setPayAmount(0);
     setPayRef("");
-    setPayReceiptNum("");
-    setPayTransactionId("");
-    setPayUtrNum("");
-    setPayChequeNum("");
     setPayProofName("");
   };
 
@@ -592,7 +668,7 @@ function ProjectsComponent() {
                             {cleanCustomerName}
                           </div>
                           <div className="text-[11px] text-muted-foreground truncate max-w-[190px]" title={`${p.phone} • ${p.location}`}>
-                            📞 {p.phone} {p.location ? `• 📍 ${p.location}` : ""}
+                            {p.phone} {p.location ? `• ${p.location}` : ""}
                           </div>
                         </td>
                         <td className="p-3">
@@ -606,10 +682,10 @@ function ProjectsComponent() {
                           </span>
                         </td>
                         <td className="p-3 font-semibold text-xs text-blue-700 whitespace-nowrap font-mono">
-                          {p.workCommittedDate ? `📅 ${p.workCommittedDate}` : "Not Set"}
+                          {p.workCommittedDate ? p.workCommittedDate : "Not Set"}
                         </td>
                         <td className="p-3 font-semibold text-xs text-emerald-700 whitespace-nowrap font-mono">
-                          {p.actualWorkStartedDate ? `⚡ ${p.actualWorkStartedDate}` : "Pending"}
+                          {p.actualWorkStartedDate ? p.actualWorkStartedDate : "Pending"}
                         </td>
                         <td className="p-3 whitespace-nowrap">
                           <Badge
@@ -710,7 +786,7 @@ function ProjectsComponent() {
                     </Badge>
                     {activeProject.enquiryId && (
                       <Badge variant="outline" className="text-[10px] bg-blue-100/80 text-blue-800 border-blue-300">
-                        🔗 Linked Enquiry: {activeProject.enquiryId}
+                        Linked Enquiry: {activeProject.enquiryId}
                       </Badge>
                     )}
                   </div>
@@ -772,13 +848,125 @@ function ProjectsComponent() {
                       <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-1">
                         <span className="text-[10px] uppercase font-bold text-slate-400 block">Customer Name</span>
                         <span className="font-bold text-slate-900 text-sm block">{activeProject.customerName}</span>
-                        <span className="text-[11px] text-slate-500 block">📞 {activeProject.phone}</span>
+                        <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5 group/edit min-h-[26px]">
+                          <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          {isEditingPhone ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                value={phoneInput}
+                                onChange={(e) => setPhoneInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    handleSavePhone();
+                                  } else if (e.key === "Escape") {
+                                    setIsEditingPhone(false);
+                                  }
+                                }}
+                                placeholder="Enter phone..."
+                                className="h-6 text-[11px] px-2 py-0 w-36 rounded-md border-slate-300 focus-visible:ring-2 focus-visible:ring-blue-500 bg-white"
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                onClick={handleSavePhone}
+                                className="p-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded transition-colors"
+                                title="Save phone number"
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setIsEditingPhone(false)}
+                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                                title="Cancel"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              {activeProject.phone && activeProject.phone.trim() !== "" && activeProject.phone !== "Not specified" ? (
+                                <span className="text-slate-600 font-medium">{activeProject.phone}</span>
+                              ) : (
+                                <span className="text-slate-400 italic">Not specified</span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPhoneInput(activeProject.phone || "");
+                                  setIsEditingPhone(true);
+                                }}
+                                className="text-slate-400 hover:text-blue-600 opacity-50 group-hover/edit:opacity-100 transition-opacity p-0.5 rounded cursor-pointer"
+                                title="Edit phone number"
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
                       <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-1">
                         <span className="text-[10px] uppercase font-bold text-slate-400 block">Site Location</span>
-                        <span className="font-semibold text-slate-800 text-xs block truncate" title={activeProject.location}>
-                          📍 {activeProject.location || "On-site"}
-                        </span>
+                        <div className="flex items-center gap-1.5 text-xs mt-0.5 group/edit min-h-[26px]">
+                          <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          {isEditingLocation ? (
+                            <div className="flex items-center gap-1 w-full">
+                              <Input
+                                value={locationInput}
+                                onChange={(e) => setLocationInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    handleSaveLocation();
+                                  } else if (e.key === "Escape") {
+                                    setIsEditingLocation(false);
+                                  }
+                                }}
+                                placeholder="Enter site location..."
+                                className="h-6 text-xs px-2 py-0 flex-1 min-w-0 rounded-md border-slate-300 focus-visible:ring-2 focus-visible:ring-blue-500 bg-white"
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                onClick={handleSaveLocation}
+                                className="p-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded transition-colors shrink-0"
+                                title="Save location"
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setIsEditingLocation(false)}
+                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors shrink-0"
+                                title="Cancel"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              {activeProject.location && activeProject.location.trim() !== "" && activeProject.location !== "Not specified" ? (
+                                <span className="font-semibold text-slate-800 truncate" title={activeProject.location}>
+                                  {activeProject.location}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 italic">Not specified</span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setLocationInput(activeProject.location || "");
+                                  setIsEditingLocation(true);
+                                }}
+                                className="text-slate-400 hover:text-blue-600 opacity-50 group-hover/edit:opacity-100 transition-opacity p-0.5 rounded cursor-pointer shrink-0"
+                                title="Edit site location"
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                            </>
+                          )}
+                        </div>
                         <div className="flex items-center gap-1 mt-1">
                           <span className="text-[10px] text-slate-400">Source:</span>
                           <Badge variant="outline" className="text-[9px] bg-white text-slate-700">{activeProject.leadSource || "Direct"}</Badge>
@@ -793,7 +981,7 @@ function ProjectsComponent() {
                           <CalendarCheck className="h-4 w-4 text-blue-600" /> Work Committed Date
                         </div>
                         <div className="text-sm font-extrabold text-blue-800 font-mono">
-                          📅 {activeProject.workCommittedDate || "Not Specified"}
+                          {activeProject.workCommittedDate || "Not Specified"}
                         </div>
                       </div>
 
@@ -802,7 +990,7 @@ function ProjectsComponent() {
                           <PlayCircle className="h-4 w-4 text-emerald-600" /> Actual Work Started Date
                         </div>
                         <div className="text-sm font-extrabold text-emerald-800 font-mono">
-                          ⚡ {activeProject.actualWorkStartedDate || "Work Pending"}
+                          {activeProject.actualWorkStartedDate || "Work Pending"}
                         </div>
                       </div>
                     </div>
@@ -916,16 +1104,9 @@ function ProjectsComponent() {
                     <Button
                       size="sm"
                       onClick={() => setAddLabourModalOpen(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1 shadow-xs"
+                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1 shadow-xs font-semibold"
                     >
-                      <Plus className="h-3.5 w-3.5" /> Add Labour Staff
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleOpenAssignLabourModal}
-                      className="bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs gap-1 shadow-xs"
-                    >
-                      <Edit3 className="h-3.5 w-3.5" /> Edit Assignments & Wages
+                      <Plus className="h-3.5 w-3.5" /> Assign Existing Labours
                     </Button>
                   </div>
                 </CardHeader>
@@ -938,48 +1119,130 @@ function ProjectsComponent() {
                           <th className="p-2">Labour Type</th>
                           <th className="p-2">Weekly Wage</th>
                           <th className="p-2">Assigned Date</th>
-                          <th className="p-2 text-right pr-3">Status</th>
+                          <th className="p-2">Status</th>
+                          <th className="p-2 text-right pr-3">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {activeProject.assignedLabourIds.length === 0 ? (
-                          <tr>
-                            <td colSpan={5} className="p-4 text-center text-muted-foreground">
-                              No labours assigned to this project yet. Click "Edit Assignments & Wages" to assign.
-                            </td>
-                          </tr>
-                        ) : (
-                          activeProject.assignedLabourIds.map((lId) => {
-                            const lab = labours.find((x) => x.id === lId);
-                            const assignment = activeProject.labourAssignments?.find((a) => a.labourId === lId);
-                            const weeklyWage = assignment ? assignment.weeklyWage : lab?.defaultWeeklyWage || 1400;
+                        {(() => {
+                          const allAssignments = activeProject.labourAssignments || [];
+                          const activeAssignments = allAssignments.filter((a) => a.isActive !== false);
+                          const inactiveAssignments = allAssignments.filter((a) => a.isActive === false);
 
+                          if (allAssignments.length === 0) {
                             return (
-                              <tr key={lId} className="hover:bg-accent/40 transition-colors">
-                                <td className="p-2.5 pl-3 font-bold text-foreground">
-                                  {lab ? lab.name : lId}
-                                  <div className="text-[10px] text-muted-foreground">{lId}</div>
-                                </td>
-                                <td className="p-2.5">
-                                  <Badge variant="outline" className="text-[10px]">
-                                    {lab?.type || "Permanent"}
-                                  </Badge>
-                                </td>
-                                <td className="p-2.5 font-bold text-blue-700">
-                                  ₹{weeklyWage.toLocaleString("en-IN")}/week
-                                </td>
-                                <td className="p-2.5 text-muted-foreground">
-                                  {assignment?.assignedDate || "Active Assignment"}
-                                </td>
-                                <td className="p-2.5 text-right pr-3">
-                                  <Badge className="text-[10px] bg-emerald-100 text-emerald-800 border-emerald-200">
-                                    Active on Site
-                                  </Badge>
+                              <tr>
+                                <td colSpan={6} className="p-4 text-center text-muted-foreground">
+                                  No labours assigned to this project yet. Click "Assign Existing Labours" to select workers.
                                 </td>
                               </tr>
                             );
-                          })
-                        )}
+                          }
+
+                          return (
+                            <>
+                              {/* ACTIVE ASSIGNMENTS */}
+                              {activeAssignments.length === 0 ? (
+                                <tr>
+                                  <td colSpan={6} className="p-3 text-center text-muted-foreground italic">
+                                    No active labours currently assigned to this project.
+                                  </td>
+                                </tr>
+                              ) : (
+                                activeAssignments.map((assignment) => {
+                                  const lab = labours.find((x) => x.id === assignment.labourId);
+                                  const weeklyWage = assignment.weeklyWage || lab?.defaultWeeklyWage || 1400;
+
+                                  return (
+                                    <tr key={assignment.labourId} className="hover:bg-accent/40 transition-colors">
+                                      <td className="p-2.5 pl-3 font-bold text-foreground">
+                                        {lab ? lab.name : assignment.labourName}
+                                        <div className="text-[10px] text-muted-foreground">{assignment.labourId}</div>
+                                      </td>
+                                      <td className="p-2.5">
+                                        <Badge variant="outline" className="text-[10px]">
+                                          {lab?.type || assignment.labourType || "Permanent"}
+                                        </Badge>
+                                      </td>
+                                      <td className="p-2.5 font-bold text-blue-700">
+                                        ₹{weeklyWage.toLocaleString("en-IN")}/week
+                                      </td>
+                                      <td className="p-2.5 text-muted-foreground">
+                                        {assignment.assignedDate || "Active"}
+                                      </td>
+                                      <td className="p-2.5">
+                                        <Badge className="text-[10px] bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300">
+                                          Active on Site
+                                        </Badge>
+                                      </td>
+                                      <td className="p-2.5 text-right pr-3">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handleUnassignLabour(assignment.labourId)}
+                                          className="h-7 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950 border-rose-200 dark:border-rose-900 rounded-lg gap-1 font-medium"
+                                        >
+                                          <X className="h-3.5 w-3.5" /> Unassign
+                                        </Button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+
+                              {/* PREVIOUSLY ASSIGNED (INACTIVE) ASSIGNMENTS */}
+                              {inactiveAssignments.length > 0 && (
+                                <>
+                                  <tr className="bg-slate-100/80 dark:bg-slate-900/80 border-t border-b">
+                                    <td colSpan={6} className="p-2.5 pl-3 font-bold text-[11px] uppercase tracking-wider text-muted-foreground">
+                                      <div className="flex items-center gap-1.5">
+                                        <History className="h-3.5 w-3.5 text-slate-500" /> Previously Assigned Workers ({inactiveAssignments.length})
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  {inactiveAssignments.map((assignment) => {
+                                    const lab = labours.find((x) => x.id === assignment.labourId);
+                                    const weeklyWage = assignment.weeklyWage || lab?.defaultWeeklyWage || 1400;
+                                    const logCount = (activeProject.labourLogs || []).filter(
+                                      (lg) => lg.labourId === assignment.labourId
+                                    ).length;
+
+                                    return (
+                                      <tr
+                                        key={`inactive_${assignment.labourId}`}
+                                        className="bg-muted/15 text-muted-foreground opacity-70 hover:opacity-100 transition-opacity border-b"
+                                      >
+                                        <td className="p-2.5 pl-3 font-medium">
+                                          <span className="line-through">{lab ? lab.name : assignment.labourName}</span>
+                                          <div className="text-[10px] text-slate-400">{assignment.labourId}</div>
+                                        </td>
+                                        <td className="p-2.5">
+                                          <Badge variant="outline" className="text-[10px] opacity-60">
+                                            {lab?.type || assignment.labourType || "Permanent"}
+                                          </Badge>
+                                        </td>
+                                        <td className="p-2.5 text-slate-500">
+                                          ₹{weeklyWage.toLocaleString("en-IN")}/week
+                                        </td>
+                                        <td className="p-2.5 text-[11px]">
+                                          {assignment.assignedDate}
+                                        </td>
+                                        <td className="p-2.5">
+                                          <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300">
+                                            Unassigned / Inactive
+                                          </Badge>
+                                        </td>
+                                        <td className="p-2.5 text-right pr-3 text-[11px] font-mono">
+                                          {logCount} work log(s)
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </>
+                              )}
+                            </>
+                          );
+                        })()}
                       </tbody>
                     </table>
                   </div>
@@ -1284,83 +1547,7 @@ function ProjectsComponent() {
                 </CardContent>
               </Card>
 
-              {/* SECTION 9: MATERIALS USED (CONSUMABLES) */}
-              <Card className="rounded-xl border border-border shadow-xs">
-                <CardHeader className="p-3 border-b bg-muted/20 flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                      <Boxes className="h-3.5 w-3.5 text-purple-600" /> Materials Used (Consumables)
-                    </CardTitle>
-                    <CardDescription className="text-xs mt-0.5">
-                      Consumables automatically deduct from stock. Total expense is tracked per project.
-                    </CardDescription>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      const availMat = materials.filter((m) => m.currentStock > 0);
-                      if (availMat.length > 0) setProjIssueMaterialId(availMat[0].id);
-                      setProjIssueMaterialQty(1);
-                      setProjIssueMaterialBy("Er. Rajesh Kumar");
-                      setProjIssueMaterialRemarks("");
-                      setProjIssueMaterialOpen(true);
-                    }}
-                    className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs gap-1"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Issue Material
-                  </Button>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="w-full overflow-hidden">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead className="bg-muted/40 text-muted-foreground border-b font-medium">
-                        <tr>
-                          <th className="p-2 pl-3">Material Name</th>
-                          <th className="p-2">Category</th>
-                          <th className="p-2 text-center">Qty Consumed</th>
-                          <th className="p-2 text-right">Unit Cost</th>
-                          <th className="p-2 text-right">Total Expense</th>
-                          <th className="p-2">Issue Date</th>
-                          <th className="p-2">Issued By</th>
-                          <th className="p-2 pr-3">Remarks</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {(!materialIssues.filter((m) => m.projectId === activeProject.id) ||
-                        materialIssues.filter((m) => m.projectId === activeProject.id).length === 0) ? (
-                          <tr>
-                            <td colSpan={8} className="p-4 text-center text-muted-foreground">
-                              No materials consumed in this project yet. Click "Issue Material" to deduct stock.
-                            </td>
-                          </tr>
-                        ) : (
-                          materialIssues
-                            .filter((m) => m.projectId === activeProject.id)
-                            .map((matIssue) => (
-                              <tr key={matIssue.id} className="hover:bg-accent/40 transition-colors">
-                                <td className="p-2.5 pl-3 font-bold text-foreground">
-                                  {matIssue.materialName}
-                                  <div className="text-[10px] text-muted-foreground font-mono">{matIssue.materialId}</div>
-                                </td>
-                                <td className="p-2.5 text-muted-foreground">{matIssue.category}</td>
-                                <td className="p-2.5 text-center font-bold text-purple-700">
-                                  {matIssue.quantity} {matIssue.unit}
-                                </td>
-                                <td className="p-2.5 text-right font-mono">₹{(matIssue.unitCost || 0).toLocaleString("en-IN")}</td>
-                                <td className="p-2.5 text-right font-mono font-bold text-emerald-600">
-                                  ₹{(matIssue.totalCost || 0).toLocaleString("en-IN")}
-                                </td>
-                                <td className="p-2.5 text-muted-foreground">{matIssue.issueDate}</td>
-                                <td className="p-2.5 text-muted-foreground">{matIssue.issuedBy}</td>
-                                <td className="p-2.5 pr-3 text-muted-foreground truncate max-w-xs">{matIssue.remarks || "-"}</td>
-                              </tr>
-                            ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
+
 
               {/* SECTION 8: ACTIVITY TIMELINE */}
               <Card className="rounded-xl border border-border">
@@ -1430,7 +1617,7 @@ function ProjectsComponent() {
                     <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/40 dark:bg-amber-950/20 space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-extrabold text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
-                          📷 1. Before Work Photo (Initial Condition)
+                          1. Before Work Photo (Initial Condition)
                         </span>
                         {activeProject.beforeWorkPhotoUrl && (
                           <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[9px] font-bold">Uploaded</Badge>
@@ -1464,31 +1651,23 @@ function ProjectsComponent() {
                           </div>
                         </div>
                       ) : (
-                        <div className="border-2 border-dashed border-amber-300 dark:border-amber-700/60 rounded-xl p-6 text-center space-y-2 bg-white dark:bg-card">
+                        <div className="border-2 border-dashed border-amber-300 dark:border-amber-700/60 rounded-xl p-6 text-center space-y-3 bg-white dark:bg-card">
                           <Camera className="h-8 w-8 text-amber-500 mx-auto" />
-                          <p className="text-xs font-bold text-amber-900 dark:text-amber-200">No Before Work Photo Uploaded</p>
-                          <p className="text-[10px] text-muted-foreground">Upload initial site damage or pre-servicing condition image.</p>
-                          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold cursor-pointer shadow-2xs transition-all">
-                            <Upload className="h-3.5 w-3.5" /> Upload Before Photo
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  const reader = new FileReader();
-                                  reader.onload = (evt) => {
-                                    const dataUrl = evt.target?.result as string;
-                                    updateProject(activeProject.id, { beforeWorkPhotoUrl: dataUrl });
-                                    setActiveProject({ ...activeProject, beforeWorkPhotoUrl: dataUrl });
-                                    toast.success("Before Work Photo uploaded successfully!");
-                                  };
-                                  reader.readAsDataURL(file);
-                                }
-                              }}
-                            />
-                          </label>
+                          <div>
+                            <p className="text-xs font-bold text-amber-900 dark:text-amber-200">No Before Work Photo Uploaded</p>
+                            <p className="text-[10px] text-muted-foreground">Upload initial site damage or pre-servicing condition image.</p>
+                          </div>
+                          <PhotoCapture
+                            folder="project-work"
+                            label="Upload Before Photo"
+                            currentPhotoUrl={activeProject.beforeWorkPhotoUrl}
+                            onUploaded={(url) => {
+                              updateProject(activeProject.id, { beforeWorkPhotoUrl: url });
+                              setActiveProject({ ...activeProject, beforeWorkPhotoUrl: url });
+                              toast.success("Before Work Photo uploaded successfully to Cloudinary!");
+                            }}
+                            className="flex justify-center"
+                          />
                         </div>
                       )}
                     </div>
@@ -1497,7 +1676,7 @@ function ProjectsComponent() {
                     <div className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/40 dark:bg-emerald-950/20 space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-extrabold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
-                          📸 2. After Work Photo (Completed Finish)
+                          2. After Work Photo (Completed Finish)
                         </span>
                         {activeProject.afterWorkPhotoUrl && (
                           <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[9px] font-bold">Uploaded</Badge>
@@ -1531,55 +1710,60 @@ function ProjectsComponent() {
                           </div>
                         </div>
                       ) : (
-                        <div className="border-2 border-dashed border-emerald-300 dark:border-emerald-700/60 rounded-xl p-6 text-center space-y-2 bg-white dark:bg-card">
+                        <div className="border-2 border-dashed border-emerald-300 dark:border-emerald-700/60 rounded-xl p-6 text-center space-y-3 bg-white dark:bg-card">
                           <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto" />
-                          <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">No After Work Photo Uploaded</p>
-                          <p className="text-[10px] text-muted-foreground">Upload post-servicing completed work verification image.</p>
-                          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer shadow-2xs transition-all">
-                            <Upload className="h-3.5 w-3.5" /> Upload After Photo
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  const reader = new FileReader();
-                                  reader.onload = (evt) => {
-                                    const dataUrl = evt.target?.result as string;
-                                    updateProject(activeProject.id, { afterWorkPhotoUrl: dataUrl });
-                                    setActiveProject({ ...activeProject, afterWorkPhotoUrl: dataUrl });
-                                    toast.success("After Work Photo uploaded successfully!");
-                                  };
-                                  reader.readAsDataURL(file);
-                                }
-                              }}
-                            />
-                          </label>
+                          <div>
+                            <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">No After Work Photo Uploaded</p>
+                            <p className="text-[10px] text-muted-foreground">Upload post-servicing completed work verification image.</p>
+                          </div>
+                          <PhotoCapture
+                            folder="project-work"
+                            label="Upload After Photo"
+                            currentPhotoUrl={activeProject.afterWorkPhotoUrl}
+                            onUploaded={(url) => {
+                              updateProject(activeProject.id, { afterWorkPhotoUrl: url });
+                              setActiveProject({ ...activeProject, afterWorkPhotoUrl: url });
+                              toast.success("After Work Photo uploaded successfully to Cloudinary!");
+                            }}
+                            className="flex justify-center"
+                          />
                         </div>
                       )}
+
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            <DialogFooter className="pt-3 border-t flex items-center justify-end gap-2">
+            <DialogFooter className="pt-3 border-t flex items-center justify-between gap-2">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setActiveProject(null)}
-                className="rounded-xl text-xs"
+                onClick={() => activeProject && handleDownloadSingleReport(activeProject.id)}
+                disabled={isDownloadingReport}
+                className="rounded-xl text-xs font-bold gap-1.5 border-rose-200 text-rose-700 hover:bg-rose-50 cursor-pointer"
               >
-                Cancel
+                <FileText className="h-3.5 w-3.5" />
+                {isDownloadingReport ? "Generating PDF..." : "Download Project Report"}
               </Button>
-              <Button
-                type="button"
-                onClick={handleSaveActiveProject}
-                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs gap-1 font-bold shadow-md px-5 h-9"
-              >
-                <Save className="h-4 w-4" /> Save & Update Project
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setActiveProject(null)}
+                  className="rounded-xl text-xs"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleSaveActiveProject}
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs gap-1 font-bold shadow-md px-5 h-9"
+                >
+                  <Save className="h-4 w-4" /> Save & Update Project
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1841,142 +2025,6 @@ function ProjectsComponent() {
                 </Select>
               </div>
 
-              {/* DYNAMIC MODE FIELDS */}
-              {payMode === "Cash" && (
-                <div className="grid grid-cols-2 gap-3 p-3 bg-amber-50/50 dark:bg-amber-950/20 rounded-xl border border-amber-200/60">
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Cash Receipt Number *</Label>
-                    <Input
-                      placeholder="e.g. CSH-REC-901"
-                      required
-                      value={payReceiptNum}
-                      onChange={(e) => setPayReceiptNum(e.target.value)}
-                      className="h-9 rounded-lg"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Received By (Staff)</Label>
-                    <Input
-                      placeholder="Staff Cashier Name"
-                      value={payReceivedByInput}
-                      onChange={(e) => setPayReceivedByInput(e.target.value)}
-                      className="h-9 rounded-lg"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {(payMode === "Google Pay / UPI" || payMode === "PhonePe" || payMode === "Paytm" || payMode === "UPI") && (
-                <div className="space-y-3 p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-xl border border-blue-200/60">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Transaction ID *</Label>
-                      <Input
-                        placeholder="e.g. TXN-987654321"
-                        required
-                        value={payTransactionId}
-                        onChange={(e) => setPayTransactionId(e.target.value)}
-                        className="h-9 rounded-lg font-mono"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">UPI App</Label>
-                      <Select value={payUpiApp} onValueChange={setPayUpiApp}>
-                        <SelectTrigger className="h-9 text-xs rounded-lg">
-                          <SelectValue placeholder="UPI App..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Google Pay">Google Pay</SelectItem>
-                          <SelectItem value="PhonePe">PhonePe</SelectItem>
-                          <SelectItem value="Paytm">Paytm</SelectItem>
-                          <SelectItem value="BHIM UPI">BHIM UPI</SelectItem>
-                          <SelectItem value="Other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">UPI Reference Number</Label>
-                    <Input
-                      placeholder="UPI Ref / RRN #"
-                      value={payUpiRefNum}
-                      onChange={(e) => setPayUpiRefNum(e.target.value)}
-                      className="h-9 rounded-lg font-mono"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {payMode === "Bank Transfer" && (
-                <div className="space-y-3 p-3 bg-purple-50/50 dark:bg-purple-950/20 rounded-xl border border-purple-200/60">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">UTR Number *</Label>
-                      <Input
-                        placeholder="e.g. UTR1293847"
-                        required
-                        value={payUtrNum}
-                        onChange={(e) => setPayUtrNum(e.target.value)}
-                        className="h-9 rounded-lg font-mono"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Bank Name</Label>
-                      <Input
-                        placeholder="e.g. HDFC Bank, ICICI Bank"
-                        value={payBankName}
-                        onChange={(e) => setPayBankName(e.target.value)}
-                        className="h-9 rounded-lg"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Account Received Into</Label>
-                    <Input
-                      placeholder="e.g. Primary Corporate Current A/c ****4019"
-                      value={payAccountReceived}
-                      onChange={(e) => setPayAccountReceived(e.target.value)}
-                      className="h-9 rounded-lg"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {payMode === "Cheque" && (
-                <div className="grid grid-cols-2 gap-3 p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-300">
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Cheque Number *</Label>
-                    <Input
-                      placeholder="e.g. CHQ-004812"
-                      required
-                      value={payChequeNum}
-                      onChange={(e) => setPayChequeNum(e.target.value)}
-                      className="h-9 rounded-lg font-mono"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Cheque Date *</Label>
-                    <Input
-                      type="date"
-                      required
-                      value={payChequeDate}
-                      onChange={(e) => setPayChequeDate(e.target.value)}
-                      className="h-9 rounded-lg"
-                    />
-                  </div>
-                  <div className="col-span-full space-y-1">
-                    <Label className="text-xs font-semibold">Drawee Bank Name</Label>
-                    <Input
-                      placeholder="e.g. State Bank of India"
-                      value={payBankName}
-                      onChange={(e) => setPayBankName(e.target.value)}
-                      className="h-9 rounded-lg"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Common Fields */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">Received By (User/Desk)</Label>
@@ -2000,16 +2048,6 @@ function ProjectsComponent() {
                     className="h-9 text-xs rounded-lg cursor-pointer"
                   />
                 </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold">Remarks</Label>
-                <Input
-                  placeholder="Collection remarks..."
-                  value={payRemarksInput}
-                  onChange={(e) => setPayRemarksInput(e.target.value)}
-                  className="h-9 rounded-lg"
-                />
               </div>
 
               {/* Live Preview Panel */}
@@ -2414,95 +2452,7 @@ function ProjectsComponent() {
         </DialogContent>
       </Dialog>
 
-      {/* PROJECT ISSUE MATERIAL MODAL */}
-      <Dialog open={projIssueMaterialOpen} onOpenChange={setProjIssueMaterialOpen}>
-        <DialogContent className="max-w-md rounded-2xl p-6">
-          <DialogHeader>
-            <DialogTitle className="text-base font-bold flex items-center gap-2">
-              <Boxes className="h-5 w-5 text-purple-600" /> Issue Consumable Material to Project {activeProject?.id}
-            </DialogTitle>
-          </DialogHeader>
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!activeProject || !projIssueMaterialId) return;
-              issueMaterialToProject({
-                materialId: projIssueMaterialId,
-                projectId: activeProject.id,
-                quantity: Number(projIssueMaterialQty),
-                issueDate: new Date().toISOString().slice(0, 10),
-                issuedBy: projIssueMaterialBy,
-                remarks: projIssueMaterialRemarks,
-              });
-              setProjIssueMaterialOpen(false);
-            }}
-            className="space-y-4 py-2 text-xs"
-          >
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Select Material *</Label>
-              <Select value={projIssueMaterialId} onValueChange={setProjIssueMaterialId}>
-                <SelectTrigger className="h-9 text-xs rounded-lg">
-                  <SelectValue placeholder="Select material..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {materials
-                    .filter((m) => m.currentStock > 0)
-                    .map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.name} ({m.currentStock} {m.unit} in stock - ₹{m.purchaseCost}/{m.unit})
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Quantity Consumed *</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  value={projIssueMaterialQty}
-                  onChange={(e) => setProjIssueMaterialQty(Math.max(1, Number(e.target.value)))}
-                  required
-                  className="h-9 text-xs rounded-lg"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Issued By</Label>
-                <Input
-                  value={projIssueMaterialBy}
-                  onChange={(e) => setProjIssueMaterialBy(e.target.value)}
-                  required
-                  className="h-9 text-xs rounded-lg"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Remarks</Label>
-              <Textarea
-                placeholder="Consumable issue notes..."
-                value={projIssueMaterialRemarks}
-                onChange={(e) => setProjIssueMaterialRemarks(e.target.value)}
-                rows={2}
-                className="text-xs rounded-lg resize-none"
-              />
-            </div>
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setProjIssueMaterialOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg">
-                Issue Material & Deduct Stock
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
         {/* PROJECT CLOSING CHECKLIST MODAL */}
         <Dialog open={!!closingProjectTarget} onOpenChange={(open) => !open && setClosingProjectTarget(null)}>
@@ -2644,98 +2594,159 @@ function ProjectsComponent() {
           </DialogContent>
         </Dialog>
 
-        {/* INLINE ADD LABOUR STAFF MODAL (INSIDE PROJECT MASTER) */}
+        {/* ASSIGN LABOUR STAFF MODAL (SELECT FROM EXISTING LABOURS MODULE) */}
         <Dialog open={addLabourModalOpen} onOpenChange={setAddLabourModalOpen}>
-          <DialogContent className="max-w-xl rounded-2xl p-6 bg-white dark:bg-card border border-border shadow-2xl">
+          <DialogContent className="max-w-2xl rounded-2xl p-6 bg-white dark:bg-card border border-border shadow-2xl">
             <DialogHeader className="border-b pb-3">
               <DialogTitle className="flex items-center gap-2.5 text-base font-extrabold text-foreground">
                 <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 grid place-items-center border border-blue-200 dark:border-blue-800">
                   <HardHat className="h-5 w-5" />
                 </div>
                 <div>
-                  <span>Add New Labour Staff Profile</span>
-                  <p className="text-xs font-normal text-muted-foreground">Register permanent staff or contract workers with wage configuration.</p>
+                  <span>Assign Labour Staff to Project</span>
+                  <p className="text-xs font-normal text-muted-foreground">Select existing staff from Labours module and configure weekly wages.</p>
                 </div>
               </DialogTitle>
             </DialogHeader>
 
-            <form onSubmit={handleInlineAddLabourSubmit} className="space-y-4 text-xs pt-2">
-              {/* SECTION 1: PERSONAL & CONTACT INFORMATION */}
-              <div className="p-4 rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/20 space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
-                  <User className="h-4 w-4 text-blue-600" /> Section 1: Contact Information
-                </h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Labour Full Name *</Label>
-                    <Input
-                      required
-                      placeholder="e.g. Ramesh Kumar"
-                      value={inlineLabourName}
-                      onChange={(e) => setInlineLabourName(e.target.value)}
-                      className="h-9 text-xs rounded-xl bg-background"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Mobile Phone Number *</Label>
-                    <Input
-                      required
-                      placeholder="e.g. 9840112233"
-                      value={inlineLabourPhone}
-                      onChange={(e) => setInlineLabourPhone(e.target.value)}
-                      className={`h-9 text-xs rounded-xl bg-background ${
-                        inlineLabourPhone.replace(/\D/g, "").length > 10 ? "border-red-500 focus-visible:ring-red-500" : ""
-                      }`}
-                    />
-                    {inlineLabourPhone.replace(/\D/g, "").length > 10 && (
-                      <p className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-1">
-                        ⚠️ Mobile number cannot exceed 10 digits ({inlineLabourPhone.replace(/\D/g, "").length}/10 digits)
-                      </p>
-                    )}
-                  </div>
-                </div>
+            <form onSubmit={handleSaveNewAssignments} className="space-y-4 text-xs pt-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search labours by name, phone, type, or ID..."
+                  value={assignSearchQuery}
+                  onChange={(e) => setAssignSearchQuery(e.target.value)}
+                  className="pl-9 h-9 text-xs rounded-xl"
+                />
               </div>
 
-              {/* SECTION 2: EMPLOYMENT TYPE & WAGES */}
-              <div className="p-4 rounded-xl border border-purple-100 dark:border-purple-900/40 bg-purple-50/40 dark:bg-purple-950/20 space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
-                  <DollarSign className="h-4 w-4 text-purple-600" /> Section 2: Employment Type & Wage Setup
-                </h3>
+              <div className="space-y-2 max-h-80 overflow-y-auto p-1 border rounded-xl divide-y">
+                {(() => {
+                  const availableLabours = labours.filter((l) => {
+                    const isCurrentlyActive = activeProject?.labourAssignments?.some(
+                      (a) => a.labourId === l.id && a.isActive !== false
+                    );
+                    if (isCurrentlyActive) return false;
+                    if (!assignSearchQuery) return true;
+                    const q = assignSearchQuery.toLowerCase();
+                    return (
+                      l.name.toLowerCase().includes(q) ||
+                      l.phone.includes(q) ||
+                      l.id.toLowerCase().includes(q) ||
+                      l.type.toLowerCase().includes(q)
+                    );
+                  });
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Labour Type (Contract / Permanent) *</Label>
-                    <Select value={inlineLabourType} onValueChange={(val: LabourType) => setInlineLabourType(val)}>
-                      <SelectTrigger className="h-9 text-xs rounded-xl">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        <SelectItem value="Permanent">Permanent Staff</SelectItem>
-                        <SelectItem value="Contract">Contract Worker</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  if (availableLabours.length === 0) {
+                    return (
+                      <div className="p-6 text-center text-muted-foreground italic text-xs">
+                        No available labours found. (Either all labours are already actively assigned or no matching records match search query).
+                      </div>
+                    );
+                  }
 
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Default Daily/Weekly Wage (₹)</Label>
-                    <Input
-                      type="number"
-                      value={inlineLabourWage}
-                      onChange={(e) => setInlineLabourWage(Number(e.target.value))}
-                      className="h-9 text-xs font-bold rounded-xl text-purple-700 dark:text-purple-400 bg-background"
-                    />
-                  </div>
-                </div>
+                  return availableLabours.map((l) => {
+                    const isSelected = selectedLabourIds.includes(l.id);
+                    const wageVal = customWeeklyWages[l.id] ?? l.defaultWeeklyWage ?? 1400;
+                    const dateVal = customAssignedDates[l.id] || new Date().toISOString().slice(0, 10);
+
+                    return (
+                      <div
+                        key={l.id}
+                        className={`p-3 rounded-lg transition-colors space-y-2 ${
+                          isSelected ? "bg-blue-50/70 border-blue-200 dark:bg-blue-950/30" : "hover:bg-accent/40"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedLabourIds((prev) => [...prev, l.id]);
+                                  if (!customWeeklyWages[l.id]) {
+                                    setCustomWeeklyWages((prev) => ({
+                                      ...prev,
+                                      [l.id]: l.defaultWeeklyWage || 1400,
+                                    }));
+                                  }
+                                  if (!customAssignedDates[l.id]) {
+                                    setCustomAssignedDates((prev) => ({
+                                      ...prev,
+                                      [l.id]: new Date().toISOString().slice(0, 10),
+                                    }));
+                                  }
+                                } else {
+                                  setSelectedLabourIds((prev) => prev.filter((id) => id !== l.id));
+                                }
+                              }}
+                            />
+                            <div>
+                              <p className="font-bold text-foreground">{l.name}</p>
+                              <p className="text-[10px] text-muted-foreground">{l.phone} • ID: {l.id}</p>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-[10px]">
+                            {l.type}
+                          </Badge>
+                        </div>
+
+                        {isSelected && (
+                          <div className="grid grid-cols-2 gap-3 pl-7 pt-2 border-t border-blue-200/60 dark:border-blue-900/60">
+                            <div className="space-y-1">
+                              <Label className="text-[11px] font-semibold text-blue-900 dark:text-blue-300">
+                                Weekly Wage (₹/week):
+                              </Label>
+                              <Input
+                                type="number"
+                                value={wageVal}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  setCustomWeeklyWages((prev) => ({ ...prev, [l.id]: val }));
+                                }}
+                                className="h-8 rounded-lg font-bold text-blue-700 dark:text-blue-400 bg-background text-xs"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-[11px] font-semibold text-blue-900 dark:text-blue-300">
+                                Assigned Date:
+                              </Label>
+                              <Input
+                                type="date"
+                                value={dateVal}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setCustomAssignedDates((prev) => ({ ...prev, [l.id]: val }));
+                                }}
+                                className="h-8 rounded-lg bg-background text-xs"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
               </div>
 
               <DialogFooter className="pt-3 border-t flex items-center justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setAddLabourModalOpen(false)} className="rounded-xl text-xs">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setAddLabourModalOpen(false);
+                    setSelectedLabourIds([]);
+                  }}
+                  className="rounded-xl text-xs"
+                >
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-10 text-xs font-bold shadow-md px-5">
-                  Add & Assign Labour Staff
+                <Button
+                  type="submit"
+                  disabled={selectedLabourIds.length === 0}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl h-10 text-xs font-bold shadow-md px-5 gap-1"
+                >
+                  <Check className="h-4 w-4" /> Assign Selected ({selectedLabourIds.length})
                 </Button>
               </DialogFooter>
             </form>
