@@ -1,5 +1,6 @@
 "use server";
 
+import fs from "fs";
 import { fileURLToPath } from "url";
 import path from "path";
 import { createServerFn } from "@tanstack/react-start";
@@ -14,6 +15,25 @@ if (typeof (globalThis as any).__dirname === "undefined") {
   (globalThis as any).__dirname = __dirname;
 }
 
+function getFontPaths() {
+  const possibleRegularPaths = [
+    path.join(process.cwd(), "public", "fonts", "Roboto-Regular.ttf"),
+    path.join(process.cwd(), ".output", "public", "fonts", "Roboto-Regular.ttf"),
+    path.resolve(__dirname, "../../public/fonts/Roboto-Regular.ttf"),
+    path.resolve(__dirname, "../public/fonts/Roboto-Regular.ttf"),
+  ];
+  const possibleBoldPaths = [
+    path.join(process.cwd(), "public", "fonts", "Roboto-Bold.ttf"),
+    path.join(process.cwd(), ".output", "public", "fonts", "Roboto-Bold.ttf"),
+    path.resolve(__dirname, "../../public/fonts/Roboto-Bold.ttf"),
+    path.resolve(__dirname, "../public/fonts/Roboto-Bold.ttf"),
+  ];
+
+  const regular = possibleRegularPaths.find((p) => fs.existsSync(p)) || possibleRegularPaths[0];
+  const bold = possibleBoldPaths.find((p) => fs.existsSync(p)) || possibleBoldPaths[0];
+
+  return { regular, bold };
+}
 
 /** Fetch image from URL safely into a Buffer, returning null on error or timeout */
 async function fetchImageBuffer(url: string | null | undefined, timeoutMs = 4000): Promise<Buffer | null> {
@@ -31,11 +51,17 @@ async function fetchImageBuffer(url: string | null | undefined, timeoutMs = 4000
   }
 }
 
-/** Utility to generate PDF buffer using pdfkit */
+/** Utility to generate PDF buffer using pdfkit with embedded fonts */
 function renderPdf(builder: (doc: InstanceType<typeof PDFDocument>) => Promise<void>): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
     try {
       const doc = new PDFDocument({ margin: 30, size: "A4" });
+      const { regular, bold } = getFontPaths();
+
+      doc.registerFont("Roboto", regular);
+      doc.registerFont("Roboto-Bold", bold);
+      doc.font("Roboto");
+
       const chunks: Buffer[] = [];
       doc.on("data", (chunk: Buffer) => chunks.push(chunk));
       doc.on("end", () => resolve(Buffer.concat(chunks)));
@@ -87,14 +113,14 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
       // Title Header
       doc
         .fontSize(16)
-        .font("Helvetica-Bold")
+        .font("Roboto-Bold")
         .fillColor("#0f172a")
         .text("Robotics Bricks & Blocks — Project Master Report", { align: "center" })
         .moveDown(0.3);
 
       doc
         .fontSize(9)
-        .font("Helvetica")
+        .font("Roboto")
         .fillColor("#475569")
         .text(`Generated on: ${nowStr} | Total Projects: ${filteredProjects.length}`, { align: "center" })
         .moveDown(0.8);
@@ -120,17 +146,17 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
 
         // 1. Project Title Banner
         doc.rect(30, startY, 535, 24).fillAndStroke("#1e293b", "#0f172a");
-        doc.fillColor("#ffffff").fontSize(10).font("Helvetica-Bold").text(`${p.id} — ${p.customerName}`, 38, startY + 6);
-        doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#38bdf8").text(`Status: ${p.status} | Pay Status: ${p.paymentStatus || "Pending"}`, 340, startY + 6, { align: "right" });
+        doc.fillColor("#ffffff").fontSize(10).font("Roboto-Bold").text(`${p.id} — ${p.customerName}`, 38, startY + 6);
+        doc.fontSize(8.5).font("Roboto-Bold").fillColor("#38bdf8").text(`Status: ${p.status} | Pay Status: ${p.paymentStatus || "Pending"}`, 340, startY + 6, { align: "right" });
 
         doc.y = startY + 30;
 
         // 2. Basic Info & Financial Details
-        doc.fillColor("#0f172a").fontSize(8.5).font("Helvetica-Bold").text("BASIC & FINANCIAL DETAILS:", 35, doc.y);
+        doc.fillColor("#0f172a").fontSize(8.5).font("Roboto-Bold").text("BASIC & FINANCIAL DETAILS:", 35, doc.y);
         doc.moveDown(0.2);
 
         const infoY = doc.y;
-        doc.font("Helvetica").fontSize(8).fillColor("#334155");
+        doc.font("Roboto").fontSize(8).fillColor("#334155");
         doc.text(`Phone: ${p.phone || "N/A"}`, 40, infoY);
         doc.text(`Location: ${p.location || "N/A"}`, 40, infoY + 12);
         doc.text(`Nature of Work: ${p.natureOfWork || "N/A"}`, 40, infoY + 24);
@@ -166,12 +192,12 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
         doc.y = Math.max(infoY + 38, photoY + 55);
 
         // 3. Assigned Labours & Work Logs Summary
-        doc.fillColor("#0f172a").fontSize(8.5).font("Helvetica-Bold").text("ASSIGNED LABOUR ROSTER & WORK LOGS SUMMARY:", 35, doc.y);
+        doc.fillColor("#0f172a").fontSize(8.5).font("Roboto-Bold").text("ASSIGNED LABOUR ROSTER & WORK LOGS SUMMARY:", 35, doc.y);
         doc.moveDown(0.2);
 
         const assignments = p.labourAssignments || [];
         if (assignments.length === 0) {
-          doc.fontSize(8).font("Helvetica").fillColor("#64748b").text("No labours assigned to this project.", 40, doc.y);
+          doc.fontSize(8).font("Roboto").fillColor("#64748b").text("No labours assigned to this project.", 40, doc.y);
           doc.moveDown(0.4);
         } else {
           for (const asgn of assignments) {
@@ -184,45 +210,45 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
             const statusTag = (asgn as any).isActive !== false ? "[Active]" : "[Previously Assigned / Inactive]";
             const dateStr = asgn.assignedDate ? (asgn.assignedDate instanceof Date ? asgn.assignedDate.toISOString().slice(0, 10) : String(asgn.assignedDate).slice(0, 10)) : "";
 
-            doc.fontSize(8).font("Helvetica-Bold").fillColor("#1e293b").text(`• ${asgn.labourName} (${asgn.labourType || "Permanent"}) ${statusTag}:`, 40, doc.y);
-            doc.font("Helvetica").fillColor("#475569").text(`   Wage: ₹${(asgn.weeklyWage || 0).toLocaleString("en-IN")}/wk | Assigned: ${dateStr || "N/A"} | Days Present: ${daysPresent} | Hours: ${totalHours} hrs | Earned: ₹${Math.round(totalEarned).toLocaleString("en-IN")}`);
+            doc.fontSize(8).font("Roboto-Bold").fillColor("#1e293b").text(`• ${asgn.labourName} (${asgn.labourType || "Permanent"}) ${statusTag}:`, 40, doc.y);
+            doc.font("Roboto").fillColor("#475569").text(`   Wage: ₹${(asgn.weeklyWage || 0).toLocaleString("en-IN")}/wk | Assigned: ${dateStr || "N/A"} | Days Present: ${daysPresent} | Hours: ${totalHours} hrs | Earned: ₹${Math.round(totalEarned).toLocaleString("en-IN")}`);
             doc.moveDown(0.2);
           }
           doc.moveDown(0.3);
         }
 
         // 4. Payment Collection History
-        doc.fillColor("#0f172a").fontSize(8.5).font("Helvetica-Bold").text("PAYMENT COLLECTION HISTORY:", 35, doc.y);
+        doc.fillColor("#0f172a").fontSize(8.5).font("Roboto-Bold").text("PAYMENT COLLECTION HISTORY:", 35, doc.y);
         doc.moveDown(0.2);
 
         const payList = p.payments || [];
         if (payList.length === 0) {
-          doc.fontSize(8).font("Helvetica").fillColor("#64748b").text("No payments recorded yet for this project.", 40, doc.y);
+          doc.fontSize(8).font("Roboto").fillColor("#64748b").text("No payments recorded yet for this project.", 40, doc.y);
           doc.moveDown(0.4);
         } else {
           for (const pay of payList) {
             if (doc.y > 730) doc.addPage();
             const payDate = pay.paymentDate ? (pay.paymentDate instanceof Date ? pay.paymentDate.toISOString().slice(0, 10) : String(pay.paymentDate).slice(0, 10)) : "";
             const pAmt = toNumber(pay.amount);
-            doc.fontSize(8).font("Helvetica").fillColor("#334155").text(`• Date: ${payDate} | Amount: ₹${pAmt.toLocaleString("en-IN")} | Mode: ${pay.mode} | Received By: ${pay.receivedBy || "Accounts Desk"}`, 40, doc.y);
+            doc.fontSize(8).font("Roboto").fillColor("#334155").text(`• Date: ${payDate} | Amount: ₹${pAmt.toLocaleString("en-IN")} | Mode: ${pay.mode} | Received By: ${pay.receivedBy || "Accounts Desk"}`, 40, doc.y);
             doc.moveDown(0.15);
           }
           doc.moveDown(0.3);
         }
 
         // 5. Timeline / Status History
-        doc.fillColor("#0f172a").fontSize(8.5).font("Helvetica-Bold").text("PROJECT TIMELINE & STATUS HISTORY:", 35, doc.y);
+        doc.fillColor("#0f172a").fontSize(8.5).font("Roboto-Bold").text("PROJECT TIMELINE & STATUS HISTORY:", 35, doc.y);
         doc.moveDown(0.2);
 
         const createdDateStr = p.createdAt instanceof Date ? p.createdAt.toISOString().slice(0, 10) : String(p.createdAt).slice(0, 10);
-        doc.fontSize(8).font("Helvetica").fillColor("#475569").text(`• Created: ${createdDateStr}`, 40, doc.y);
+        doc.fontSize(8).font("Roboto").fillColor("#475569").text(`• Created: ${createdDateStr}`, 40, doc.y);
         doc.moveDown(0.15);
 
         const history = p.statusHistory || [];
         for (const st of history) {
           if (doc.y > 730) doc.addPage();
           const stTime = st.timestamp ? (st.timestamp instanceof Date ? st.timestamp.toISOString().slice(0, 10) : String(st.timestamp).slice(0, 10)) : "";
-          doc.fontSize(8).font("Helvetica").fillColor("#475569").text(`• ${stTime}: Status changed to ${st.status}${st.note ? ` (${st.note})` : ""}`, 40, doc.y);
+          doc.fontSize(8).font("Roboto").fillColor("#475569").text(`• ${stTime}: Status changed to ${st.status}${st.note ? ` (${st.note})` : ""}`, 40, doc.y);
           doc.moveDown(0.15);
         }
 
