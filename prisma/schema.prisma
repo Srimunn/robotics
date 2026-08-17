@@ -228,6 +228,7 @@ model Enquiry {
   enquiryDate              DateTime
   customerName             String
   phone                    String
+  phone2                   String?
   location                 String
   leadSource               String
   referredBy               String?

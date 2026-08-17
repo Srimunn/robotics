@@ -28,6 +28,7 @@ const enquiryCreate = z.object({
   enquiryDate: z.preprocess((v) => (v === "" || v === null || v === undefined ? undefined : v), z.coerce.date()),
   customerName: z.string().min(1),
   phone: z.string().min(1),
+  phone2: z.string().optional().nullable(),
   location: z.string().min(1),
   leadSource: z.string(),
   referredBy: z.string().optional().nullable(),
@@ -67,6 +68,7 @@ export const addEnquiry = createServerFn({ method: "POST" })
         enquiryDate: data.enquiryDate,
         customerName: data.customerName,
         phone: cleanPhone(data.phone),
+        phone2: data.phone2 ? cleanPhone(data.phone2) : undefined,
         location: data.location,
         leadSource: data.leadSource,
         referredBy: data.referredBy ?? undefined,
@@ -101,19 +103,36 @@ export const updateEnquiry = createServerFn({ method: "POST" })
     const parsed = enquiryUpdate.parse(updates);
 
     return db.$transaction(async (tx) => {
-      let engName: string | undefined = parsed.assignedEngineerName ?? undefined;
-      if (parsed.assignedEngineerId) {
-        const eng = await tx.engineer.findUnique({ where: { id: parsed.assignedEngineerId } });
-        if (eng) engName = eng.name;
+      let engName: string | null | undefined = parsed.assignedEngineerName;
+      let engId: string | null | undefined = parsed.assignedEngineerId;
+
+      if (engId) {
+        const eng = await tx.engineer.findUnique({ where: { id: engId } });
+        if (eng) {
+          engName = eng.name;
+        } else {
+          engId = null;
+        }
+      } else if (engId === "") {
+        engId = null;
       }
+
+      if (!engId && engName) {
+        const eng = await tx.engineer.findFirst({ where: { name: engName } });
+        if (eng) engId = eng.id;
+      }
+
+      const updateData: any = {
+        ...parsed,
+      };
+      if (parsed.phone !== undefined) updateData.phone = parsed.phone ? cleanPhone(parsed.phone) : undefined;
+      if (parsed.phone2 !== undefined) updateData.phone2 = parsed.phone2 ? cleanPhone(parsed.phone2) : null;
+      if (parsed.assignedEngineerId !== undefined) updateData.assignedEngineerId = engId;
+      if (parsed.assignedEngineerName !== undefined || engName !== undefined) updateData.assignedEngineerName = engName;
 
       const updated = await tx.enquiry.update({
         where: { id },
-        data: {
-          ...parsed,
-          phone: parsed.phone ? cleanPhone(parsed.phone) : undefined,
-          assignedEngineerName: engName,
-        },
+        data: updateData,
       });
 
       // Bi-directional auto-sync to linked Project
@@ -129,30 +148,33 @@ export const updateEnquiry = createServerFn({ method: "POST" })
           newStatus = "Scheduled";
         }
 
+        const projectUpdateData: any = {
+          customerName: parsed.customerName ?? undefined,
+          phone: parsed.phone ? cleanPhone(parsed.phone) : undefined,
+          location: parsed.location ?? undefined,
+          leadSource: parsed.leadSource ?? undefined,
+          leakageType: parsed.leakageType ?? undefined,
+          natureOfWork: parsed.leakageType ?? undefined,
+          siteVisitDate: parsed.siteVisitDate ?? undefined,
+          siteVisitStatus: parsed.siteVisitStatus ?? undefined,
+          quotationDate: parsed.quotationDate ?? undefined,
+          quotationAmount: parsed.quotationAmount ?? undefined,
+          projectValue: newValue ?? undefined,
+          balanceAmount: balance,
+          workCommittedDate: parsed.workCommittedDate ?? undefined,
+          actualWorkStartedDate: parsed.actualWorkStartedDate ?? undefined,
+          remarks: parsed.remarks ?? undefined,
+          customerDecision: parsed.customerDecision ?? undefined,
+          cancellationReason: parsed.cancellationReason ?? undefined,
+          status: newStatus,
+        };
+
+        if (parsed.assignedEngineerId !== undefined) projectUpdateData.assignedEngineerId = engId;
+        if (parsed.assignedEngineerName !== undefined || engName !== undefined) projectUpdateData.assignedEngineerName = engName;
+
         await tx.project.update({
           where: { id: linkedProject.id },
-          data: {
-            customerName: parsed.customerName ?? undefined,
-            phone: parsed.phone ? cleanPhone(parsed.phone) : undefined,
-            location: parsed.location ?? undefined,
-            leadSource: parsed.leadSource ?? undefined,
-            leakageType: parsed.leakageType ?? undefined,
-            natureOfWork: parsed.leakageType ?? undefined,
-            assignedEngineerId: parsed.assignedEngineerId ?? undefined,
-            assignedEngineerName: engName,
-            siteVisitDate: parsed.siteVisitDate ?? undefined,
-            siteVisitStatus: parsed.siteVisitStatus ?? undefined,
-            quotationDate: parsed.quotationDate ?? undefined,
-            quotationAmount: parsed.quotationAmount ?? undefined,
-            projectValue: newValue ?? undefined,
-            balanceAmount: balance,
-            workCommittedDate: parsed.workCommittedDate ?? undefined,
-            actualWorkStartedDate: parsed.actualWorkStartedDate ?? undefined,
-            remarks: parsed.remarks ?? undefined,
-            customerDecision: parsed.customerDecision ?? undefined,
-            cancellationReason: parsed.cancellationReason ?? undefined,
-            status: newStatus,
-          },
+          data: projectUpdateData,
         });
         await tx.projectActivity.create({
           data: {

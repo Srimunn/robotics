@@ -259,52 +259,17 @@ export function SmartComboBox({
               {filteredOptions.length > 0 && (
                 <CommandGroup heading="Existing Options">
                   {filteredOptions.map((opt) => {
-                    let isBooked = false;
-                    let bookedReason = "";
-
-                    if (category === "Engineer Names") {
-                      const eng = engineers.find((x) => x.name === opt || x.id === opt);
-                      if (eng) {
-                        const avail = checkEngineerAvailability(eng.id, eng.name, siteVisitDate, excludeEnquiryId);
-                        if (!avail.isAvailable) {
-                          isBooked = true;
-                          bookedReason = avail.currentProject ? `Assigned to ${avail.currentProject.id}` : "Booked for Site Visit";
-                        }
-                      }
-                    }
-
                     return (
                       <CommandItem
                         key={opt}
                         value={opt}
-                        disabled={isBooked}
                         onSelect={() => {
-                          if (isBooked) {
-                            toast.error(`Cannot select ${opt}: Engineer is booked (${bookedReason})`);
-                            return;
-                          }
                           handleSelectExisting(opt);
                         }}
-                        className={cn(
-                          "text-xs flex items-center justify-between py-1.5 px-2 rounded-md transition-colors",
-                          isBooked
-                            ? "opacity-50 cursor-not-allowed bg-rose-50/50 dark:bg-rose-950/20 text-muted-foreground"
-                            : "cursor-pointer hover:bg-accent"
-                        )}
+                        className="text-xs flex items-center justify-between py-1.5 px-2 rounded-md transition-colors cursor-pointer hover:bg-accent"
                       >
                         <div className="flex items-center gap-2 truncate">
-                          <span className={cn("truncate font-medium", isBooked && "line-through text-slate-400")}>{opt}</span>
-                          {category === "Engineer Names" && (
-                            isBooked ? (
-                              <Badge variant="outline" className="text-[9px] bg-rose-50 text-rose-700 border-rose-200 font-bold shrink-0">
-                                Booked ({bookedReason})
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-[9px] bg-emerald-50 text-emerald-700 border-emerald-200 font-bold shrink-0">
-                                Available
-                              </Badge>
-                            )
-                          )}
+                          <span className="truncate font-medium">{opt}</span>
                         </div>
                         {value === opt && <Check className="h-3.5 w-3.5 text-blue-600 shrink-0 ml-1" />}
                       </CommandItem>

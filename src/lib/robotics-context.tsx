@@ -641,21 +641,7 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   // ---------- Sync getters (derived from cached data) ----------
   const getMasterDataByCategory = (category: MasterDataCategory) => masterData.filter((m: MasterDataItem) => m.category === category);
 
-  const checkEngineerAvailability = (engineerId: string, engineerName?: string, siteVisitDate?: string, excludeEnquiryId?: string) => {
-    const eng = engineers.find((e: Engineer) => e.id === engineerId || e.name === engineerName || e.name === engineerId);
-    if (!eng) return { isAvailable: true };
-    if (siteVisitDate) {
-      const conflicting = enquiries.find((e: Enquiry) =>
-        e.id !== excludeEnquiryId &&
-        (e.assignedEngineerId === eng.id || e.assignedEngineerName === eng.name) &&
-        e.siteVisitDate === siteVisitDate &&
-        e.siteVisitStatus !== "Completed" &&
-        e.customerDecision !== "Cancelled"
-      );
-      if (conflicting) return { isAvailable: false, conflictMessage: `Engineer ${eng.name} already scheduled on ${siteVisitDate} (${conflicting.customerName})` };
-    }
-    const activeProj = projects.find((p: Project) => (p.assignedEngineerId === eng.id || p.assignedEngineerName === eng.name) && (p.status === "Ongoing" || p.status === "Scheduled"));
-    if (activeProj) return { isAvailable: false, currentProject: activeProj, conflictMessage: `Already Assigned to ${activeProj.id} (${activeProj.customerName})` };
+  const checkEngineerAvailability = (_engineerId?: string, _engineerName?: string, _siteVisitDate?: string, _excludeEnquiryId?: string) => {
     return { isAvailable: true };
   };
 

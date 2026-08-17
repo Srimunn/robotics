@@ -80,13 +80,6 @@ function EnquiriesComponent() {
   // Delete Confirmation state
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
-  // Engineer Conflict Alert Modal state
-  const [engineerConflict, setEngineerConflict] = useState<{
-    message: string;
-    engineerName: string;
-    targetEnquiryId?: string;
-  } | null>(null);
-
   // Create Enquiry Modal State
   const [createOpen, setCreateOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -94,18 +87,12 @@ function EnquiriesComponent() {
     enquiryDate: new Date().toISOString().slice(0, 10),
     customerName: "",
     phone: "",
+    phone2: "",
     location: "",
     leadSource: "Phone Call",
     referredBy: "",
     leakageType: "Robotic Arm Oil Leakage & Joint Seal",
-    assignedEngineerId: engineers[0]?.id || "",
-    assignedEngineerName: engineers[0]?.name || "Er. Rajesh Kumar",
-    siteVisitDate: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10),
-    quotationDate: new Date().toISOString().slice(0, 10),
-    quotationAmount: 0,
-    workCommittedDate: new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10),
-    actualWorkStartedDate: "",
-    customerStatus: "Prospective",
+    quotationAmount: 0 as number | string,
     remarks: "",
   });
 
@@ -117,6 +104,7 @@ function EnquiriesComponent() {
       e.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       e.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       e.phone.includes(searchQuery) ||
+      (e.phone2 && e.phone2.includes(searchQuery)) ||
       e.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
       e.leakageType.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (e.assignedEngineerName && e.assignedEngineerName.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -148,36 +136,23 @@ function EnquiriesComponent() {
     }
     const cleanPhone = createData.phone.replace(/\D/g, "");
     if (cleanPhone.length < 10) {
-      toast.error("Phone Number must be at least 10 digits");
+      toast.error("Phone 1 must be at least 10 digits");
       return;
     }
     if (cleanPhone.length > 10) {
-      toast.error("Mobile Number cannot exceed 10 digits");
+      toast.error("Phone 1 cannot exceed 10 digits");
       return;
+    }
+    if (createData.phone2) {
+      const cleanPhone2 = createData.phone2.replace(/\D/g, "");
+      if (cleanPhone2.length > 10) {
+        toast.error("Phone 2 cannot exceed 10 digits");
+        return;
+      }
     }
     if (!createData.location.trim()) {
       toast.error("Location is required");
       return;
-    }
-    if (!createData.assignedEngineerId && !createData.assignedEngineerName) {
-      toast.error("Engineer assignment is required");
-      return;
-    }
-
-    if (createData.assignedEngineerId && createData.siteVisitDate) {
-      const avail = checkEngineerAvailability(
-        createData.assignedEngineerId,
-        createData.assignedEngineerName,
-        createData.siteVisitDate
-      );
-      if (!avail.isAvailable) {
-        toast.warning(avail.conflictMessage || "Engineer conflict detected for site visit!");
-        setEngineerConflict({
-          message: avail.conflictMessage || "Engineer is already scheduled for another site visit on this date.",
-          engineerName: createData.assignedEngineerName,
-        });
-        return;
-      }
     }
 
     setIsSaving(true);
@@ -186,17 +161,12 @@ function EnquiriesComponent() {
         enquiryDate: createData.enquiryDate,
         customerName: createData.customerName,
         phone: createData.phone,
+        phone2: createData.phone2 || undefined,
         location: createData.location,
         leadSource: createData.leadSource,
+        referredBy: createData.referredBy || undefined,
         leakageType: createData.leakageType,
-        assignedEngineerId: createData.assignedEngineerId,
-        assignedEngineerName: createData.assignedEngineerName,
-        siteVisitDate: createData.siteVisitDate,
-        quotationDate: createData.quotationDate,
         quotationAmount: (createData.quotationAmount as any) === "" || createData.quotationAmount === null || createData.quotationAmount === undefined ? undefined : Number(createData.quotationAmount),
-        workCommittedDate: createData.workCommittedDate,
-        actualWorkStartedDate: createData.actualWorkStartedDate,
-        customerStatus: createData.customerStatus,
         remarks: createData.remarks,
       });
 
@@ -208,18 +178,12 @@ function EnquiriesComponent() {
           enquiryDate: new Date().toISOString().slice(0, 10),
           customerName: "",
           phone: "",
+          phone2: "",
           location: "",
           leadSource: "Phone Call",
           referredBy: "",
           leakageType: "Robotic Arm Oil Leakage & Joint Seal",
-          assignedEngineerId: engineers[0]?.id || "",
-          assignedEngineerName: engineers[0]?.name || "Er. Rajesh Kumar",
-          siteVisitDate: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10),
-          quotationDate: new Date().toISOString().slice(0, 10),
           quotationAmount: 0,
-          workCommittedDate: new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10),
-          actualWorkStartedDate: "",
-          customerStatus: "Prospective",
           remarks: "",
         });
       } else {
@@ -236,37 +200,22 @@ function EnquiriesComponent() {
     }
   };
 
-  const handleEngineerSelectWithConflictCheck = (
-    engName: string,
-    isEdit: boolean = false
-  ) => {
-    const eng = engineers.find((x) => x.name === engName);
-    if (eng) {
-      const avail = checkEngineerAvailability(eng.id, eng.name);
-      if (!avail.isAvailable && avail.conflictMessage) {
-        setEngineerConflict({
-          message: avail.conflictMessage,
-          engineerName: eng.name,
-        });
-      }
-    }
+  const handleEngineerSelectInEdit = (engName: string) => {
+    const eng = engineers.find(
+      (x) => x.name.toLowerCase().trim() === engName.toLowerCase().trim() || x.id === engName
+    );
+    const engId = eng ? eng.id : undefined;
 
-    if (isEdit && activeEnquiry) {
+    if (activeEnquiry) {
       updateEnquiry(activeEnquiry.id, {
         assignedEngineerName: engName,
-        assignedEngineerId: eng?.id || activeEnquiry.assignedEngineerId,
+        assignedEngineerId: engId,
         siteVisitStatus: activeEnquiry.siteVisitStatus === "Pending" ? "Assigned" : activeEnquiry.siteVisitStatus,
       });
       setActiveEnquiry({
         ...activeEnquiry,
         assignedEngineerName: engName,
-        assignedEngineerId: eng?.id || activeEnquiry.assignedEngineerId,
-      });
-    } else {
-      setCreateData({
-        ...createData,
-        assignedEngineerName: engName,
-        assignedEngineerId: eng?.id || createData.assignedEngineerId,
+        assignedEngineerId: engId,
       });
     }
   };
@@ -614,7 +563,7 @@ function EnquiriesComponent() {
                   </div>
 
                   <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Phone Number</Label>
+                    <Label className="text-xs font-semibold">Phone 1</Label>
                     <Input
                       value={activeEnquiry.phone}
                       onChange={(e) => {
@@ -626,6 +575,18 @@ function EnquiriesComponent() {
                   </div>
 
                   <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Phone 2 (Optional)</Label>
+                    <Input
+                      value={activeEnquiry.phone2 || ""}
+                      onChange={(e) => {
+                        updateEnquiry(activeEnquiry.id, { phone2: e.target.value });
+                        setActiveEnquiry({ ...activeEnquiry, phone2: e.target.value });
+                      }}
+                      className="h-9 rounded-lg"
+                    />
+                  </div>
+
+                  <div className="space-y-1 sm:col-span-2">
                     <Label className="text-xs font-semibold">Location / Address</Label>
                     <Input
                       value={activeEnquiry.location}
@@ -700,7 +661,7 @@ function EnquiriesComponent() {
                     <SmartComboBox
                       category="Engineer Names"
                       value={activeEnquiry.assignedEngineerName || ""}
-                      onChange={(val) => handleEngineerSelectWithConflictCheck(val, true)}
+                      onChange={(val) => handleEngineerSelectInEdit(val)}
                     />
                   </div>
 
@@ -951,7 +912,7 @@ function EnquiriesComponent() {
                 <UserCheck className="h-4 w-4 text-blue-600" /> Customer
               </h3>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-3">
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">Name *</Label>
                   <Input
@@ -962,216 +923,135 @@ function EnquiriesComponent() {
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Phone *</Label>
-                  <Input
-                    required
-                    value={createData.phone}
-                    onChange={(e) => setCreateData({ ...createData, phone: e.target.value })}
-                    className={`h-9 text-xs rounded-xl bg-background ${
-                      createData.phone.replace(/\D/g, "").length > 10 ? "border-red-500 focus-visible:ring-red-500" : ""
-                    }`}
-                  />
-                  {createData.phone.replace(/\D/g, "").length > 10 && (
-                    <p className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-1">
-                      <AlertTriangle className="h-3 w-3 inline text-red-500 shrink-0" /> Phone number cannot exceed 10 digits ({createData.phone.replace(/\D/g, "").length}/10 digits)
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold">Location</Label>
-                <Input
-                  value={createData.location}
-                  onChange={(e) => setCreateData({ ...createData, location: e.target.value })}
-                  className="h-9 text-xs rounded-xl bg-background"
-                />
-              </div>
-            </div>
-
-            {/* SECTION 2: SERVICE NEED & REFERENCE DETAILS */}
-            <div className="p-4 rounded-xl border border-purple-100 dark:border-purple-900/40 bg-purple-50/40 dark:bg-purple-950/20 space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
-                <Sparkles className="h-4 w-4 text-purple-600" /> Work Details
-              </h3>
-
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold">Work Type *</Label>
-                <SmartComboBox
-                  category="Leakage Type"
-                  value={createData.leakageType}
-                  onChange={(val) => setCreateData({ ...createData, leakageType: val })}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Lead Source</Label>
-                  <SmartComboBox
-                    category="Lead Source"
-                    value={createData.leadSource}
-                    onChange={(val) => setCreateData({ ...createData, leadSource: val })}
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-semibold">Referred By</Label>
-                    {["Word of Mouth", "Existing Customer", "Builder Reference", "Engineer Reference", "CEO Reference"].includes(createData.leadSource) && (
-                      <Badge variant="outline" className="text-[9px] bg-purple-50 text-purple-700 border-purple-200">
-                        Recommended
-                      </Badge>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Phone 1 *</Label>
+                    <Input
+                      required
+                      value={createData.phone}
+                      onChange={(e) => setCreateData({ ...createData, phone: e.target.value })}
+                      className={`h-9 text-xs rounded-xl bg-background ${
+                        createData.phone.replace(/\D/g, "").length > 10 ? "border-red-500 focus-visible:ring-red-500" : ""
+                      }`}
+                    />
+                    {createData.phone.replace(/\D/g, "").length > 10 && (
+                      <p className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-1">
+                        <AlertTriangle className="h-3 w-3 inline text-red-500 shrink-0" /> Phone 1 cannot exceed 10 digits ({createData.phone.replace(/\D/g, "").length}/10 digits)
+                      </p>
                     )}
                   </div>
-                  <SmartComboBox
-                    category="Referred By Options"
-                    value={createData.referredBy || ""}
-                    onChange={(val) => setCreateData({ ...createData, referredBy: val })}
-                  />
-                </div>
-              </div>
-            </div>
 
-            {/* SECTION 3: ENGINEERING ASSIGNMENT & ESTIMATE */}
-            <div className="p-4 rounded-xl border border-amber-100 dark:border-amber-900/40 bg-amber-50/40 dark:bg-amber-950/20 space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-                <UserCheck className="h-4 w-4 text-amber-600" /> Engineer & Visit
-              </h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Engineer</Label>
-                  <SmartComboBox
-                    category="Engineer Names"
-                    value={createData.assignedEngineerName}
-                    onChange={(val) => handleEngineerSelectWithConflictCheck(val, false)}
-                    siteVisitDate={createData.siteVisitDate}
-                  />
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Phone 2</Label>
+                    <Input
+                      value={createData.phone2}
+                      onChange={(e) => setCreateData({ ...createData, phone2: e.target.value })}
+                      className={`h-9 text-xs rounded-xl bg-background ${
+                        createData.phone2.replace(/\D/g, "").length > 10 ? "border-red-500 focus-visible:ring-red-500" : ""
+                      }`}
+                    />
+                    {createData.phone2.replace(/\D/g, "").length > 10 && (
+                      <p className="text-[11px] text-red-500 font-medium flex items-center gap-1 mt-1">
+                        <AlertTriangle className="h-3 w-3 inline text-red-500 shrink-0" /> Phone 2 cannot exceed 10 digits ({createData.phone2.replace(/\D/g, "").length}/10 digits)
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Site Visit Date</Label>
+                  <Label className="text-xs font-semibold">Location</Label>
                   <Input
-                    type="date"
-                    value={createData.siteVisitDate}
-                    onChange={(e) => setCreateData({ ...createData, siteVisitDate: e.target.value })}
+                    value={createData.location}
+                    onChange={(e) => setCreateData({ ...createData, location: e.target.value })}
                     className="h-9 text-xs rounded-xl bg-background"
                   />
                 </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Amount (₹)</Label>
-                  <Input
-                    type="number"
-                    value={createData.quotationAmount === undefined || createData.quotationAmount === null ? "" : createData.quotationAmount}
-                    onChange={(e) => {
-                      const val = e.target.value === "" ? "" : Number(e.target.value);
-                      setCreateData({ ...createData, quotationAmount: val as any });
-                    }}
-                    className="h-9 text-xs rounded-xl font-bold text-amber-700 dark:text-amber-400 bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                </div>
               </div>
             </div>
 
-            {/* SECTION 4: WORK COMMITMENT TIMELINE */}
-            <div className="p-4 rounded-xl border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-950/20 space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
-                <CalendarCheck className="h-4 w-4 text-emerald-600" /> Dates
-              </h3>
+            {/* SECTION 2: WORK DETAILS */}
+            <div className="p-4 rounded-xl border border-purple-100 dark:border-purple-900/40 bg-purple-50/40 dark:bg-purple-950/20 space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
+                  <Sparkles className="h-4 w-4 text-purple-600" /> Work Details
+                </h3>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center gap-1">
-                    <CalendarCheck className="h-3.5 w-3.5 text-purple-600" /> Start Date *
-                  </Label>
-                  <Input
-                    type="date"
-                    value={createData.workCommittedDate}
-                    onChange={(e) => setCreateData({ ...createData, workCommittedDate: e.target.value })}
-                    className="h-9 text-xs rounded-xl bg-background border-purple-300 font-semibold"
+                  <Label className="text-xs font-semibold">Work Type *</Label>
+                  <SmartComboBox
+                    category="Leakage Type"
+                    value={createData.leakageType}
+                    onChange={(val) => setCreateData({ ...createData, leakageType: val })}
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1">
-                    <PlayCircle className="h-3.5 w-3.5 text-emerald-600" /> Work Started
-                  </Label>
-                  <Input
-                    type="date"
-                    value={createData.actualWorkStartedDate}
-                    onChange={(e) => setCreateData({ ...createData, actualWorkStartedDate: e.target.value })}
-                    className="h-9 text-xs rounded-xl bg-background border-emerald-300 font-semibold"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Lead Source</Label>
+                    <SmartComboBox
+                      category="Lead Source"
+                      value={createData.leadSource}
+                      onChange={(val) => setCreateData({ ...createData, leadSource: val })}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold">Referred By</Label>
+                      {["Word of Mouth", "Existing Customer", "Builder Reference", "Engineer Reference", "CEO Reference"].includes(createData.leadSource) && (
+                        <Badge variant="outline" className="text-[9px] bg-purple-50 text-purple-700 border-purple-200">
+                          Recommended
+                        </Badge>
+                      )}
+                    </div>
+                    <SmartComboBox
+                      category="Referred By Options"
+                      value={createData.referredBy || ""}
+                      onChange={(val) => setCreateData({ ...createData, referredBy: val })}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* SECTION 5: INITIAL REMARKS */}
-            <div className="space-y-1 pt-1">
-              <Label className="text-xs font-semibold">Notes</Label>
-              <SmartComboBox
-                category="Remarks Templates"
-                value={createData.remarks}
-                onChange={(val) => setCreateData({ ...createData, remarks: val })}
-              />
-            </div>
-
-            <DialogFooter className="pt-4 border-t flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
-              <Button
-                type="submit"
-                disabled={isSaving}
-                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs gap-1 font-bold shadow-md px-5 w-full sm:w-auto"
-              >
-                {isSaving ? "Saving..." : "Save Enquiry"}
-              </Button>
-              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} className="rounded-xl text-xs w-full sm:w-auto">
-                Cancel
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* ENGINEER CONFLICT ALERT MODAL */}
-      {engineerConflict && (
-        <Dialog open={!!engineerConflict} onOpenChange={() => setEngineerConflict(null)}>
-          <DialogContent className="max-w-md rounded-xl border border-amber-200 bg-amber-50/90 dark:bg-amber-950/90 p-5">
-            <DialogHeader>
-              <DialogTitle className="text-sm font-bold text-amber-900 dark:text-amber-200 flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-amber-600" /> Engineer Schedule Conflict Warning
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3 text-xs text-amber-900 dark:text-amber-300 py-2">
-              <p className="font-semibold">
-                {engineerConflict.engineerName} is currently busy on an active engagement:
-              </p>
-              <div className="bg-white/80 dark:bg-black/40 p-3 rounded-lg border border-amber-200 font-mono text-[11px]">
-                {engineerConflict.message}
+              {/* SECTION 3: NOTES */}
+              <div className="space-y-1 pt-1">
+                <Label className="text-xs font-semibold">Notes</Label>
+                <SmartComboBox
+                  category="Remarks Templates"
+                  value={createData.remarks}
+                  onChange={(val) => setCreateData({ ...createData, remarks: val })}
+                />
               </div>
-              <p className="text-[11px] text-amber-800 dark:text-amber-400">
-                Are you sure you want to reassign this engineer for another site visit / project?
-              </p>
-            </div>
-            <DialogFooter className="pt-2">
-              <Button
-                variant="outline"
-                onClick={() => setEngineerConflict(null)}
-                className="text-xs rounded-lg"
-              >
-                Change Selection
-              </Button>
-              <Button
-                onClick={() => setEngineerConflict(null)}
-                className="bg-amber-600 hover:bg-amber-700 text-white text-xs rounded-lg"
-              >
-                Confirm Reassignment
-              </Button>
-            </DialogFooter>
+
+              {/* SECTION 4: AMOUNT (₹) */}
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">Amount (₹)</Label>
+                <Input
+                  type="number"
+                  placeholder="Enter amount (e.g. 150000)"
+                  value={createData.quotationAmount === undefined || createData.quotationAmount === null ? "" : createData.quotationAmount}
+                  onChange={(e) => {
+                    const val = e.target.value === "" ? "" : Number(e.target.value);
+                    setCreateData({ ...createData, quotationAmount: val as any });
+                  }}
+                  className="h-9 text-xs rounded-xl font-bold text-amber-700 dark:text-amber-400 bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
+
+              <DialogFooter className="pt-4 border-t flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
+                <Button
+                  type="submit"
+                  disabled={isSaving}
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs gap-1 font-bold shadow-md px-5 w-full sm:w-auto"
+                >
+                  {isSaving ? "Saving..." : "Save Enquiry"}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} className="rounded-xl text-xs w-full sm:w-auto">
+                  Cancel
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
-      )}
 
       {/* DELETE CONFIRMATION DIALOG */}
       <DeleteConfirm

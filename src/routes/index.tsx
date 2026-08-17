@@ -1899,41 +1899,23 @@ function DashboardComponent() {
                   <SelectValue placeholder="Choose Engineer..." />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl max-h-[240px]">
-                  {engineers.map((eng) => {
-                    const avail = checkEngineerAvailability(eng.id, eng.name);
-                    const isBooked = !avail.isAvailable;
-                    const bookedReason = avail.currentProject ? `Assigned to ${avail.currentProject.id}` : "Booked for Site Visit";
-                    return (
-                      <SelectItem
-                        key={eng.id}
-                        value={eng.id}
-                        textValue={`${eng.name} (${eng.specialty})`}
-                        disabled={isBooked}
-                        className={cn(
-                          "py-2 transition-colors",
-                          isBooked ? "opacity-50 cursor-not-allowed bg-rose-50/50 dark:bg-rose-950/20 text-muted-foreground" : "cursor-pointer"
-                        )}
-                      >
-                        <div className="flex items-center justify-between w-full gap-3 min-w-0 pr-1">
-                          <div className="flex flex-col min-w-0 truncate">
-                            <span className={cn("font-semibold truncate text-foreground", isBooked && "line-through text-slate-400")}>
-                              {eng.name}
-                            </span>
-                            <span className="text-[11px] text-muted-foreground truncate font-normal">{eng.specialty}</span>
-                          </div>
-                          {isBooked ? (
-                            <Badge variant="outline" className="text-[10px] bg-rose-50 text-rose-700 border-rose-200 font-bold shrink-0">
-                              Booked
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 font-bold shrink-0">
-                              Available
-                            </Badge>
-                          )}
+                  {engineers.map((eng) => (
+                    <SelectItem
+                      key={eng.id}
+                      value={eng.id}
+                      textValue={`${eng.name} (${eng.specialty})`}
+                      className="py-2 transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between w-full gap-3 min-w-0 pr-1">
+                        <div className="flex flex-col min-w-0 truncate">
+                          <span className="font-semibold truncate text-foreground">
+                            {eng.name}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground truncate font-normal">{eng.specialty}</span>
                         </div>
-                      </SelectItem>
-                    );
-                  })}
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -118,6 +118,7 @@ export interface Enquiry {
   enquiryDate: string; // YYYY-MM-DD
   customerName: string;
   phone: string;
+  phone2?: string;
   location: string;
   leadSource: string;
   referredBy?: string;

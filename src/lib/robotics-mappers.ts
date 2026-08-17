@@ -238,6 +238,7 @@ export function mapEnquiryFromDb(e: DbEnquiry): Enquiry {
     enquiryDate: isoDate(e.enquiryDate)!,
     customerName: e.customerName,
     phone: e.phone,
+    phone2: (e as any).phone2 ?? undefined,
     location: e.location,
     leadSource: e.leadSource,
     referredBy: e.referredBy ?? undefined,

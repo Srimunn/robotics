@@ -70,8 +70,6 @@ function EngineersPageComponent() {
   const [formPhone, setFormPhone] = useState("");
   const [formSpecialty, setFormSpecialty] = useState("Robotic Welding & Hydraulics Specialist");
 
-  // Availability Conflict Inspector
-  const [inspectEng, setInspectEng] = useState<Engineer | null>(null);
 
   // Calculate real-time availability for engineers based on active projects and site visits
   const engineerRoster = useMemo(() => {
@@ -339,14 +337,8 @@ function EngineersPageComponent() {
                     </TableCell>
 
                     <TableCell className="text-center">
-                      <Badge
-                        className={`text-[10px] font-bold ${
-                          eng.status === "Available"
-                            ? "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300"
-                            : "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300"
-                        }`}
-                      >
-                        {eng.status === "Available" ? "Available" : "Already Assigned"}
+                      <Badge className="text-[10px] font-bold bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300">
+                        Available
                       </Badge>
                     </TableCell>
 
@@ -367,16 +359,6 @@ function EngineersPageComponent() {
 
                     <TableCell className="text-right pr-4">
                       <div className="flex items-center justify-end gap-1">
-                        {eng.status === "Assigned" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setInspectEng(eng)}
-                            className="h-7 text-[11px] font-semibold text-amber-700 border-amber-200 bg-amber-50 hover:bg-amber-100 gap-1"
-                          >
-                            <ShieldAlert className="h-3 w-3" /> View Conflict
-                          </Button>
-                        )}
 
                         <Button
                           size="icon"
@@ -481,57 +463,7 @@ function EngineersPageComponent() {
         </DialogContent>
       </Dialog>
 
-      {/* INSPECT ASSIGNMENT CONFLICT MODAL */}
-      <Dialog open={!!inspectEng} onOpenChange={(open) => !open && setInspectEng(null)}>
-        <DialogContent className="max-w-md rounded-2xl p-6">
-          <DialogHeader>
-            <DialogTitle className="text-base font-bold flex items-center gap-2 text-amber-700">
-              <ShieldAlert className="h-5 w-5 text-amber-600" />
-              Engineer Assignment Warning
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Conflict prevention rule: Engineer is currently locked on an active field project.
-            </DialogDescription>
-          </DialogHeader>
 
-          {inspectEng && (
-            <div className="space-y-4 py-2 text-xs">
-              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 space-y-1">
-                <div className="font-bold text-amber-950">{inspectEng.name} ({inspectEng.id})</div>
-                <div className="text-amber-800 text-[11px] font-medium">{inspectEng.specialty}</div>
-              </div>
-
-              <div className="space-y-2 border rounded-xl p-3 bg-slate-50 dark:bg-slate-900/40">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Status:</span>
-                  <Badge className="bg-amber-600 text-white text-[10px]">Already Assigned</Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Active Assignment:</span>
-                  <span className="font-bold text-purple-700">{inspectEng.currentProjectName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Next Available Date:</span>
-                  <span className="font-bold text-emerald-600">{inspectEng.nextAvailableDate}</span>
-                </div>
-              </div>
-
-              <p className="text-[11px] text-muted-foreground italic">
-                Notice: Double assignment is restricted by ERP workflow policy to prevent scheduling conflicts on site. Admin override is enabled during urgent dispatch.
-              </p>
-
-              <DialogFooter>
-                <Button
-                  onClick={() => setInspectEng(null)}
-                  className="h-9 text-xs bg-slate-900 text-white hover:bg-slate-800 rounded-xl w-full"
-                >
-                  Understood & Close
-                </Button>
-              </DialogFooter>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       <DeleteConfirm
         open={Boolean(deleteTargetId)}
