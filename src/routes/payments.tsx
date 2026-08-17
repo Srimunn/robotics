@@ -917,7 +917,13 @@ function PaymentsComponent() {
               </div>
             </div>
 
-            <DialogFooter className="pt-2 flex flex-col-reverse sm:flex-row gap-2">
+            <DialogFooter className="pt-2 flex flex-col sm:flex-row justify-end gap-2">
+              <Button
+                type="submit"
+                className="h-9 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs w-full sm:w-auto"
+              >
+                Record Payment
+              </Button>
               <Button
                 type="button"
                 variant="outline"
@@ -925,12 +931,6 @@ function PaymentsComponent() {
                 className="h-9 text-xs rounded-xl w-full sm:w-auto"
               >
                 Cancel
-              </Button>
-              <Button
-                type="submit"
-                className="h-9 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs w-full sm:w-auto"
-              >
-                Record Payment
               </Button>
             </DialogFooter>
           </form>

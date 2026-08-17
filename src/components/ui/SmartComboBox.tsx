@@ -157,7 +157,7 @@ export function SmartComboBox({
             aria-expanded={open}
             disabled={disabled}
             className={cn(
-              "w-full justify-between font-normal text-left h-9 px-3 text-xs rounded-lg border-input bg-background hover:bg-slate-50 transition-colors",
+              "w-full flex-1 min-w-0 justify-between font-normal text-left h-8 sm:h-9 px-3 text-xs rounded-lg border-input bg-background hover:bg-slate-50 transition-colors",
               !value && "text-muted-foreground",
               className
             )}
@@ -327,7 +327,7 @@ export function SmartComboBox({
           setQuickAddDialogOpen(true);
         }}
         title={`Add new option to ${category}`}
-        className="h-9 w-9 rounded-lg border border-input bg-background hover:bg-blue-50 text-blue-600 hover:text-blue-700 shrink-0"
+        className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg border border-input bg-background hover:bg-blue-50 text-blue-600 hover:text-blue-700 flex-shrink-0"
       >
         <Plus className="h-4 w-4" />
       </Button>
@@ -339,7 +339,7 @@ export function SmartComboBox({
         disabled={disabled}
         onClick={() => setManageModalOpen(true)}
         title={`Manage ${category} Master List`}
-        className="h-9 w-9 rounded-lg border border-input bg-background hover:bg-slate-100 text-muted-foreground hover:text-foreground shrink-0"
+        className="hidden sm:inline-flex h-8 w-8 sm:h-9 sm:w-9 rounded-lg border border-input bg-background hover:bg-slate-100 text-muted-foreground hover:text-foreground flex-shrink-0"
       >
         <Settings className="h-3.5 w-3.5" />
       </Button>

@@ -634,7 +634,13 @@ function MaterialsPageComponent() {
               />
             </div>
 
-            <DialogFooter className="pt-2 flex flex-col-reverse sm:flex-row gap-2">
+            <DialogFooter className="pt-2 flex flex-col sm:flex-row justify-end gap-2">
+              <Button
+                type="submit"
+                className="h-9 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-xs w-full sm:w-auto"
+              >
+                {editingMaterial ? "Update Material" : "Save Material"}
+              </Button>
               <Button
                 type="button"
                 variant="outline"
@@ -642,12 +648,6 @@ function MaterialsPageComponent() {
                 className="h-9 text-xs rounded-xl w-full sm:w-auto"
               >
                 Cancel
-              </Button>
-              <Button
-                type="submit"
-                className="h-9 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-xs w-full sm:w-auto"
-              >
-                {editingMaterial ? "Update Material" : "Save Material"}
               </Button>
             </DialogFooter>
           </form>

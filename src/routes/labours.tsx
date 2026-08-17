@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   Copy,
   Wrench,
+  KeyRound,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -131,6 +132,18 @@ function LaboursComponent() {
   const [deactivateConfirmTarget, setDeactivateConfirmTarget] = useState<Labour | null>(null);
   const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<Labour | null>(null);
   const [reactivateConfirmTarget, setReactivateConfirmTarget] = useState<Labour | null>(null);
+
+  const isManagerOrCeo = currentUser?.role === "CEO" || currentUser?.role === "Worker";
+
+  const handleResetPin = async (labourId: string) => {
+    const newPin = String(Math.floor(1000 + Math.random() * 9000));
+    try {
+      await updateLabour(labourId, { pin: newPin });
+      toast.success(`PIN reset to: ${newPin} — share this with the worker`);
+    } catch (err) {
+      toast.error("Failed to reset PIN");
+    }
+  };
 
   const hasLabourHistory = (labourId: string) => {
     const hasAttendance = Object.values(attendance || {}).some((r) => r?.labourId === labourId);
@@ -364,7 +377,7 @@ function LaboursComponent() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-card p-6 rounded-xl border border-border shadow-xs">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Workers</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Labours</h1>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -381,7 +394,7 @@ function LaboursComponent() {
             onClick={() => setAddOpen(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1.5 shadow-xs"
           >
-            <Plus className="h-4 w-4" /> Add Worker
+            <Plus className="h-4 w-4" /> Add Labour
           </Button>
         </div>
       </div>
@@ -414,7 +427,7 @@ function LaboursComponent() {
             onClick={() => setActiveTab("MASTER")}
             className={`text-xs rounded-lg gap-1.5 ${activeTab === "MASTER" ? "bg-blue-600 hover:bg-blue-700" : ""}`}
           >
-            <HardHat className="h-3.5 w-3.5" /> Worker Table
+            <HardHat className="h-3.5 w-3.5" /> Labour Table
           </Button>
         </div>
 
@@ -454,7 +467,7 @@ function LaboursComponent() {
                   Workforce Roster ({filteredLabours.length})
                 </CardTitle>
                 <Badge variant="outline" className="text-[10px]">
-                  {labourTypeFilter === "PERMANENT" ? "Permanent Only" : labourTypeFilter === "CONTRACT" ? "Contract Only" : "All Workers"}
+                  {labourTypeFilter === "PERMANENT" ? "Permanent Only" : labourTypeFilter === "CONTRACT" ? "Contract Only" : "All Labours"}
                 </Badge>
               </div>
 
@@ -662,8 +675,8 @@ function LaboursComponent() {
                         ) : (
                           <div className="p-3 bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-200 border border-slate-200 dark:border-slate-800 rounded-xl text-xs flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <Badge className="bg-slate-800 text-white">Contract Worker</Badge>
-                              <span className="font-semibold">Project-specific contract worker assigned specifically for particular site contracts.</span>
+                              <Badge className="bg-slate-800 text-white">Contract Labour</Badge>
+                              <span className="font-semibold">Project-specific contract labour assigned specifically for particular site contracts.</span>
                             </div>
                           </div>
                         )}
@@ -682,19 +695,32 @@ function LaboursComponent() {
                               Generated 4-Digit PIN: <code className="bg-white dark:bg-purple-900/80 px-2 py-0.5 rounded border border-purple-300 font-extrabold text-purple-700 dark:text-purple-300 text-xs">{activeLabour.pin || "4827"}</code>
                             </span>
                           </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              const text = `Robotics ERP Labour Portal Credentials\nLabour Name: ${activeLabour.name}\nLabour ID: ${activeLabour.id}\nLogin ID: ${activeLabour.loginId || activeLabour.name.split(" ")[0]}\nPIN: ${activeLabour.pin || "4827"}`;
-                              navigator.clipboard.writeText(text);
-                              toast.success(`Copied login credentials for ${activeLabour.name}`);
-                            }}
-                            className="h-8 text-[11px] font-bold text-purple-700 border-purple-300 hover:bg-purple-100 cursor-pointer rounded-lg gap-1"
-                          >
-                            <Copy className="h-3.5 w-3.5 inline mr-1" /> Copy Credentials
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            {isManagerOrCeo && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleResetPin(activeLabour.id)}
+                                className="h-8 text-[11px] font-bold text-purple-700 border-purple-300 hover:bg-purple-100 cursor-pointer rounded-lg gap-1"
+                              >
+                                <KeyRound className="h-3.5 w-3.5 inline mr-1" /> Reset PIN
+                              </Button>
+                            )}
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const text = `Robotics ERP Labour Portal Credentials\nLabour Name: ${activeLabour.name}\nLabour ID: ${activeLabour.id}\nLogin ID: ${activeLabour.loginId || activeLabour.name.split(" ")[0]}\nPIN: ${activeLabour.pin || "4827"}`;
+                                navigator.clipboard.writeText(text);
+                                toast.success(`Copied login credentials for ${activeLabour.name}`);
+                              }}
+                              className="h-8 text-[11px] font-bold text-purple-700 border-purple-300 hover:bg-purple-100 cursor-pointer rounded-lg gap-1"
+                            >
+                              <Copy className="h-3.5 w-3.5 inline mr-1" /> Copy Credentials
+                            </Button>
+                          </div>
                         </div>
 
                         {/* STRUCTURED BLOCK 2: TECHNICAL SKILLS & CAPABILITIES */}
@@ -837,7 +863,7 @@ function LaboursComponent() {
                                 {recentProjectsList.length === 0 ? (
                                   <tr>
                                     <td colSpan={5} className="p-4 text-center text-muted-foreground">
-                                      No past project assignment records found for this worker.
+                                      No past project assignment records found for this labour.
                                     </td>
                                   </tr>
                                 ) : (
@@ -1174,6 +1200,16 @@ function LaboursComponent() {
                       </td>
                       <td className="p-3 text-right pr-4">
                         <div className="flex items-center justify-end gap-1.5">
+                          {isManagerOrCeo && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleResetPin(l.id)}
+                              className="h-7 text-[11px] font-bold text-purple-700 border-purple-300 hover:bg-purple-50 rounded-lg gap-1"
+                            >
+                              <KeyRound className="h-3 w-3" /> Reset PIN
+                            </Button>
+                          )}
                           {l.isActive === false ? (
                             <Button
                               size="sm"
@@ -1224,22 +1260,21 @@ function LaboursComponent() {
                 <HardHat className="h-5 w-5" />
               </div>
               <div>
-                <span>Add New Labour Staff Profile</span>
-                <p className="text-xs font-normal text-muted-foreground">Register permanent staff or contract workers with wage configuration.</p>
+                <span>Add Labour</span>
               </div>
             </DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleAddLabourSubmit} className="space-y-4 text-xs pt-2">
-            {/* SECTION 1: PERSONAL & CONTACT INFORMATION */}
+            {/* CONTACT */}
             <div className="p-4 rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/20 space-y-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
-                <User className="h-4 w-4 text-blue-600" /> Section 1: Contact Information
+                <User className="h-4 w-4 text-blue-600" /> Contact
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Labour Full Name *</Label>
+                  <Label className="text-xs font-semibold">Name *</Label>
                   <Input
                     required
                     value={labourFormData.name}
@@ -1249,7 +1284,7 @@ function LaboursComponent() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Mobile Phone Number *</Label>
+                  <Label className="text-xs font-semibold">Phone *</Label>
                   <Input
                     required
                     value={labourFormData.phone}
@@ -1266,7 +1301,7 @@ function LaboursComponent() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Login ID (Auto-generated if empty)</Label>
+                  <Label className="text-xs font-semibold">Login ID</Label>
                   <Input
                     value={labourFormData.loginId}
                     onChange={(e) => setLabourFormData({ ...labourFormData, loginId: e.target.value })}
@@ -1275,7 +1310,7 @@ function LaboursComponent() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">4-Digit Security PIN (Auto-generated if empty)</Label>
+                  <Label className="text-xs font-semibold">PIN</Label>
                   <Input
                     maxLength={4}
                     value={labourFormData.pin}
@@ -1286,15 +1321,15 @@ function LaboursComponent() {
               </div>
             </div>
 
-            {/* SECTION 2: EMPLOYMENT TYPE & WAGES */}
+            {/* EMPLOYMENT */}
             <div className="p-4 rounded-xl border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-950/20 space-y-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
-                <DollarSign className="h-4 w-4 text-emerald-600" /> Section 2: Employment Type & Wage Setup
+                <DollarSign className="h-4 w-4 text-emerald-600" /> Employment
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Labour Type (Contract / Permanent) *</Label>
+                  <Label className="text-xs font-semibold">Type *</Label>
                   <SmartComboBox
                     category="Labour Types"
                     value={labourFormData.type}
@@ -1303,7 +1338,7 @@ function LaboursComponent() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Default Weekly Wage (₹/wk) *</Label>
+                  <Label className="text-xs font-semibold">Weekly Wage (₹) *</Label>
                   <Input
                     type="number"
                     required
@@ -1317,12 +1352,12 @@ function LaboursComponent() {
               </div>
             </div>
 
-            <DialogFooter className="pt-3 border-t flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setAddOpen(false)} className="rounded-xl text-xs w-full sm:w-auto">
-                Cancel
-              </Button>
+            <DialogFooter className="pt-3 border-t flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
               <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-10 text-xs font-bold shadow-md px-5 w-full sm:w-auto">
                 Add Labour Profile
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setAddOpen(false)} className="rounded-xl text-xs w-full sm:w-auto">
+                Cancel
               </Button>
             </DialogFooter>
           </form>

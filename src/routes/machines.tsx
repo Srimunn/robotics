@@ -679,7 +679,13 @@ function MachinesPageComponent() {
               />
             </div>
 
-            <DialogFooter className="pt-2 flex flex-col-reverse sm:flex-row gap-2">
+            <DialogFooter className="pt-2 flex flex-col sm:flex-row justify-end gap-2">
+              <Button
+                type="submit"
+                className="h-9 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs w-full sm:w-auto"
+              >
+                {editingMachine ? "Update Machine" : "Save Machine"}
+              </Button>
               <Button
                 type="button"
                 variant="outline"
@@ -687,12 +693,6 @@ function MachinesPageComponent() {
                 className="h-9 text-xs rounded-xl w-full sm:w-auto"
               >
                 Cancel
-              </Button>
-              <Button
-                type="submit"
-                className="h-9 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs w-full sm:w-auto"
-              >
-                {editingMachine ? "Update Machine" : "Save Machine"}
               </Button>
             </DialogFooter>
           </form>

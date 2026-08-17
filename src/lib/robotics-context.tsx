@@ -169,6 +169,7 @@ import {
 
 
 const SESSION_KEY = "robotics_erp_current_user";
+export const SESSION_TIMEOUT_MS = 15 * 60 * 1000;
 
 const defaultSettings: SystemSettings = {
   companyName: "Robotics Bricks and Blocks Pvt. Ltd.",
@@ -190,7 +191,7 @@ const defaultSettings: SystemSettings = {
 type RoboticsContextType = {
   currentUser: CurrentUser | null;
   login: (role: "CEO" | "Worker" | "Labor", loginIdOrId?: string, pin?: string) => boolean;
-  logout: () => void;
+  logout: (isAutoTimeout?: boolean) => void;
   isLoading: boolean;
 
   enquiries: Enquiry[];
@@ -585,7 +586,57 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
     return false;
   };
 
-  const logout = () => { setCurrentUser(null); toast.info("Logged out successfully"); };
+  const logout = (isAutoTimeout: boolean = false) => {
+    try {
+      localStorage.removeItem(SESSION_KEY);
+    } catch {}
+    setCurrentUser(null);
+    if (isAutoTimeout) {
+      toast.error("Session expired due to inactivity");
+    } else {
+      toast.info("Logged out successfully");
+    }
+    if (typeof window !== "undefined" && window.location.pathname !== "/") {
+      window.location.href = "/";
+    }
+  };
+
+  // Inactivity timeout (15 minutes)
+  useEffect(() => {
+    if (!currentUser) return;
+
+    let timeoutId: ReturnType<typeof setTimeout>;
+    let lastReset = 0;
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        logout(true);
+      }, SESSION_TIMEOUT_MS);
+    };
+
+    const handleInteraction = () => {
+      const now = Date.now();
+      if (now - lastReset > 1000) {
+        lastReset = now;
+        resetTimer();
+      }
+    };
+
+    resetTimer();
+
+    const events = ["mousemove", "keydown", "touchstart", "click", "keypress"];
+    events.forEach((evt) => {
+      window.addEventListener(evt, handleInteraction, { passive: true });
+    });
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach((evt) => {
+        window.removeEventListener(evt, handleInteraction);
+      });
+    };
+  }, [currentUser]);
 
   // ---------- Sync getters (derived from cached data) ----------
   const getMasterDataByCategory = (category: MasterDataCategory) => masterData.filter((m: MasterDataItem) => m.category === category);

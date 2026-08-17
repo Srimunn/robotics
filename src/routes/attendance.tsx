@@ -713,12 +713,12 @@ function AttendancePageComponent() {
               );
             })()}
 
-            <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" onClick={() => setMarkAttendanceOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold">
+            <DialogFooter className="pt-2 flex flex-col sm:flex-row justify-end gap-2">
+              <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold w-full sm:w-auto">
                 Save & Mark Attendance
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setMarkAttendanceOpen(false)} className="rounded-lg text-xs w-full sm:w-auto">
+                Cancel
               </Button>
             </DialogFooter>
           </form>

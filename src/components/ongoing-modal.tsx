@@ -137,11 +137,11 @@ export function OngoingModal({
               onChange={(e) => setForm({ ...form, remarks: e.target.value })}
             />
           </div>
-          <DialogFooter className="sm:col-span-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="sm:col-span-2 flex flex-col sm:flex-row justify-end gap-2">
+            <Button type="submit" className="w-full sm:w-auto">{initial ? "Save Changes" : "Add Work"}</Button>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button type="submit">{initial ? "Save Changes" : "Add Work"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

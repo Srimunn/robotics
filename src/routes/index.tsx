@@ -389,11 +389,11 @@ function DashboardComponent() {
           id: `la_${proj.id}_${la.labourId}`,
           time: "08:30 AM",
           date: la.assignedDate || realTodayStr,
-          title: `Worker ${la.labourName} (${la.labourType}) assigned to ${proj.customerName} (${proj.id})`,
+          title: `Labour ${la.labourName} (${la.labourType}) assigned to ${proj.customerName} (${proj.id})`,
           subtitle: `Weekly Wage: ₹${la.weeklyWage} • Site Location: ${proj.location}`,
           category: "SHIFTS",
           type: "assignment",
-          badgeText: "Worker Assigned",
+          badgeText: "Labour Assigned",
           badgeColor: "bg-purple-50 text-purple-700 border-purple-200 font-bold",
           projectObj: proj,
         });
@@ -1428,7 +1428,7 @@ function DashboardComponent() {
                             </div>
                             <div className="text-[11px] text-muted-foreground flex items-center gap-3">
                               <span>Engineer: {proj.assignedEngineerName || "Er. Rajesh Kumar"}</span>
-                              <span>• {proj.assignedLabourIds.length} Workers</span>
+                              <span>• {proj.assignedLabourIds.length} Labours</span>
                               <span>• Collected: ₹{proj.receivedAmount.toLocaleString("en-IN")}</span>
                             </div>
                           </div>
@@ -2114,22 +2114,21 @@ function DashboardComponent() {
                 <HardHat className="h-5 w-5" />
               </div>
               <div>
-                <span>Add New Labour Staff Profile</span>
-                <p className="text-xs font-normal text-muted-foreground">Register permanent staff or contract workers with wage configuration.</p>
+                <span>Add Labour</span>
               </div>
             </DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleAddLabourSubmit} className="space-y-4 text-xs pt-2">
-            {/* SECTION 1: PERSONAL & CONTACT INFORMATION */}
+            {/* CONTACT */}
             <div className="p-4 rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/20 space-y-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
-                <User className="h-4 w-4 text-blue-600" /> Section 1: Contact Information
+                <User className="h-4 w-4 text-blue-600" /> Contact
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Labour Full Name *</Label>
+                  <Label className="text-xs font-semibold">Name *</Label>
                   <Input
                     required
                     placeholder="e.g. Ramesh Kumar"
@@ -2140,7 +2139,7 @@ function DashboardComponent() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Mobile Phone Number *</Label>
+                  <Label className="text-xs font-semibold">Phone *</Label>
                   <Input
                     required
                     placeholder="e.g. 9840112233"
@@ -2159,28 +2158,28 @@ function DashboardComponent() {
               </div>
             </div>
 
-            {/* SECTION 2: EMPLOYMENT TYPE & WAGES */}
+            {/* EMPLOYMENT */}
             <div className="p-4 rounded-xl border border-purple-100 dark:border-purple-900/40 bg-purple-50/40 dark:bg-purple-950/20 space-y-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
-                <DollarSign className="h-4 w-4 text-purple-600" /> Section 2: Employment Type & Wage Setup
+                <DollarSign className="h-4 w-4 text-purple-600" /> Employment
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Labour Type (Contract / Permanent) *</Label>
+                  <Label className="text-xs font-semibold">Type *</Label>
                   <Select value={labourType} onValueChange={(val: LabourType) => setLabourType(val)}>
                     <SelectTrigger className="h-9 text-xs rounded-xl">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl">
                       <SelectItem value="Permanent">Permanent Staff</SelectItem>
-                      <SelectItem value="Contract">Contract Worker</SelectItem>
+                      <SelectItem value="Contract">Contract Labour</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Daily Wage (₹)</Label>
+                  <Label className="text-xs font-semibold">Weekly Wage (₹)</Label>
                   <Input
                     type="number"
                     value={labourWage}
@@ -2191,12 +2190,12 @@ function DashboardComponent() {
               </div>
             </div>
 
-            <DialogFooter className="pt-3 border-t flex items-center justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setAddLabourOpen(false)} className="rounded-xl text-xs">
-                Cancel
+            <DialogFooter className="pt-3 border-t flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-10 text-xs font-bold shadow-md px-5 w-full sm:w-auto">
+                Add Labour Profile
               </Button>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-10 text-xs font-bold shadow-md px-5">
-                Add Labour Staff Profile
+              <Button type="button" variant="outline" onClick={() => setAddLabourOpen(false)} className="rounded-xl text-xs w-full sm:w-auto">
+                Cancel
               </Button>
             </DialogFooter>
           </form>

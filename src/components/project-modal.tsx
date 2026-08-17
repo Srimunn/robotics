@@ -139,11 +139,11 @@ export function ProjectModal({
             <div className="text-sm text-muted-foreground">Balance Amount (auto)</div>
             <div className="text-xl font-bold">{formatCurrency(balance)}</div>
           </div>
-          <DialogFooter className="sm:col-span-2 flex flex-col-reverse sm:flex-row gap-2">
+          <DialogFooter className="sm:col-span-2 flex flex-col sm:flex-row justify-end gap-2">
+            <Button type="submit" className="w-full sm:w-auto">{initial ? "Save Changes" : "Add Project"}</Button>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button type="submit" className="w-full sm:w-auto">{initial ? "Save Changes" : "Add Project"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -1097,7 +1097,7 @@ function ProjectsComponent() {
                 <CardHeader className="p-3 border-b bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                      <HardHat className="h-3.5 w-3.5 text-blue-600" /> Workers
+                      <HardHat className="h-3.5 w-3.5 text-blue-600" /> Labours
                     </CardTitle>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1133,7 +1133,7 @@ function ProjectsComponent() {
                             return (
                               <tr>
                                 <td colSpan={6} className="p-4 text-center text-muted-foreground">
-                                  No labours assigned to this project yet. Click "Assign Existing Labours" to select workers.
+                                  No labours assigned to this project yet. Click "Assign Existing Labours" to select labours.
                                 </td>
                               </tr>
                             );
@@ -1196,7 +1196,7 @@ function ProjectsComponent() {
                                   <tr className="bg-slate-100/80 dark:bg-slate-900/80 border-t border-b">
                                     <td colSpan={6} className="p-2.5 pl-3 font-bold text-[11px] uppercase tracking-wider text-muted-foreground">
                                       <div className="flex items-center gap-1.5">
-                                        <History className="h-3.5 w-3.5 text-slate-500" /> Previously Assigned Workers ({inactiveAssignments.length})
+                                        <History className="h-3.5 w-3.5 text-slate-500" /> Previously Assigned Labours ({inactiveAssignments.length})
                                       </div>
                                     </td>
                                   </tr>
@@ -1869,7 +1869,7 @@ function ProjectsComponent() {
             <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
               <p className="font-bold text-purple-950">Weekly Wages Policy</p>
               <p className="text-[11px] text-purple-800 mt-0.5">
-                Configure project-specific weekly wages for each worker. (e.g., Ravi ₹1400/wk, Ganesh ₹1800/wk, Selvam ₹2200/wk).
+                Configure project-specific weekly wages for each labour. (e.g., Ravi ₹1400/wk, Ganesh ₹1800/wk, Selvam ₹2200/wk).
               </p>
             </div>
 

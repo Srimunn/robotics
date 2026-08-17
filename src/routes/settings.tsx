@@ -216,6 +216,54 @@ function SettingsComponent() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Security & System PIN Management (CEO Only) */}
+          {currentUser?.role === "CEO" && (
+            <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card lg:col-span-2">
+              <CardHeader className="p-4 border-b">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-purple-600" /> Security & System PIN Management
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  System Administrator & Manager security access credentials
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Reset Admin PIN */}
+                  <div className="p-4 rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/30 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-purple-950 dark:text-purple-200 text-xs">Reset Admin PIN</span>
+                      <Badge className="bg-purple-600 text-white text-[10px]">CEO / Admin</Badge>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <span className="text-xs text-muted-foreground font-medium">Current Admin PIN:</span>
+                      <code className="bg-white dark:bg-purple-900/80 px-2.5 py-1 rounded-lg border border-purple-300 font-extrabold text-purple-700 dark:text-purple-300 text-xs tracking-wider font-mono">1234</code>
+                    </div>
+                  </div>
+
+                  {/* Reset Manager PIN */}
+                  <div className="p-4 rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/30 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-purple-950 dark:text-purple-200 text-xs">Reset Manager PIN</span>
+                      <Badge className="bg-purple-600 text-white text-[10px]">Supervisor / Manager</Badge>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <span className="text-xs text-muted-foreground font-medium">Current Manager PIN:</span>
+                      <code className="bg-white dark:bg-purple-900/80 px-2.5 py-1 rounded-lg border border-purple-300 font-extrabold text-purple-700 dark:text-purple-300 text-xs tracking-wider font-mono">5678</code>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-800 rounded-xl text-xs flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                  <p className="font-medium">
+                    To change admin/manager PINs, contact your system administrator. <span className="text-muted-foreground">(Full PIN change will be implemented with proper user authentication in a future phase.)</span>
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </form>
       )}
     </div>

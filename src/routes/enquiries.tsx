@@ -897,20 +897,7 @@ function EnquiriesComponent() {
               </Card>
             </div>
 
-            <DialogFooter className="pt-3 border-t flex items-center justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setActiveEnquiry(null)} className="rounded-lg text-xs">
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={() => {
-                  toast.success(`Enquiry ${activeEnquiry.id} saved successfully`);
-                  setActiveEnquiry(null);
-                }}
-                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1 font-bold shadow-xs px-4"
-              >
-                <Save className="h-3.5 w-3.5" /> Save
-              </Button>
+            <DialogFooter className="pt-3 border-t flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
               {activeEnquiry.customerDecision === "Approved" && !activeEnquiry.projectId && (
                 <Button
                   type="button"
@@ -918,11 +905,24 @@ function EnquiriesComponent() {
                     handleConvert(activeEnquiry.id);
                     setActiveEnquiry(null);
                   }}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs gap-1.5 shadow-xs"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs gap-1.5 shadow-xs w-full sm:w-auto"
                 >
                   <Sparkles className="h-4 w-4" /> Save & Create Project
                 </Button>
               )}
+              <Button
+                type="button"
+                onClick={() => {
+                  toast.success(`Enquiry ${activeEnquiry.id} saved successfully`);
+                  setActiveEnquiry(null);
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1 font-bold shadow-xs px-4 w-full sm:w-auto"
+              >
+                <Save className="h-3.5 w-3.5" /> Save
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setActiveEnquiry(null)} className="rounded-lg text-xs w-full sm:w-auto">
+                Cancel
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1118,16 +1118,16 @@ function EnquiriesComponent() {
               />
             </div>
 
-            <DialogFooter className="pt-4 border-t flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} className="rounded-xl text-xs w-full sm:w-auto">
-                Cancel
-              </Button>
+            <DialogFooter className="pt-4 border-t flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
               <Button
                 type="submit"
                 disabled={isSaving}
                 className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs gap-1 font-bold shadow-md px-5 w-full sm:w-auto"
               >
                 {isSaving ? "Saving..." : "Save Enquiry"}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} className="rounded-xl text-xs w-full sm:w-auto">
+                Cancel
               </Button>
             </DialogFooter>
           </form>
