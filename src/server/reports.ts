@@ -1,9 +1,19 @@
 "use server";
 
+import { fileURLToPath } from "url";
+import path from "path";
 import { createServerFn } from "@tanstack/react-start";
 import PDFDocument from "pdfkit";
 import { db } from "~/lib/db";
 import { toNumber } from "./utils";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+if (typeof (globalThis as any).__dirname === "undefined") {
+  (globalThis as any).__dirname = __dirname;
+}
+
 
 /** Fetch image from URL safely into a Buffer, returning null on error or timeout */
 async function fetchImageBuffer(url: string | null | undefined, timeoutMs = 4000): Promise<Buffer | null> {
