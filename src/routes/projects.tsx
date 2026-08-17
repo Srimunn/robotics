@@ -1590,7 +1590,73 @@ function ProjectsComponent() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => toast.success("Downloading Quotation PDF...")}
+                    onClick={() => {
+                      const pdfUrl = (activeProject as any).quotationPdfUrl;
+                      if (pdfUrl) {
+                        window.open(pdfUrl, "_blank");
+                        toast.success("Opening Quotation PDF...");
+                      } else {
+                        const printWin = window.open("", "_blank");
+                        if (!printWin) {
+                          toast.error("Please allow popups to view/download PDF");
+                          return;
+                        }
+                        const dateStr = activeProject.quotationDate || activeProject.scheduledDate || new Date().toISOString().slice(0, 10);
+                        printWin.document.write(`
+                          <!DOCTYPE html>
+                          <html>
+                            <head>
+                              <title>Quotation_${activeProject.id}</title>
+                              <style>
+                                body { font-family: system-ui, -apple-system, sans-serif; margin: 30px; color: #0f172a; }
+                                .header { border-bottom: 2px solid #2563eb; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+                                .title { font-size: 22px; font-weight: 800; color: #1e3a8a; }
+                                .subtitle { font-size: 12px; color: #64748b; margin-top: 4px; }
+                                .info-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                                .info-table th, .info-table td { border: 1px solid #cbd5e1; padding: 10px; font-size: 13px; text-align: left; }
+                                .info-table th { background: #f8fafc; font-weight: 700; width: 30%; }
+                                .amount-box { background: #f0fdf4; border: 1px solid #86efac; padding: 15px; border-radius: 8px; margin-top: 20px; font-size: 16px; font-weight: 700; color: #166534; }
+                                .footer { margin-top: 40px; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+                              </style>
+                            </head>
+                            <body>
+                              <div class="header">
+                                <div>
+                                  <div class="title">Robotics ERP — Official Quotation Artifact</div>
+                                  <div class="subtitle">Project Reference: ${activeProject.id}</div>
+                                </div>
+                                <div style="text-align: right; font-size: 12px; color: #475569;">
+                                  Date: ${dateStr}<br/>
+                                  Status: ${activeProject.status || "Scheduled"}
+                                </div>
+                              </div>
+
+                              <table class="info-table">
+                                <tr><th>Customer Name</th><td>${activeProject.customerName || "N/A"}</td></tr>
+                                <tr><th>Location / Address</th><td>${activeProject.location || "N/A"}</td></tr>
+                                <tr><th>Nature of Work</th><td>${activeProject.natureOfWork || "N/A"}</td></tr>
+                                <tr><th>Lead Source</th><td>${activeProject.leadSource || "Direct / Internal"}</td></tr>
+                                <tr><th>Assigned Engineer</th><td>${activeProject.assignedEngineerName || "Unassigned"}</td></tr>
+                              </table>
+
+                              <div class="amount-box">
+                                Quotation Amount: ₹${(activeProject.quotationAmount || activeProject.projectValue || 0).toLocaleString("en-IN")}
+                              </div>
+
+                              <div class="footer">
+                                Generated automatically by Robotics ERP • Authorized Copy
+                              </div>
+
+                              <script>
+                                window.onload = function() { window.print(); };
+                              </script>
+                            </body>
+                          </html>
+                        `);
+                        printWin.document.close();
+                        toast.success("Quotation PDF generated for download/print!");
+                      }
+                    }}
                     className="text-xs gap-1.5 rounded-lg"
                   >
                     <FileDown className="h-3.5 w-3.5" /> Download PDF

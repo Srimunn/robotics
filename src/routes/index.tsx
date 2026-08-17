@@ -1087,9 +1087,9 @@ function DashboardComponent() {
         </div>
 
         {/* Main Grid: 5 Operations Cards (Col-span-3) & Right Summary Panel (Col-span-1) */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
           {/* LEFT & CENTER CARDS CONTAINER (COL-SPAN 3) */}
-          <div className="lg:col-span-3 space-y-6">
+          <div className="xl:col-span-3 space-y-6">
             {/* GRID OF 5 MODERN OPERATIONS CARDS */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
@@ -1253,12 +1253,12 @@ function DashboardComponent() {
                   CARD 3: Labour Yet To Check In (Smart Auto-Removal on In Time Entry)
                   ------------------------------------------------------------------- */}
               <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-md transition-all duration-200">
-                <CardHeader className="p-4 border-b bg-slate-50/60 flex flex-row items-center justify-between">
-                  <div>
+                <CardHeader className="p-4 border-b bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="space-y-0.5 min-w-0 flex-1">
                     <CardTitle className="text-xs font-bold uppercase tracking-wider text-rose-700 flex items-center gap-1.5">
-                      <AlertTriangle className="h-4 w-4 text-rose-600 animate-pulse" /> Labour Yet To Check In
+                      <AlertTriangle className="h-4 w-4 text-rose-600 animate-pulse shrink-0" /> Labour Yet To Check In
                     </CardTitle>
-                    <CardDescription className="text-[11px]">
+                    <CardDescription className="text-[11px] leading-tight text-muted-foreground">
                       Permanent staff assigned today pending In Time check-in ({permanentLabourPendingCheckIn.length})
                     </CardDescription>
                   </div>
@@ -1266,7 +1266,7 @@ function DashboardComponent() {
                     size="sm"
                     variant="outline"
                     onClick={() => setAttendanceOpen(true)}
-                    className="text-xs text-rose-700 border-rose-200 bg-rose-50 hover:bg-rose-100"
+                    className="text-xs text-rose-700 border-rose-200 bg-rose-50 hover:bg-rose-100 shrink-0 self-start sm:self-center"
                   >
                     Quick Check-In
                   </Button>
@@ -1285,12 +1285,12 @@ function DashboardComponent() {
                         return (
                           <div
                             key={lab.id}
-                            className="p-3 hover:bg-rose-50/30 transition-colors flex items-center justify-between text-xs"
+                            className="p-3 hover:bg-rose-50/30 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
                           >
-                            <div className="space-y-0.5">
-                              <div className="font-bold text-foreground flex items-center gap-1.5">
-                                <span>{lab.name}</span>
-                                <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 rounded font-mono">
+                            <div className="space-y-0.5 min-w-0 flex-1">
+                              <div className="font-bold text-foreground flex flex-wrap items-center gap-1.5">
+                                <span className="truncate">{lab.name}</span>
+                                <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 rounded font-mono shrink-0">
                                   {lab.id}
                                 </span>
                               </div>
@@ -1299,8 +1299,8 @@ function DashboardComponent() {
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2">
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 animate-pulse">
+                            <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 animate-pulse shrink-0">
                                 Check-In Pending
                               </span>
                               <Button
@@ -1309,7 +1309,7 @@ function DashboardComponent() {
                                   setSelectedAttLabourId(lab.id);
                                   setAttendanceOpen(true);
                                 }}
-                                className="h-7 text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white"
+                                className="h-7 text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white shrink-0"
                               >
                                 Check In
                               </Button>
@@ -1326,12 +1326,12 @@ function DashboardComponent() {
                   CARD 4: Pending Payments (Outstanding Amounts)
                   ------------------------------------------------------------------- */}
               <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-md transition-all duration-200">
-                <CardHeader className="p-4 border-b bg-slate-50/60 flex flex-row items-center justify-between">
-                  <div>
+                <CardHeader className="p-4 border-b bg-slate-50/60 flex flex-row items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
                     <CardTitle className="text-xs font-bold uppercase tracking-wider text-rose-700 flex items-center gap-1.5">
-                      <Coins className="h-4 w-4 text-rose-600" /> Pending Payments
+                      <Coins className="h-4 w-4 text-rose-600 shrink-0" /> Pending Payments
                     </CardTitle>
-                    <CardDescription className="text-[11px]">
+                    <CardDescription className="text-[11px] truncate">
                       Outstanding project contract balances ({pendingPaymentsProjects.length})
                     </CardDescription>
                   </div>
@@ -1339,7 +1339,7 @@ function DashboardComponent() {
                     size="sm"
                     variant="ghost"
                     onClick={() => navigate({ to: "/payments" })}
-                    className="text-xs text-blue-600 hover:text-blue-800"
+                    className="text-xs text-blue-600 hover:text-blue-800 shrink-0"
                   >
                     View All →
                   </Button>
@@ -1355,20 +1355,20 @@ function DashboardComponent() {
                       pendingPaymentsProjects.map((proj) => (
                         <div
                           key={proj.id}
-                          className="p-3 hover:bg-slate-50/80 transition-colors flex items-center justify-between text-xs"
+                          className="p-3 hover:bg-slate-50/80 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
                         >
-                          <div className="space-y-0.5">
-                            <div className="font-bold text-foreground flex items-center gap-1.5">
-                              <span>{proj.customerName}</span>
-                              <span className="text-[10px] text-blue-600 font-semibold">{proj.id}</span>
+                          <div className="space-y-0.5 min-w-0 flex-1">
+                            <div className="font-bold text-foreground flex flex-wrap items-center gap-1.5">
+                              <span className="truncate">{proj.customerName}</span>
+                              <span className="text-[10px] text-blue-600 font-semibold shrink-0">{proj.id}</span>
                             </div>
                             <div className="text-[11px] text-muted-foreground">
                               Due: <span className="font-semibold text-slate-700">{proj.workCommittedDate || "Immediate"}</span> • <span className="font-bold text-rose-600">₹{proj.balanceAmount.toLocaleString("en-IN")} due</span>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-1.5">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                          <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-center">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shrink-0">
                               Priority: High
                             </span>
                             <Button
@@ -1378,7 +1378,7 @@ function DashboardComponent() {
                                 setPayAmountInput(proj.balanceAmount);
                                 setRecordPayOpen(true);
                               }}
-                              className="h-7 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
+                              className="h-7 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
                             >
                               Record Payment
                             </Button>

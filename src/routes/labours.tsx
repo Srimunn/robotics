@@ -529,13 +529,18 @@ function LaboursComponent() {
               ) : (
                 filteredLabours.map((l) => {
                   const isSelected = selectedLabourProfile?.id === l.id;
+                  const isInactive = l.isActive === false;
 
                   return (
                     <div
                       key={l.id}
                       onClick={() => setSelectedLabourProfile(l)}
                       className={`p-3 rounded-xl border cursor-pointer transition-all duration-200 ${
-                        isSelected
+                        isInactive
+                          ? isSelected
+                            ? "bg-amber-50 border-amber-400 dark:bg-amber-950/60 opacity-80 shadow-xs"
+                            : "bg-slate-100/80 dark:bg-slate-900/50 border-slate-300/80 opacity-65 hover:opacity-90"
+                          : isSelected
                           ? "bg-blue-50/90 border-blue-400 dark:bg-blue-950/60 shadow-xs"
                           : "bg-white dark:bg-card border-slate-200/80 hover:bg-slate-50 dark:hover:bg-slate-900"
                       }`}
@@ -543,12 +548,19 @@ function LaboursComponent() {
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <div className={`h-8 w-8 rounded-lg grid place-items-center font-bold text-xs shrink-0 ${
-                            l.type === "Permanent" ? "bg-blue-100 text-blue-800" : "bg-slate-200 text-slate-800"
+                            isInactive ? "bg-slate-300 text-slate-700" : l.type === "Permanent" ? "bg-blue-100 text-blue-800" : "bg-slate-200 text-slate-800"
                           }`}>
                             <HardHat className="h-4 w-4 text-blue-600" />
                           </div>
                           <div className="min-w-0 space-y-0.5">
-                            <p className="font-extrabold text-xs text-foreground truncate">{l.name}</p>
+                            <div className="flex items-center gap-1 min-w-0">
+                              <p className="font-extrabold text-xs text-foreground truncate">{l.name}</p>
+                              {isInactive && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300 shrink-0">
+                                  Inactive
+                                </span>
+                              )}
+                            </div>
                             <p className="text-[10px] text-muted-foreground font-medium truncate">
                               ID: <span className="font-mono font-semibold">{l.id}</span> • {l.phone}
                             </p>
@@ -564,9 +576,9 @@ function LaboursComponent() {
                             {l.type}
                           </Badge>
                           <span className={`text-[9px] font-bold ${
-                            l.status === "Assigned" ? "text-emerald-700" : "text-amber-700"
+                            isInactive ? "text-amber-800 font-bold" : l.status === "Assigned" ? "text-emerald-700" : "text-amber-700"
                           }`}>
-                            ● {l.status}
+                            ● {isInactive ? "Deactivated" : l.status}
                           </span>
                         </div>
                       </div>
@@ -1180,12 +1192,12 @@ function LaboursComponent() {
                 </thead>
                 <tbody className="divide-y">
                   {filteredLabours.map((l) => (
-                    <tr key={l.id} className="hover:bg-accent/40">
+                    <tr key={l.id} className={`hover:bg-accent/40 ${l.isActive === false ? "opacity-60 bg-amber-50/40 dark:bg-amber-950/20" : ""}`}>
                       <td className="p-3 pl-4 font-bold text-blue-600">{l.id}</td>
                       <td className="p-3 font-semibold text-foreground">
                         {l.name}
                         {l.isActive === false && (
-                          <Badge variant="outline" className="ml-1.5 text-[9px] bg-amber-50 text-amber-800 border-amber-300">
+                          <Badge variant="outline" className="ml-1.5 text-[9px] bg-amber-100 text-amber-900 border-amber-300 font-bold">
                             Inactive
                           </Badge>
                         )}

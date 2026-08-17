@@ -275,7 +275,46 @@ function AttendancePageComponent() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => toast.success("Exporting Payroll Summary to Excel / PDF...")}
+            onClick={() => {
+              if (!allAttendanceLogs || allAttendanceLogs.length === 0) {
+                toast.error("No attendance data available to export");
+                return;
+              }
+
+              const headers = ["Labour Name", "Date", "Project", "In Time", "Out Time", "Hours", "Status"];
+              const rows = allAttendanceLogs.map((log) => {
+                const labName = log.labourName || labours.find((l) => l.id === log.labourId)?.name || log.labourId;
+                const projName = log.projectName || log.projectId || "N/A";
+                const dateStr = log.date ? String(log.date).slice(0, 10) : "N/A";
+                const inT = log.inTime || "N/A";
+                const outT = log.outTime || "N/A";
+                const hrs = log.hoursWorked !== undefined && log.hoursWorked !== null ? String(log.hoursWorked) : "0";
+                const st = log.status || "N/A";
+
+                return [
+                  `"${labName.replace(/"/g, '""')}"`,
+                  `"${dateStr}"`,
+                  `"${projName.replace(/"/g, '""')}"`,
+                  `"${inT}"`,
+                  `"${outT}"`,
+                  `"${hrs}"`,
+                  `"${st}"`,
+                ].join(",");
+              });
+
+              const csvContent = [headers.join(","), ...rows].join("\n");
+              const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.setAttribute("href", url);
+              link.setAttribute("download", `Attendance_Summary_${new Date().toISOString().slice(0, 10)}.csv`);
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              URL.revokeObjectURL(url);
+
+              toast.success(`Exported ${allAttendanceLogs.length} attendance records to CSV!`);
+            }}
             className="text-xs font-semibold h-9 rounded-xl gap-1.5"
           >
             <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />

@@ -214,8 +214,14 @@ function ReportsComponent() {
   // Revenue Filtered Array
   const filteredRevenueReport = projects.filter((p) => {
     // 1. Payment Status Filter
-    if (revenuePaymentStatusFilter !== "ALL" && p.paymentStatus !== revenuePaymentStatusFilter) {
-      return false;
+    if (revenuePaymentStatusFilter !== "ALL") {
+      if (revenuePaymentStatusFilter === "Unpaid") {
+        if (p.paymentStatus !== "Pending" && p.paymentStatus !== "Overdue" && (p.paymentStatus as any) !== "Unpaid") {
+          return false;
+        }
+      } else if (p.paymentStatus !== revenuePaymentStatusFilter) {
+        return false;
+      }
     }
 
     // 2. Date Range Filter
@@ -248,7 +254,9 @@ function ReportsComponent() {
 
   const paidStatusCount = projects.filter((p) => p.paymentStatus === "Paid").length;
   const partialStatusCount = projects.filter((p) => p.paymentStatus === "Partial").length;
-  const unpaidStatusCount = projects.filter((p) => p.paymentStatus === "Pending" || (p.paymentStatus as any) === "Unpaid").length;
+  const unpaidStatusCount = projects.filter(
+    (p) => p.paymentStatus === "Pending" || p.paymentStatus === "Overdue" || (p.paymentStatus as any) === "Unpaid"
+  ).length;
 
   // Pending Collections Custom Filtering States
   const [pendingPaymentStatusFilter, setPendingPaymentStatusFilter] = useState<string>("ALL");
@@ -261,8 +269,14 @@ function ReportsComponent() {
     .filter((p) => (p.balanceAmount || 0) > 0)
     .filter((p) => {
       // 1. Payment Status Filter
-      if (pendingPaymentStatusFilter !== "ALL" && p.paymentStatus !== pendingPaymentStatusFilter) {
-        return false;
+      if (pendingPaymentStatusFilter !== "ALL") {
+        if (pendingPaymentStatusFilter === "Unpaid" || pendingPaymentStatusFilter === "Pending") {
+          if (p.paymentStatus !== "Pending" && p.paymentStatus !== "Overdue" && (p.paymentStatus as any) !== "Unpaid") {
+            return false;
+          }
+        } else if (p.paymentStatus !== pendingPaymentStatusFilter) {
+          return false;
+        }
       }
 
       // 2. Date Range Filter
@@ -1203,7 +1217,7 @@ function ReportsComponent() {
               <span className="text-[11px] font-bold text-muted-foreground mr-1">Collection Status:</span>
               {[
                 { id: "ALL", label: `All Pending (${projects.filter((p) => (p.balanceAmount || 0) > 0).length})` },
-                { id: "Unpaid", label: `Unpaid Only (${projects.filter((p) => (p.paymentStatus === "Pending" || (p.paymentStatus as any) === "Unpaid") && (p.balanceAmount || 0) > 0).length})` },
+                { id: "Unpaid", label: `Unpaid Only (${projects.filter((p) => (p.paymentStatus === "Pending" || p.paymentStatus === "Overdue" || (p.paymentStatus as any) === "Unpaid") && (p.balanceAmount || 0) > 0).length})` },
                 { id: "Partial", label: `Partial Paid (${projects.filter((p) => p.paymentStatus === "Partial" && (p.balanceAmount || 0) > 0).length})` },
               ].map((tab) => (
                 <button
