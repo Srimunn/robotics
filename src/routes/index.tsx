@@ -658,7 +658,7 @@ function DashboardComponent() {
       {/* ===========================================================================
           STICKY PAGE HEADER BANNER WITH QUICK ACTION TRIGGER PILLS
           =========================================================================== */}
-      <div className="sticky top-14 z-20 bg-white/95 dark:bg-card/95 backdrop-blur-md border-b border-border px-6 py-4 rounded-xl shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-card border border-border px-6 py-4 rounded-xl shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
             <Activity className="h-5 w-5 text-blue-600" /> Dashboard
