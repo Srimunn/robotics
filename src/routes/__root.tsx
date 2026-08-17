@@ -18,7 +18,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { LoginPage } from "@/components/LoginPage";
 import { LaborDashboard } from "@/components/LaborDashboard";
 import { GlobalSearchModal } from "@/components/global-search-modal";
-import { Search, Plus, Bell, User, CheckCircle2, AlertCircle, PhoneCall, Banknote, Calendar } from "lucide-react";
+import { Search, Plus, Bell, User, CheckCircle2, AlertCircle, PhoneCall, Banknote, Calendar, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -99,6 +99,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Robotics Service Management System" },
       { name: "description", content: "Enterprise ERP for Robotics & Industrial Automation Service Operations" },
+      { name: "theme-color", content: "#1a56db" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
     ],
     links: [
       {
@@ -106,6 +109,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "manifest", href: "/manifest.json" },
+      { rel: "apple-touch-icon", href: "/icon-192.png" },
     ],
   }),
   shellComponent: RootShell,
@@ -289,6 +294,85 @@ function MainHeader() {
   );
 }
 
+function PwaInstallBanner() {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showBanner, setShowBanner] = useState(false);
+
+  useEffect(() => {
+    // Client-side Service Worker Registration
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/service-worker.js")
+        .catch((err) => console.error("ServiceWorker registration failed:", err));
+    }
+
+    // Check if user previously dismissed prompt
+    const isDismissed = typeof window !== "undefined" && localStorage.getItem("pwa_install_dismissed") === "true";
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      if (window.innerWidth < 768 && !isDismissed) {
+        setShowBanner(true);
+      }
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === "accepted") {
+      setShowBanner(false);
+    }
+    setDeferredPrompt(null);
+  };
+
+  const handleDismiss = () => {
+    try {
+      localStorage.setItem("pwa_install_dismissed", "true");
+    } catch {}
+    setShowBanner(false);
+  };
+
+  if (!showBanner) return null;
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-blue-600 text-white p-3 shadow-2xl rounded-t-2xl flex items-center justify-between gap-3 border-t border-blue-500 md:hidden">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <div className="h-8 w-8 rounded-lg bg-white/20 flex items-center justify-center font-bold text-white shrink-0 text-xs">
+          R
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-bold truncate">Install Robotics ERP</p>
+          <p className="text-[10px] text-blue-100 truncate">Install Robotics ERP for a better experience</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <button
+          onClick={handleInstall}
+          className="bg-white text-blue-700 hover:bg-blue-50 px-3 py-1 rounded-lg text-xs font-extrabold shadow-xs transition-colors cursor-pointer"
+        >
+          Install
+        </button>
+        <button
+          onClick={handleDismiss}
+          className="text-blue-200 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+          aria-label="Dismiss banner"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
@@ -296,6 +380,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <RoboticsProvider>
         <RootLayout />
+        <PwaInstallBanner />
         <Toaster richColors position="top-right" />
       </RoboticsProvider>
     </QueryClientProvider>
