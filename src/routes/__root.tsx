@@ -164,6 +164,7 @@ function MainHeader() {
         <div className="flex items-center gap-3">
           <SidebarTrigger className="text-slate-700 hover:text-slate-900 hover:bg-slate-100" />
           <div className="hidden sm:flex items-center gap-2 text-xs text-slate-600">
+            <img src="/logo.png" alt="RPC Logo" className="h-6 w-6 object-contain" />
             <span className="font-bold text-slate-900 tracking-wide">Robotics ERP</span>
           </div>
         </div>
@@ -346,9 +347,7 @@ function PwaInstallBanner() {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-blue-600 text-white p-3 shadow-2xl rounded-t-2xl flex items-center justify-between gap-3 border-t border-blue-500 md:hidden">
       <div className="flex items-center gap-2.5 min-w-0">
-        <div className="h-8 w-8 rounded-lg bg-white/20 flex items-center justify-center font-bold text-white shrink-0 text-xs">
-          R
-        </div>
+        <img src="/logo.png" alt="RPC Logo" className="h-8 w-8 object-contain shrink-0 drop-shadow-xs" />
         <div className="min-w-0">
           <p className="text-xs font-bold truncate">Install Robotics ERP</p>
           <p className="text-[10px] text-blue-100 truncate">Install Robotics ERP for a better experience</p>

@@ -63,9 +63,7 @@ export function LoginPage() {
       <Card className="w-full max-w-sm sm:max-w-md rounded-2xl border border-slate-200/80 bg-white shadow-xl p-5 sm:p-8 space-y-6">
         {/* Header with Company Logo & Name */}
         <div className="flex flex-col items-center text-center space-y-3">
-          <div className="h-12 w-12 rounded-full bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
-            <Briefcase className="h-6 w-6" />
-          </div>
+          <img src="/logo.png" alt="RPC Logo" className="h-16 w-16 object-contain drop-shadow-md" />
           <div>
             <h1 className="text-xl font-bold tracking-tight text-slate-900">
               Robotics Bricks & Blocks

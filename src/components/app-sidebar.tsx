@@ -60,9 +60,7 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r border-slate-200 bg-white text-slate-900">
       <SidebarHeader className="border-b border-slate-200 p-3 bg-white">
         <div className="flex items-center gap-3">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-blue-600 text-white shadow-xs">
-            <Bot className="h-5 w-5" />
-          </div>
+          <img src="/logo.png" alt="RPC Logo" className="h-8 w-8 object-contain shrink-0" />
           <div className="min-w-0">
             <div className="truncate text-base font-extrabold tracking-tight text-slate-900">
               Robotics ERP
