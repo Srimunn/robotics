@@ -24,6 +24,12 @@ function formatProject<T extends Record<string, any>>(p: T | null) {
   };
 }
 
+const preprocessDate = (v: unknown) => {
+  if (v === undefined) return undefined;
+  if (v === "" || v === null) return null;
+  return v;
+};
+
 const enquiryCreate = z.object({
   enquiryDate: z.preprocess((v) => (v === "" || v === null || v === undefined ? undefined : v), z.coerce.date()),
   customerName: z.string().min(1),
@@ -35,13 +41,13 @@ const enquiryCreate = z.object({
   leakageType: z.string(),
   assignedEngineerId: z.string().optional().nullable(),
   assignedEngineerName: z.string().optional().nullable(),
-  siteVisitDate: z.preprocess((v) => (v === "" || v === null || v === undefined ? undefined : v), z.coerce.date().optional().nullable()),
-  quotationDate: z.preprocess((v) => (v === "" || v === null || v === undefined ? undefined : v), z.coerce.date().optional().nullable()),
+  siteVisitDate: z.preprocess(preprocessDate, z.coerce.date().optional().nullable()),
+  quotationDate: z.preprocess(preprocessDate, z.coerce.date().optional().nullable()),
   quotationAmount: z.preprocess((v) => (v === "" || v === null || v === undefined || (typeof v === "string" && v.trim() === "") || Number.isNaN(Number(v)) ? undefined : Number(v)), z.number().optional().nullable()),
   quotationPdfUrl: z.string().optional().nullable(),
   remarks: z.string().optional().nullable(),
-  workCommittedDate: z.preprocess((v) => (v === "" || v === null || v === undefined ? undefined : v), z.coerce.date().optional().nullable()),
-  actualWorkStartedDate: z.preprocess((v) => (v === "" || v === null || v === undefined ? undefined : v), z.coerce.date().optional().nullable()),
+  workCommittedDate: z.preprocess(preprocessDate, z.coerce.date().optional().nullable()),
+  actualWorkStartedDate: z.preprocess(preprocessDate, z.coerce.date().optional().nullable()),
   customerStatus: z.string().optional().nullable(),
 });
 
@@ -136,7 +142,8 @@ export const updateEnquiry = createServerFn({ method: "POST" })
       });
 
       // Bi-directional auto-sync to linked Project
-      const linkedProject = await tx.project.findFirst({ where: { enquiry: { id } } });
+      const linkedProjectId = updated.projectId;
+      const linkedProject = linkedProjectId ? await tx.project.findUnique({ where: { id: linkedProjectId } }) : null;
       if (linkedProject) {
         const newValue =
           parsed.quotationAmount !== undefined ? parsed.quotationAmount : Number(linkedProject.projectValue);
@@ -161,8 +168,8 @@ export const updateEnquiry = createServerFn({ method: "POST" })
           quotationAmount: parsed.quotationAmount ?? undefined,
           projectValue: newValue ?? undefined,
           balanceAmount: balance,
-          workCommittedDate: parsed.workCommittedDate ?? undefined,
-          actualWorkStartedDate: parsed.actualWorkStartedDate ?? undefined,
+          workCommittedDate: parsed.workCommittedDate !== undefined ? parsed.workCommittedDate : undefined,
+          actualWorkStartedDate: parsed.actualWorkStartedDate !== undefined ? parsed.actualWorkStartedDate : undefined,
           remarks: parsed.remarks ?? undefined,
           customerDecision: parsed.customerDecision ?? undefined,
           cancellationReason: parsed.cancellationReason ?? undefined,

@@ -156,20 +156,17 @@ export const assignLaboursToProject = createServerFn({ method: "POST" })
           continue;
         }
 
-        // Conflict check: labour on another active project with active assignment
-        const conflict = await tx.projectLabourAssignment.findFirst({
+        // Deactivate any active assignments on other projects for this labourer
+        await tx.projectLabourAssignment.updateMany({
           where: {
             labourId: asgn.labourId,
             NOT: { projectId: data.projectId },
-            project: { status: { in: ["Ongoing", "Scheduled"] } },
             isActive: true,
           },
-          include: { project: true },
+          data: {
+            isActive: false,
+          },
         });
-        if (conflict) {
-          results.push({ labourId: asgn.labourId, ok: false, reason: `Already on ${conflict.projectId}` });
-          continue;
-        }
 
         // Upsert the assignment
         await tx.projectLabourAssignment.upsert({

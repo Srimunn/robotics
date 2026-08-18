@@ -104,6 +104,9 @@ import {
 
 import {
   issueMaterialToProject as issueMaterialToProjectFn,
+  addProjectMaterialNote as addProjectMaterialNoteFn,
+  updateProjectMaterialNote as updateProjectMaterialNoteFn,
+  deleteProjectMaterialNote as deleteProjectMaterialNoteFn,
   adjustStock as adjustStockFn,
 } from "~/server/materials";
 
@@ -259,13 +262,16 @@ type RoboticsContextType = {
   addMachine: (m: Omit<Machine, "id" | "createdAt" | "issuedQuantity" | "repairQuantity" | "lostQuantity">) => Promise<Machine>;
   updateMachine: (id: string, updates: Partial<Machine>) => Promise<void>;
   deleteMachine: (id: string) => Promise<void>;
-  issueMachineToProject: (params: { machineId: string; projectId: string; quantity: number; issueDate: string; expectedReturnDate: string; issuedBy: string; remarks?: string }) => Promise<MachineIssueRecord | undefined>;
+  issueMachineToProject: (params: { machineId: string; projectId: string; quantity: number; issueDate: string; expectedReturnDate?: string | null; issuedBy: string; remarks?: string }) => Promise<MachineIssueRecord | undefined>;
   returnMachineFromProject: (params: { issueRecordId: string; returnQty: number; condition: MachineCondition; returnRemarks?: string; returnedBy?: string }) => Promise<void>;
 
   addMaterial: (m: Omit<Material, "id" | "createdAt">) => Promise<Material>;
   updateMaterial: (id: string, updates: Partial<Material>) => Promise<void>;
   deleteMaterial: (id: string) => Promise<void>;
   issueMaterialToProject: (params: { materialId: string; projectId: string; quantity: number; issueDate: string; issuedBy: string; remarks?: string }) => Promise<MaterialIssueRecord | undefined>;
+  addProjectMaterialNote: (params: { projectId: string; description: string; date: string }) => Promise<MaterialIssueRecord | undefined>;
+  updateProjectMaterialNote: (params: { id: string; description: string; date: string }) => Promise<MaterialIssueRecord | undefined>;
+  deleteProjectMaterialNote: (id: string) => Promise<void>;
   adjustStock: (params: { itemType: StockItemType; itemId: string; newQuantity: number; reason: string; actor: string }) => Promise<void>;
 
   updateSettings: (s: Partial<SystemSettings>) => Promise<void>;
@@ -906,7 +912,7 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const issueMachineM = useMutation({
-    mutationFn: async (params: { machineId: string; projectId: string; quantity: number; issueDate: string; expectedReturnDate: string; issuedBy: string; remarks?: string }) => {
+    mutationFn: async (params: { machineId: string; projectId: string; quantity: number; issueDate: string; expectedReturnDate?: string | null; issuedBy: string; remarks?: string }) => {
       const rec = await issueMachineToProjectFn({ data: params });
       return rec ? mapMachineIssueFromDb(rec as any) : undefined;
     },
@@ -945,6 +951,27 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
       return rec ? mapMaterialIssueFromDb(rec as any) : undefined;
     },
     onSuccess: (rec) => { invalidate("materials", "materialIssues", "projects", "stockAuditLogs"); if (rec) toast.success(`Issued ${rec.quantity} of ${rec.materialName}`); },
+    onError: (err) => toast.error(`${(err as Error).message}`),
+  });
+  const addProjectMaterialNoteM = useMutation({
+    mutationFn: async (params: { projectId: string; description: string; date: string }) => {
+      const rec = await addProjectMaterialNoteFn({ data: params });
+      return rec ? mapMaterialIssueFromDb(rec as any) : undefined;
+    },
+    onSuccess: () => { invalidate("projects", "materialIssues"); toast.success("Material note added"); },
+    onError: (err) => toast.error(`${(err as Error).message}`),
+  });
+  const updateProjectMaterialNoteM = useMutation({
+    mutationFn: async (params: { id: string; description: string; date: string }) => {
+      const rec = await updateProjectMaterialNoteFn({ data: params });
+      return rec ? mapMaterialIssueFromDb(rec as any) : undefined;
+    },
+    onSuccess: () => { invalidate("projects", "materialIssues"); toast.success("Material note updated"); },
+    onError: (err) => toast.error(`${(err as Error).message}`),
+  });
+  const deleteProjectMaterialNoteM = useMutation({
+    mutationFn: async (id: string) => deleteProjectMaterialNoteFn({ data: { id } }),
+    onSuccess: () => { invalidate("projects", "materialIssues"); toast.success("Material note deleted"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const adjustStockM = useMutation({
@@ -1071,6 +1098,9 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
         updateMaterial: async (id, updates) => { await updateMaterialM.mutateAsync({ id, updates }); },
         deleteMaterial: async (id) => { await deleteMaterialM.mutateAsync(id); },
         issueMaterialToProject: (params) => issueMaterialM.mutateAsync(params),
+        addProjectMaterialNote: (params) => addProjectMaterialNoteM.mutateAsync(params),
+        updateProjectMaterialNote: (params) => updateProjectMaterialNoteM.mutateAsync(params),
+        deleteProjectMaterialNote: async (id) => { await deleteProjectMaterialNoteM.mutateAsync(id); },
         adjustStock: async (params) => { await adjustStockM.mutateAsync(params); },
 
         updateSettings: async (s) => { await updateSettingsM.mutateAsync(s); },

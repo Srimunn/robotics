@@ -13,7 +13,7 @@ export const issueMachineToProject = createServerFn({ method: "POST" })
       projectId: string;
       quantity: number;
       issueDate: string;
-      expectedReturnDate: string;
+      expectedReturnDate?: string | null;
       issuedBy: string;
       remarks?: string;
     }) => input
@@ -46,7 +46,7 @@ export const issueMachineToProject = createServerFn({ method: "POST" })
           customerName: project.customerName,
           quantity: data.quantity,
           issueDate: new Date(data.issueDate),
-          expectedReturnDate: new Date(data.expectedReturnDate),
+          expectedReturnDate: (data.expectedReturnDate ? new Date(data.expectedReturnDate) : null) as any,
           issuedBy: data.issuedBy,
           status: "Issued",
           remarks: data.remarks,

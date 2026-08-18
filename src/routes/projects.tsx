@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { uploadImage } from "~/server/upload";
 import { useRobotics, calculateHoursFromTimes, calculateEarnedWage } from "@/lib/robotics-context";
-import type { Project, ProjectStatus, ProjectLabourLog, LabourType, MachineCondition, MachineIssueRecord, PaymentStageItem, PaymentStatus, ProjectLabourAssignment } from "@/lib/robotics-types";
+import type { Project, ProjectStatus, ProjectLabourLog, LabourType, MachineCondition, MachineIssueRecord, MaterialIssueRecord, PaymentStageItem, PaymentStatus, ProjectLabourAssignment } from "@/lib/robotics-types";
 import { SmartComboBox } from "@/components/ui/SmartComboBox";
 import { DataPagination } from "@/components/ui/DataPagination";
 import { DeleteConfirm } from "@/components/delete-confirm";
@@ -50,8 +50,11 @@ import {
   Save,
   Camera,
   Pencil,
+  FileSpreadsheet,
+  Package,
   Check,
   X,
+  ChevronsUpDown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -67,6 +70,8 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
   Select,
   SelectContent,
@@ -117,6 +122,9 @@ function ProjectsComponent() {
     issueMachineToProject,
     returnMachineFromProject,
     issueMaterialToProject,
+    addProjectMaterialNote,
+    updateProjectMaterialNote,
+    deleteProjectMaterialNote,
     addPaymentStage,
     updatePaymentStage,
     deletePaymentStage,
@@ -136,7 +144,12 @@ function ProjectsComponent() {
   const [activeProject, setActiveProject] = useState<Project | null>(null);
 
   useEffect(() => {
-    if (openId && projects.length > 0) {
+    if (activeProject) {
+      const fresh = projects.find((p) => p.id === activeProject.id);
+      if (fresh) {
+        setActiveProject(fresh);
+      }
+    } else if (openId && projects.length > 0) {
       const found = projects.find((p) => p.id === openId);
       if (found) {
         setActiveProject(found);
@@ -327,11 +340,37 @@ function ProjectsComponent() {
     toast.success("Labour unassigned from project");
   };
 
-  const handleSaveActiveProject = () => {
+  const handleSaveActiveProject = async () => {
     if (!activeProject) return;
-    updateProject(activeProject.id, activeProject);
-    toast.success(`Project ${activeProject.id} saved & updated successfully!`);
-    setActiveProject(null);
+    try {
+      await updateProject(activeProject.id, {
+        customerName: activeProject.customerName,
+        phone: activeProject.phone,
+        location: activeProject.location,
+        leadSource: activeProject.leadSource,
+        leakageType: activeProject.leakageType,
+        natureOfWork: activeProject.natureOfWork,
+        assignedEngineerId: activeProject.assignedEngineerId,
+        assignedEngineerName: activeProject.assignedEngineerName,
+        siteVisitDate: activeProject.siteVisitDate,
+        siteVisitStatus: activeProject.siteVisitStatus,
+        quotationDate: activeProject.quotationDate,
+        quotationAmount: activeProject.quotationAmount,
+        quotationPdfUrl: activeProject.quotationPdfUrl,
+        projectValue: activeProject.projectValue,
+        scheduledDate: activeProject.scheduledDate,
+        workCommittedDate: activeProject.workCommittedDate,
+        actualWorkStartedDate: activeProject.actualWorkStartedDate,
+        customerDecision: activeProject.customerDecision,
+        cancellationReason: activeProject.cancellationReason,
+        remarks: activeProject.remarks,
+        internalNotes: activeProject.internalNotes,
+      });
+      toast.success(`Project ${activeProject.id} saved & updated successfully!`);
+      setActiveProject(null);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update project");
+    }
   };
 
   // Policy Notice Modal
@@ -343,6 +382,7 @@ function ProjectsComponent() {
 
   // Project Issue / Return Machine Modal
   const [projIssueMachineOpen, setProjIssueMachineOpen] = useState(false);
+  const [projMachineSelectOpen, setProjMachineSelectOpen] = useState(false);
   const [projIssueMachineId, setProjIssueMachineId] = useState("");
   const [projIssueMachineQty, setProjIssueMachineQty] = useState(1);
   const [projIssueMachineReturnDate, setProjIssueMachineReturnDate] = useState(
@@ -362,6 +402,12 @@ function ProjectsComponent() {
   const [projIssueMaterialQty, setProjIssueMaterialQty] = useState(1);
   const [projIssueMaterialBy, setProjIssueMaterialBy] = useState("Er. Rajesh Kumar");
   const [projIssueMaterialRemarks, setProjIssueMaterialRemarks] = useState("");
+
+  // Project Material Note Modal
+  const [isAddMaterialNoteOpen, setIsAddMaterialNoteOpen] = useState(false);
+  const [editingMatNote, setEditingMatNote] = useState<MaterialIssueRecord | null>(null);
+  const [matNoteDesc, setMatNoteDesc] = useState("");
+  const [matNoteDate, setMatNoteDate] = useState(new Date().toISOString().slice(0, 10));
 
   // Project Closing Checklist Modal
   const [closingProjectTarget, setClosingProjectTarget] = useState<Project | null>(null);
@@ -1505,7 +1551,9 @@ function ProjectsComponent() {
                                   <td className="p-2.5 text-center font-bold text-emerald-600">{mIssue.returnedQuantity}</td>
                                   <td className="p-2.5 text-muted-foreground">
                                     <div>Issued: {mIssue.issueDate}</div>
-                                    <div className="text-[10px]">Exp: {mIssue.expectedReturnDate}</div>
+                                    {mIssue.actualReturnedDate && (
+                                      <div className="text-[10px] text-emerald-600 font-semibold">Returned: {mIssue.actualReturnedDate}</div>
+                                    )}
                                   </td>
                                   <td className="p-2.5 text-muted-foreground">{mIssue.issuedBy}</td>
                                   <td className="p-2.5">
@@ -1550,6 +1598,90 @@ function ProjectsComponent() {
 
 
 
+              {/* SECTION 7.5: MATERIAL ISSUE LOG */}
+              <Card className="rounded-xl border border-border">
+                <CardHeader className="p-3 border-b bg-muted/20 flex flex-row items-center justify-between">
+                  <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
+                    <Package className="h-3.5 w-3.5 text-amber-600" /> Section 7.5: Material Issue Log (Reference Notes)
+                  </CardTitle>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setEditingMatNote(null);
+                      setMatNoteDesc("");
+                      setMatNoteDate(new Date().toISOString().slice(0, 10));
+                      setIsAddMaterialNoteOpen(true);
+                    }}
+                    className="bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs gap-1.5 h-7 shadow-xs font-semibold"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add Material Note
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-muted/10 text-muted-foreground border-b text-[10px] font-bold uppercase">
+                        <tr>
+                          <th className="p-2 pl-3 w-32">Date</th>
+                          <th className="p-2">Material / Item Description</th>
+                          <th className="p-2 text-right pr-3 w-24">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {(!materialIssues.filter((m) => m.projectId === activeProject.id) ||
+                        materialIssues.filter((m) => m.projectId === activeProject.id).length === 0) ? (
+                          <tr>
+                            <td colSpan={3} className="p-4 text-center text-muted-foreground">
+                              No material notes recorded for this project yet. Click "Add Material Note" to log materials used.
+                            </td>
+                          </tr>
+                        ) : (
+                          materialIssues
+                            .filter((m) => m.projectId === activeProject.id)
+                            .map((mat) => (
+                              <tr key={mat.id} className="hover:bg-accent/40 transition-colors">
+                                <td className="p-2.5 pl-3 font-semibold text-foreground whitespace-nowrap">
+                                  {mat.issueDate}
+                                </td>
+                                <td className="p-2.5 text-foreground font-medium">
+                                  {mat.materialName}
+                                </td>
+                                <td className="p-2.5 text-right pr-3">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => {
+                                        setEditingMatNote(mat);
+                                        setMatNoteDesc(mat.materialName);
+                                        setMatNoteDate(mat.issueDate || new Date().toISOString().slice(0, 10));
+                                        setIsAddMaterialNoteOpen(true);
+                                      }}
+                                      title="Edit Note"
+                                      className="h-7 w-7 rounded-lg text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => deleteProjectMaterialNote(mat.id)}
+                                      title="Delete Note"
+                                      className="h-7 w-7 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* SECTION 8: ACTIVITY TIMELINE */}
               <Card className="rounded-xl border border-border">
                 <CardHeader className="p-3 border-b bg-muted/20">
@@ -1588,57 +1720,67 @@ function ProjectsComponent() {
                       <p className="text-[11px] text-muted-foreground">Inherited from Enquiry {activeProject.enquiryId || "Original"}</p>
                     </div>
                   </div>
-                  {activeProject.quotationPdfUrl ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        window.open(activeProject.quotationPdfUrl, "_blank");
-                        toast.success("Opening Quotation PDF...");
-                      }}
-                      className="text-xs gap-1.5 rounded-lg bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold hover:bg-emerald-100 shadow-2xs"
-                    >
-                      <FileDown className="h-3.5 w-3.5 text-emerald-600" /> Download PDF
-                    </Button>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="file"
-                        id={`proj-quotation-pdf-input-${activeProject.id}`}
-                        accept="application/pdf,image/*"
-                        className="hidden"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          try {
-                            const reader = new FileReader();
-                            reader.onload = async () => {
-                              const base64Data = reader.result as string;
-                              const res = await uploadImage({ data: { image: base64Data, folder: "quotations" } });
-                              if (res?.url) {
-                                updateProject(activeProject.id, { quotationPdfUrl: res.url });
-                                setActiveProject({ ...activeProject, quotationPdfUrl: res.url });
-                                toast.success("Quotation PDF uploaded and saved to Project!");
-                              } else {
-                                toast.error("Failed to upload Quotation PDF");
-                              }
-                            };
-                            reader.readAsDataURL(file);
-                          } catch (err: any) {
-                            toast.error("Failed to upload Quotation PDF");
-                          }
-                        }}
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => document.getElementById(`proj-quotation-pdf-input-${activeProject.id}`)?.click()}
-                        className="text-xs gap-1.5 rounded-lg border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 font-semibold shadow-2xs"
-                      >
-                        <Upload className="h-3.5 w-3.5 text-blue-600" /> Upload Quotation PDF
-                      </Button>
-                    </div>
-                  )}
+                  {(() => {
+                    const quotationUrl =
+                      activeProject.quotationPdfUrl ||
+                      enquiries.find((e) => e.projectId === activeProject.id || e.id === activeProject.enquiryId)?.quotationPdfUrl;
+
+                    if (quotationUrl) {
+                      return (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            window.open(quotationUrl, "_blank", "noopener,noreferrer");
+                            toast.success("Opening Quotation PDF...");
+                          }}
+                          className="text-xs gap-1.5 rounded-lg bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold hover:bg-emerald-100 shadow-2xs"
+                        >
+                          <FileDown className="h-3.5 w-3.5 text-emerald-600" /> View / Download PDF
+                        </Button>
+                      );
+                    }
+
+                    return (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="file"
+                          id={`proj-quotation-pdf-input-${activeProject.id}`}
+                          accept="application/pdf,image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            try {
+                              const reader = new FileReader();
+                              reader.onload = async () => {
+                                const base64Data = reader.result as string;
+                                const res = await uploadImage({ data: { image: base64Data, folder: "quotations" } });
+                                if (res?.url) {
+                                  updateProject(activeProject.id, { quotationPdfUrl: res.url });
+                                  setActiveProject({ ...activeProject, quotationPdfUrl: res.url });
+                                  toast.success("Quotation PDF uploaded and saved to Project!");
+                                } else {
+                                  toast.error("Failed to upload Quotation PDF");
+                                }
+                              };
+                              reader.readAsDataURL(file);
+                            } catch (err: any) {
+                              toast.error("Failed to upload Quotation PDF");
+                            }
+                          }}
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => document.getElementById(`proj-quotation-pdf-input-${activeProject.id}`)?.click()}
+                          className="text-xs gap-1.5 rounded-lg border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 font-semibold shadow-2xs"
+                        >
+                          <Upload className="h-3.5 w-3.5 text-blue-600" /> Upload Quotation PDF
+                        </Button>
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
 
@@ -2329,7 +2471,6 @@ function ProjectsComponent() {
                 projectId: activeProject.id,
                 quantity: Number(projIssueMachineQty),
                 issueDate: new Date().toISOString().slice(0, 10),
-                expectedReturnDate: projIssueMachineReturnDate,
                 issuedBy: projIssueMachineBy,
                 remarks: projIssueMachineRemarks,
               });
@@ -2337,22 +2478,61 @@ function ProjectsComponent() {
             }}
             className="space-y-4 py-2 text-xs"
           >
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 flex flex-col">
               <Label className="text-xs font-semibold">Select Available Machine *</Label>
-              <Select value={projIssueMachineId} onValueChange={setProjIssueMachineId}>
-                <SelectTrigger className="h-9 text-xs rounded-lg">
-                  <SelectValue placeholder="Select machine..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {machines
-                    .filter((m) => m.availableQuantity > 0)
-                    .map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.toolName} ({m.availableQuantity} {m.unit} available)
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <Popover open={projMachineSelectOpen} onOpenChange={setProjMachineSelectOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={projMachineSelectOpen}
+                    className="w-full justify-between h-9 text-xs rounded-lg font-normal bg-background border-input px-3"
+                  >
+                    <span className="truncate">
+                      {projIssueMachineId
+                        ? (() => {
+                            const m = machines.find((x) => x.id === projIssueMachineId);
+                            return m ? `${m.toolName} (${m.availableQuantity} ${m.unit} available)` : "Select machine...";
+                          })()
+                        : "Search & select available machine..."}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[380px] p-0 shadow-xl rounded-xl" align="start">
+                  <Command>
+                    <CommandInput placeholder="Type to search machine name, brand, or ID..." className="h-9 text-xs" />
+                    <CommandList className="max-h-60 overflow-y-auto p-1">
+                      <CommandEmpty className="p-4 text-xs text-center text-muted-foreground italic">
+                        No available machines match search query.
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {machines
+                          .filter((m) => m.availableQuantity > 0)
+                          .map((m) => (
+                            <CommandItem
+                              key={m.id}
+                              value={`${m.toolName} ${m.category || ""} ${m.brand || ""} ${m.id}`}
+                              onSelect={() => {
+                                setProjIssueMachineId(m.id);
+                                setProjMachineSelectOpen(false);
+                              }}
+                              className="text-xs flex items-center justify-between py-2 px-3 rounded-lg cursor-pointer hover:bg-accent"
+                            >
+                              <div className="flex flex-col gap-0.5 max-w-[240px]">
+                                <span className="font-bold text-foreground truncate">{m.toolName}</span>
+                                <span className="text-[10px] text-muted-foreground">{m.category || "Tool"} • ID: {m.id}</span>
+                              </div>
+                              <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0 font-medium">
+                                {m.availableQuantity} {m.unit} available
+                              </Badge>
+                            </CommandItem>
+                          ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -2377,16 +2557,6 @@ function ProjectsComponent() {
                   className="h-9 text-xs rounded-lg"
                 />
               </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Expected Return Date</Label>
-              <Input
-                type="date"
-                value={projIssueMachineReturnDate}
-                onChange={(e) => setProjIssueMachineReturnDate(e.target.value)}
-                className="h-9 text-xs rounded-lg"
-              />
             </div>
 
             <div className="space-y-1.5">
@@ -2791,6 +2961,87 @@ function ProjectsComponent() {
                   className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl h-10 text-xs font-bold shadow-md px-5 gap-1"
                 >
                   <Check className="h-4 w-4" /> Assign Selected ({selectedLabourIds.length})
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* ADD / EDIT MATERIAL NOTE DIALOG */}
+        <Dialog open={isAddMaterialNoteOpen} onOpenChange={(open) => {
+          setIsAddMaterialNoteOpen(open);
+          if (!open) setEditingMatNote(null);
+        }}>
+          <DialogContent className="max-w-full sm:max-w-md w-full rounded-2xl p-4 sm:p-6 bg-background">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold flex items-center gap-2 text-foreground">
+                <Package className="h-5 w-5 text-amber-600" />
+                {editingMatNote ? "Edit Material Note" : "Add Material Note"}
+              </DialogTitle>
+            </DialogHeader>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!activeProject || !matNoteDesc.trim()) return;
+                if (editingMatNote) {
+                  await updateProjectMaterialNote({
+                    id: editingMatNote.id,
+                    description: matNoteDesc.trim(),
+                    date: matNoteDate,
+                  });
+                } else {
+                  await addProjectMaterialNote({
+                    projectId: activeProject.id,
+                    description: matNoteDesc.trim(),
+                    date: matNoteDate,
+                  });
+                }
+                setIsAddMaterialNoteOpen(false);
+                setEditingMatNote(null);
+              }}
+              className="space-y-4 py-2 text-xs"
+            >
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Date *</Label>
+                <Input
+                  type="date"
+                  required
+                  value={matNoteDate}
+                  onChange={(e) => setMatNoteDate(e.target.value)}
+                  className="h-9 text-xs rounded-lg"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Material / Item Description *</Label>
+                <Textarea
+                  required
+                  rows={3}
+                  placeholder='e.g., "PU chemical - 2.6 kgs, Packer rod - 13"'
+                  value={matNoteDesc}
+                  onChange={(e) => setMatNoteDesc(e.target.value)}
+                  className="text-xs rounded-lg resize-none"
+                />
+              </div>
+
+              <DialogFooter className="pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsAddMaterialNoteOpen(false);
+                    setEditingMatNote(null);
+                  }}
+                  className="h-9 text-xs rounded-xl"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="h-9 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-xs"
+                >
+                  {editingMatNote ? "Update Note" : "Save Note"}
                 </Button>
               </DialogFooter>
             </form>

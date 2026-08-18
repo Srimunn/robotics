@@ -295,6 +295,7 @@ model Project {
   labourLogs               ProjectLabourLog[]
   machineIssues            MachineIssueRecord[]
   materialIssues           MaterialIssueRecord[]
+  materialNotes            ProjectMaterialNote[]
   paymentStages            PaymentStageItem[]
   payments                 Payment[]
   documents                ProjectDocument[]
@@ -517,7 +518,7 @@ model MachineIssueRecord {
   customerName         String
   quantity             Int
   issueDate            DateTime
-  expectedReturnDate   DateTime
+  expectedReturnDate   DateTime?
   actualReturnedDate   DateTime?
   issuedBy             String
   returnedQuantity     Int                 @default(0)
@@ -586,4 +587,15 @@ model StockAuditLog {
 
   @@index([itemId])
   @@index([timestamp])
+}
+
+model ProjectMaterialNote {
+  id          String   @id
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  description String
+  date        DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([projectId])
 }

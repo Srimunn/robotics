@@ -29,6 +29,9 @@ import {
   Send,
   RotateCcw,
   Info,
+  LayoutGrid,
+  List,
+  ChevronsUpDown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +39,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
   Table,
   TableBody,
@@ -83,6 +88,7 @@ function MachinesPageComponent() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [brandFilter, setBrandFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   // Modals state
@@ -105,6 +111,7 @@ function MachinesPageComponent() {
 
   // Issue Machine Form
   const [issueProjectId, setIssueProjectId] = useState("");
+  const [projectSelectOpen, setProjectSelectOpen] = useState(false);
   const [issueQty, setIssueQty] = useState(1);
   const [issueDate, setIssueDate] = useState(new Date().toISOString().slice(0, 10));
   const [issueReturnDate, setIssueReturnDate] = useState(
@@ -257,7 +264,6 @@ function MachinesPageComponent() {
       projectId: issueProjectId,
       quantity: Number(issueQty),
       issueDate,
-      expectedReturnDate: issueReturnDate,
       issuedBy: issueBy,
       remarks: issueRemarks,
     });
@@ -411,174 +417,308 @@ function MachinesPageComponent() {
                   <TabsTrigger value="repair" className="text-xs px-2.5 h-8">Repair</TabsTrigger>
                 </TabsList>
               </Tabs>
+
+              {/* View Toggle */}
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                <Button
+                  type="button"
+                  variant={viewMode === "list" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("list")}
+                  className={`h-8 px-2 text-xs rounded-md ${viewMode === "list" ? "bg-white text-slate-900 shadow-xs dark:bg-slate-900 dark:text-slate-100" : "text-slate-600 hover:text-slate-900"}`}
+                  title="List View"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant={viewMode === "grid" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("grid")}
+                  className={`h-8 px-2 text-xs rounded-md ${viewMode === "grid" ? "bg-white text-slate-900 shadow-xs dark:bg-slate-900 dark:text-slate-100" : "text-slate-600 hover:text-slate-900"}`}
+                  title="Grid View"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Main Table */}
-      <Card className="rounded-xl border border-border/80 bg-white dark:bg-card shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="text-xs font-bold text-muted-foreground w-28">ID</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground min-w-[220px]">TOOL NAME</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground">CATEGORY</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground">ATTACHMENT</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-center">QTY</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-center">BREAKDOWN</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground">CONDITION</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-right pr-4">ACTION</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredMachines.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12">
-                    <div className="flex flex-col items-center justify-center space-y-3">
-                      <div className="grid h-12 w-12 place-items-center rounded-full bg-blue-50 text-blue-600">
-                        <Wrench className="h-6 w-6 stroke-[1.5]" />
+      {/* Main View: List or Grid */}
+      {viewMode === "list" ? (
+        <Card className="rounded-xl border border-border/80 bg-white dark:bg-card shadow-xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-xs font-bold text-muted-foreground w-28">ID</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground min-w-[220px]">TOOL NAME</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground">CATEGORY</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground">ATTACHMENT</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground text-center">QTY</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground text-center">BREAKDOWN</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground">CONDITION</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground text-right pr-4">ACTION</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredMachines.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-12">
+                      <div className="flex flex-col items-center justify-center space-y-3">
+                        <div className="grid h-12 w-12 place-items-center rounded-full bg-blue-50 text-blue-600">
+                          <Wrench className="h-6 w-6 stroke-[1.5]" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-base font-semibold text-foreground">Machine inventory is empty.</p>
+                          <p className="text-xs text-muted-foreground">Add machinery and equipment to inventory to enable project dispatching.</p>
+                        </div>
+                        <Button size="sm" onClick={() => setIsAddModalOpen(true)} className="mt-2 bg-blue-600 hover:bg-blue-700 text-white gap-1.5 rounded-lg shadow-xs">
+                          <Plus className="h-4 w-4" /> Add Machine / Tool
+                        </Button>
                       </div>
-                      <div className="space-y-1">
-                        <p className="text-base font-semibold text-foreground">Machine inventory is empty.</p>
-                        <p className="text-xs text-muted-foreground">Add machinery and equipment to inventory to enable project dispatching.</p>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredMachines.map((m) => {
+                    const isAvailable = m.availableQuantity > 0;
+
+                    return (
+                      <TableRow key={m.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/30 transition-colors">
+                        <TableCell className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
+                          {m.id}
+                        </TableCell>
+
+                        <TableCell>
+                          <div className="font-semibold text-xs text-foreground">{m.toolName}</div>
+                          {m.remarks && (
+                            <div className="text-[11px] text-muted-foreground truncate max-w-xs">{m.remarks}</div>
+                          )}
+                        </TableCell>
+
+                        <TableCell>
+                          <div className="flex flex-col gap-1 items-start">
+                            <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-medium">
+                              {m.category}
+                            </Badge>
+                            <span className="text-[11px] font-medium text-muted-foreground">{m.brand}</span>
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="text-xs text-muted-foreground">
+                          {m.attachment || "Standard Attachment"}
+                        </TableCell>
+
+                        <TableCell className="text-center">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 font-bold text-xs">
+                            <span className={m.availableQuantity > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600"}>
+                              {m.availableQuantity}
+                            </span>
+                            <span className="text-muted-foreground">/</span>
+                            <span>{m.currentStock} {m.unit}</span>
+                          </div>
+                        </TableCell>
+
+                        <TableCell>
+                          <div className="flex items-center justify-center gap-1.5">
+                            {m.issuedQuantity > 0 && (
+                              <Badge className="text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-950 border-blue-200">
+                                Issued: {m.issuedQuantity}
+                              </Badge>
+                            )}
+                            {m.repairQuantity > 0 && (
+                              <Badge className="text-[10px] bg-amber-50 text-amber-700 dark:bg-amber-950 border-amber-200">
+                                Repair: {m.repairQuantity}
+                              </Badge>
+                            )}
+                            {m.lostQuantity > 0 && (
+                              <Badge className="text-[10px] bg-rose-50 text-rose-700 dark:bg-rose-950 border-rose-200">
+                                Lost: {m.lostQuantity}
+                              </Badge>
+                            )}
+                            {m.issuedQuantity === 0 && m.repairQuantity === 0 && m.lostQuantity === 0 && (
+                              <span className="text-[11px] text-muted-foreground font-medium">100% In Stock</span>
+                            )}
+                          </div>
+                        </TableCell>
+
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] font-semibold ${
+                              m.condition === "Good"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : m.condition === "Damaged" || m.condition === "Repair Required"
+                                ? "bg-amber-50 text-amber-700 border-amber-200"
+                                : "bg-rose-50 text-rose-700 border-rose-200"
+                            }`}
+                          >
+                            {m.condition}
+                          </Badge>
+                        </TableCell>
+
+                        <TableCell className="text-right pr-4">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              size="sm"
+                              disabled={!isAvailable}
+                              onClick={() => handleOpenIssueModal(m)}
+                              className="h-7 px-2.5 text-[11px] font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg gap-1 shadow-xs"
+                            >
+                              <Send className="h-3 w-3" />
+                              Issue
+                            </Button>
+
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setHistoryMachine(m)}
+                              title="View Machine History"
+                              className="h-7 w-7 rounded-lg text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+                            >
+                              <History className="h-3.5 w-3.5" />
+                            </Button>
+
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleOpenEditModal(m)}
+                              title="Edit Machine"
+                              className="h-7 w-7 rounded-lg text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setDeleteTargetId(m.id)}
+                              title="Delete Machine"
+                              className="h-7 w-7 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredMachines.length === 0 ? (
+            <Card className="col-span-full rounded-xl border border-border/80 bg-white dark:bg-card p-12 text-center">
+              <div className="flex flex-col items-center justify-center space-y-3">
+                <div className="grid h-12 w-12 place-items-center rounded-full bg-blue-50 text-blue-600">
+                  <Wrench className="h-6 w-6 stroke-[1.5]" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-base font-semibold text-foreground">No matching machines found.</p>
+                  <p className="text-xs text-muted-foreground">Try adjusting your search query or filter settings.</p>
+                </div>
+              </div>
+            </Card>
+          ) : (
+            filteredMachines.map((m) => {
+              const isAvailable = m.availableQuantity > 0;
+              return (
+                <Card key={m.id} className="rounded-xl border border-border/80 bg-white dark:bg-card p-4 space-y-3 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">{m.id}</span>
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] font-semibold ${
+                          m.condition === "Good"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : m.condition === "Damaged" || m.condition === "Repair Required"
+                            ? "bg-amber-50 text-amber-700 border-amber-200"
+                            : "bg-rose-50 text-rose-700 border-rose-200"
+                        }`}
+                      >
+                        {m.condition}
+                      </Badge>
+                    </div>
+
+                    <div>
+                      <h3 className="font-bold text-sm text-foreground">{m.toolName}</h3>
+                      {m.remarks && <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{m.remarks}</p>}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        {m.category}
+                      </Badge>
+                      <span className="text-[11px] font-medium text-muted-foreground">{m.brand}</span>
+                    </div>
+
+                    <div className="text-xs text-muted-foreground pt-1">
+                      <span className="font-semibold text-foreground">Attachment:</span> {m.attachment || "Standard Attachment"}
+                    </div>
+
+                    <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 text-xs mt-2">
+                      <span className="font-semibold text-slate-600 dark:text-slate-400">Stock Availability:</span>
+                      <div className="inline-flex items-center gap-1 font-bold">
+                        <span className={m.availableQuantity > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600"}>
+                          {m.availableQuantity}
+                        </span>
+                        <span className="text-muted-foreground">/</span>
+                        <span>{m.currentStock} {m.unit}</span>
                       </div>
-                      <Button size="sm" onClick={() => setIsAddModalOpen(true)} className="mt-2 bg-blue-600 hover:bg-blue-700 text-white gap-1.5 rounded-lg shadow-xs">
-                        <Plus className="h-4 w-4" /> Add Machine / Tool
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t flex items-center justify-between gap-2">
+                    <Button
+                      size="sm"
+                      disabled={!isAvailable}
+                      onClick={() => handleOpenIssueModal(m)}
+                      className="h-8 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg gap-1 shadow-xs flex-1"
+                    >
+                      <Send className="h-3.5 w-3.5" /> Issue
+                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => setHistoryMachine(m)}
+                        title="View Machine History"
+                        className="h-8 w-8 rounded-lg text-slate-600"
+                      >
+                        <History className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => handleOpenEditModal(m)}
+                        title="Edit Machine"
+                        className="h-8 w-8 rounded-lg text-slate-600"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => setDeleteTargetId(m.id)}
+                        title="Delete Machine"
+                        className="h-8 w-8 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredMachines.map((m) => {
-                  const isAvailable = m.availableQuantity > 0;
-
-                  return (
-                    <TableRow key={m.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/30 transition-colors">
-                      <TableCell className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
-                        {m.id}
-                      </TableCell>
-
-                      <TableCell>
-                        <div className="font-semibold text-xs text-foreground">{m.toolName}</div>
-                        {m.remarks && (
-                          <div className="text-[11px] text-muted-foreground truncate max-w-xs">{m.remarks}</div>
-                        )}
-                      </TableCell>
-
-                      <TableCell>
-                        <div className="flex flex-col gap-1 items-start">
-                          <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-medium">
-                            {m.category}
-                          </Badge>
-                          <span className="text-[11px] font-medium text-muted-foreground">{m.brand}</span>
-                        </div>
-                      </TableCell>
-
-                      <TableCell className="text-xs text-muted-foreground">
-                        {m.attachment || "Standard Attachment"}
-                      </TableCell>
-
-                      <TableCell className="text-center">
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 font-bold text-xs">
-                          <span className={m.availableQuantity > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600"}>
-                            {m.availableQuantity}
-                          </span>
-                          <span className="text-muted-foreground">/</span>
-                          <span>{m.currentStock} {m.unit}</span>
-                        </div>
-                      </TableCell>
-
-                      <TableCell>
-                        <div className="flex items-center justify-center gap-1.5">
-                          {m.issuedQuantity > 0 && (
-                            <Badge className="text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-950 border-blue-200">
-                              Issued: {m.issuedQuantity}
-                            </Badge>
-                          )}
-                          {m.repairQuantity > 0 && (
-                            <Badge className="text-[10px] bg-amber-50 text-amber-700 dark:bg-amber-950 border-amber-200">
-                              Repair: {m.repairQuantity}
-                            </Badge>
-                          )}
-                          {m.lostQuantity > 0 && (
-                            <Badge className="text-[10px] bg-rose-50 text-rose-700 dark:bg-rose-950 border-rose-200">
-                              Lost: {m.lostQuantity}
-                            </Badge>
-                          )}
-                          {m.issuedQuantity === 0 && m.repairQuantity === 0 && m.lostQuantity === 0 && (
-                            <span className="text-[11px] text-muted-foreground font-medium">100% In Stock</span>
-                          )}
-                        </div>
-                      </TableCell>
-
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] font-semibold ${
-                            m.condition === "Good"
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : m.condition === "Damaged" || m.condition === "Repair Required"
-                              ? "bg-amber-50 text-amber-700 border-amber-200"
-                              : "bg-rose-50 text-rose-700 border-rose-200"
-                          }`}
-                        >
-                          {m.condition}
-                        </Badge>
-                      </TableCell>
-
-                      <TableCell className="text-right pr-4">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            size="sm"
-                            disabled={!isAvailable}
-                            onClick={() => handleOpenIssueModal(m)}
-                            className="h-7 px-2.5 text-[11px] font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg gap-1 shadow-xs"
-                          >
-                            <Send className="h-3 w-3" />
-                            Issue
-                          </Button>
-
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => setHistoryMachine(m)}
-                            title="View Machine History"
-                            className="h-7 w-7 rounded-lg text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-                          >
-                            <History className="h-3.5 w-3.5" />
-                          </Button>
-
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => handleOpenEditModal(m)}
-                            title="Edit Machine"
-                            className="h-7 w-7 rounded-lg text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => setDeleteTargetId(m.id)}
-                            title="Delete Machine"
-                            className="h-7 w-7 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+                  </div>
+                </Card>
+              );
+            })
+          )}
         </div>
-      </Card>
+      )}
 
       {/* ADD / EDIT MACHINE MODAL */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
@@ -722,20 +862,59 @@ function MachinesPageComponent() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 flex flex-col">
                 <Label className="text-xs font-semibold">Target Project *</Label>
-                <Select value={issueProjectId} onValueChange={setIssueProjectId}>
-                  <SelectTrigger className="h-9 text-xs rounded-lg">
-                    <SelectValue placeholder="Select Project..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {projects.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.id} - {p.customerName} ({p.status})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={projectSelectOpen} onOpenChange={setProjectSelectOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={projectSelectOpen}
+                      className="w-full justify-between h-9 text-xs rounded-lg font-normal bg-background border-input px-3"
+                    >
+                      <span className="truncate">
+                        {issueProjectId
+                          ? (() => {
+                              const p = projects.find((x) => x.id === issueProjectId);
+                              return p ? `${p.id} - ${p.customerName} (${p.status})` : "Select Project...";
+                            })()
+                          : "Search & select target project..."}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[380px] p-0 shadow-xl rounded-xl" align="start">
+                    <Command>
+                      <CommandInput placeholder="Type to search project ID, customer, location..." className="h-9 text-xs" />
+                      <CommandList className="max-h-60 overflow-y-auto p-1">
+                        <CommandEmpty className="p-4 text-xs text-center text-muted-foreground italic">
+                          No projects match search query.
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {projects.map((p) => (
+                            <CommandItem
+                              key={p.id}
+                              value={`${p.id} ${p.customerName} ${p.location} ${p.status}`}
+                              onSelect={() => {
+                                setIssueProjectId(p.id);
+                                setProjectSelectOpen(false);
+                              }}
+                              className="text-xs flex items-center justify-between py-2 px-3 rounded-lg cursor-pointer hover:bg-accent"
+                            >
+                              <div className="flex flex-col gap-0.5 max-w-[240px]">
+                                <span className="font-bold text-foreground truncate">{p.id} - {p.customerName}</span>
+                                <span className="text-[10px] text-muted-foreground">{p.location}</span>
+                              </div>
+                              <Badge variant="outline" className="text-[10px] shrink-0 font-medium">
+                                {p.status}
+                              </Badge>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -763,26 +942,14 @@ function MachinesPageComponent() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">Issue Date</Label>
-                  <Input
-                    type="date"
-                    value={issueDate}
-                    onChange={(e) => setIssueDate(e.target.value)}
-                    className="h-9 text-xs rounded-lg"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">Expected Return Date</Label>
-                  <Input
-                    type="date"
-                    value={issueReturnDate}
-                    onChange={(e) => setIssueReturnDate(e.target.value)}
-                    className="h-9 text-xs rounded-lg"
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Issue Date</Label>
+                <Input
+                  type="date"
+                  value={issueDate}
+                  onChange={(e) => setIssueDate(e.target.value)}
+                  className="h-9 text-xs rounded-lg"
+                />
               </div>
 
               <div className="space-y-1.5">

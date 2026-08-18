@@ -978,9 +978,36 @@ function EnquiriesComponent() {
               )}
               <Button
                 type="button"
-                onClick={() => {
-                  toast.success(`Enquiry ${activeEnquiry.id} saved successfully`);
-                  setActiveEnquiry(null);
+                onClick={async () => {
+                  if (activeEnquiry) {
+                    try {
+                      await updateEnquiry(activeEnquiry.id, {
+                        customerName: activeEnquiry.customerName,
+                        phone: activeEnquiry.phone,
+                        phone2: activeEnquiry.phone2,
+                        location: activeEnquiry.location,
+                        leadSource: activeEnquiry.leadSource,
+                        referredBy: activeEnquiry.referredBy,
+                        leakageType: activeEnquiry.leakageType,
+                        assignedEngineerId: activeEnquiry.assignedEngineerId,
+                        assignedEngineerName: activeEnquiry.assignedEngineerName,
+                        siteVisitDate: activeEnquiry.siteVisitDate,
+                        siteVisitStatus: activeEnquiry.siteVisitStatus,
+                        quotationDate: activeEnquiry.quotationDate,
+                        quotationAmount: activeEnquiry.quotationAmount,
+                        quotationPdfUrl: activeEnquiry.quotationPdfUrl,
+                        remarks: activeEnquiry.remarks,
+                        workCommittedDate: activeEnquiry.workCommittedDate,
+                        actualWorkStartedDate: activeEnquiry.actualWorkStartedDate,
+                        customerDecision: activeEnquiry.customerDecision,
+                        cancellationReason: activeEnquiry.cancellationReason,
+                      });
+                      toast.success(`Enquiry ${activeEnquiry?.id} saved successfully`);
+                      setActiveEnquiry(null);
+                    } catch (err: any) {
+                      toast.error(err?.message || "Failed to update enquiry");
+                    }
+                  }
                 }}
                 className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1 font-bold shadow-xs px-4 w-full sm:w-auto"
               >

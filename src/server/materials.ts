@@ -143,3 +143,79 @@ export const adjustStock = createServerFn({ method: "POST" })
       return { ok: true };
     }, { timeout: 30000, maxWait: 10000 });
   });
+
+export const addProjectMaterialNote = createServerFn({ method: "POST" })
+  .validator(
+    (input: {
+      projectId: string;
+      description: string;
+      date: string;
+    }) => input
+  )
+  .handler(async ({ data }) => {
+    return db.$transaction(async (tx) => {
+      const project = await tx.project.findUnique({ where: { id: data.projectId } });
+      if (!project) throw new Error("Project not found");
+
+      const year = new Date().getFullYear();
+      const count = await tx.materialIssueRecord.count();
+      const id = `MAT-NOTE-${year}-${String(count + 1).padStart(3, "0")}`;
+
+      const record = await tx.materialIssueRecord.create({
+        data: {
+          id,
+          materialName: data.description,
+          quantity: 1,
+          issueDate: new Date(data.date),
+          projectId: project.id,
+          projectName: project.customerName,
+          customerName: project.customerName,
+          issuedBy: "Site Log",
+          remarks: "Material Note",
+        },
+      });
+
+      await tx.projectActivity.create({
+        data: {
+          projectId: project.id,
+          event: "Material Note Added",
+          actor: "Site Log",
+          details: `Material Note: ${data.description}`,
+        },
+      });
+
+      return formatMaterialIssue(record);
+    });
+  });
+
+export const updateProjectMaterialNote = createServerFn({ method: "POST" })
+  .validator(
+    (input: {
+      id: string;
+      description: string;
+      date: string;
+    }) => input
+  )
+  .handler(async ({ data }) => {
+    return db.$transaction(async (tx) => {
+      const existing = await tx.materialIssueRecord.findUnique({ where: { id: data.id } });
+      if (!existing) throw new Error("Material note not found");
+
+      const updated = await tx.materialIssueRecord.update({
+        where: { id: data.id },
+        data: {
+          materialName: data.description,
+          issueDate: new Date(data.date),
+        },
+      });
+
+      return formatMaterialIssue(updated);
+    });
+  });
+
+export const deleteProjectMaterialNote = createServerFn({ method: "POST" })
+  .validator((input: { id: string }) => input)
+  .handler(async ({ data }) => {
+    await db.materialIssueRecord.delete({ where: { id: data.id } });
+    return { ok: true };
+  });
