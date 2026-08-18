@@ -8,25 +8,37 @@ import PDFDocument from "pdfkit";
 import { db } from "~/lib/db";
 import { toNumber } from "./utils";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-if (typeof (globalThis as any).__dirname === "undefined") {
-  (globalThis as any).__dirname = __dirname;
-}
-
 function getFontPaths() {
+  let dirname = "";
+  try {
+    const filename = fileURLToPath(import.meta.url);
+    dirname = path.dirname(filename);
+    if (typeof (globalThis as any).__dirname === "undefined") {
+      (globalThis as any).__dirname = dirname;
+    }
+  } catch {
+    dirname = process.cwd();
+  }
+
   const possibleRegularPaths = [
     path.join(process.cwd(), "public", "fonts", "Roboto-Regular.ttf"),
     path.join(process.cwd(), ".output", "public", "fonts", "Roboto-Regular.ttf"),
-    path.resolve(__dirname, "../../public/fonts/Roboto-Regular.ttf"),
-    path.resolve(__dirname, "../public/fonts/Roboto-Regular.ttf"),
+    ...(dirname
+      ? [
+          path.resolve(dirname, "../../public/fonts/Roboto-Regular.ttf"),
+          path.resolve(dirname, "../public/fonts/Roboto-Regular.ttf"),
+        ]
+      : []),
   ];
   const possibleBoldPaths = [
     path.join(process.cwd(), "public", "fonts", "Roboto-Bold.ttf"),
     path.join(process.cwd(), ".output", "public", "fonts", "Roboto-Bold.ttf"),
-    path.resolve(__dirname, "../../public/fonts/Roboto-Bold.ttf"),
-    path.resolve(__dirname, "../public/fonts/Roboto-Bold.ttf"),
+    ...(dirname
+      ? [
+          path.resolve(dirname, "../../public/fonts/Roboto-Bold.ttf"),
+          path.resolve(dirname, "../public/fonts/Roboto-Bold.ttf"),
+        ]
+      : []),
   ];
 
   const regular = possibleRegularPaths.find((p) => fs.existsSync(p)) || possibleRegularPaths[0];
