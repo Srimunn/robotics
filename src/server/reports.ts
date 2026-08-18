@@ -1,5 +1,12 @@
 "use server";
 
+if (typeof (globalThis as any).__dirname === "undefined") {
+  (globalThis as any).__dirname = typeof process !== "undefined" && process.cwd ? process.cwd() : "/";
+}
+if (typeof (globalThis as any).__filename === "undefined") {
+  (globalThis as any).__filename = typeof process !== "undefined" && process.cwd ? process.cwd() : "/";
+}
+
 import { createServerFn } from "@tanstack/react-start";
 import PDFDocument from "pdfkit";
 import { db } from "~/lib/db";

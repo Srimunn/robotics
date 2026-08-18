@@ -11,6 +11,10 @@ export default defineConfig({
     preset: "node-server",
   },
   vite: {
+    define: {
+      __dirname: "globalThis.__dirname",
+      __filename: "globalThis.__filename",
+    },
     server: {
       host: "0.0.0.0",
     },

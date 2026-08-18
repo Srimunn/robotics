@@ -1,3 +1,10 @@
+if (typeof (globalThis as any).__dirname === "undefined") {
+  (globalThis as any).__dirname = typeof process !== "undefined" && process.cwd ? process.cwd() : "/";
+}
+if (typeof (globalThis as any).__filename === "undefined") {
+  (globalThis as any).__filename = typeof process !== "undefined" && process.cwd ? process.cwd() : "/";
+}
+
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
