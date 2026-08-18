@@ -8,7 +8,9 @@ if (typeof (globalThis as any).__filename === "undefined") {
 }
 
 import { createServerFn } from "@tanstack/react-start";
-import PDFDocument from "pdfkit";
+import type PDFDocumentType from "pdfkit";
+// @ts-ignore
+import PDFDocument from "pdfkit/js/pdfkit.standalone.js";
 import { db } from "~/lib/db";
 import { toNumber } from "./utils";
 
