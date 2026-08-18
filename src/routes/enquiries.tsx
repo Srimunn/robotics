@@ -335,7 +335,8 @@ function EnquiriesComponent() {
                 ) : (
                   paginatedEnquiries.map((enq) => {
                     const linkedProj = projects.find((p) => p.enquiryId === enq.id);
-                    const isConverted = Boolean(linkedProj);
+                    const targetProjectId = enq.projectId || linkedProj?.id;
+                    const isConverted = Boolean(targetProjectId);
 
                     const cleanCustomerName = (() => {
                       if (!enq.customerName) return "";
@@ -430,33 +431,28 @@ function EnquiriesComponent() {
                         </td>
                         <td className="p-3 text-right pr-4">
                           <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                            {enq.customerDecision === "Approved" ? (
+                            {targetProjectId ? (
+                              <Button
+                                size="sm"
+                                onClick={() => navigate({ to: "/projects", search: { openId: targetProjectId } })}
+                                className="h-7 text-xs gap-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5" /> View Project &rarr;
+                              </Button>
+                            ) : enq.customerDecision === "Approved" ? (
                               <Button
                                 size="sm"
                                 onClick={() => handleConvert(enq.id)}
-                                disabled={isConverted}
-                                className={`h-7 text-xs gap-1 rounded-lg ${
-                                  isConverted
-                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                    : "bg-blue-600 hover:bg-blue-700 text-white"
-                                }`}
+                                className="h-7 text-xs gap-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium"
                               >
-                                {isConverted ? (
-                                  <>
-                                    <CheckCircle2 className="h-3.5 w-3.5" /> Project Created ({linkedProj?.id})
-                                  </>
-                                ) : (
-                                  <>
-                                    <Sparkles className="h-3.5 w-3.5" /> Convert to Project
-                                  </>
-                                )}
+                                <Sparkles className="h-3.5 w-3.5" /> Convert to Project
                               </Button>
                             ) : (
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => setActiveEnquiry(enq)}
-                                className="h-7 text-xs text-blue-600 gap-1"
+                                className="h-7 text-xs text-blue-600 gap-1 font-medium"
                               >
                                 Edit / View <ChevronRight className="h-3.5 w-3.5" />
                               </Button>
@@ -522,14 +518,33 @@ function EnquiriesComponent() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {activeEnquiry.customerDecision === "Approved" && (
-                    <Button
-                      onClick={() => handleConvert(activeEnquiry.id)}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs gap-1.5 shadow-xs"
-                    >
-                      <Sparkles className="h-4 w-4" /> Convert To Project
-                    </Button>
-                  )}
+                  {(() => {
+                    const activeTargetProjId = activeEnquiry.projectId || projects.find((p) => p.enquiryId === activeEnquiry.id)?.id;
+                    if (activeTargetProjId) {
+                      return (
+                        <Button
+                          onClick={() => {
+                            setActiveEnquiry(null);
+                            navigate({ to: "/projects", search: { openId: activeTargetProjId } });
+                          }}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs gap-1.5 shadow-xs font-semibold"
+                        >
+                          <CheckCircle2 className="h-4 w-4" /> View Project &rarr;
+                        </Button>
+                      );
+                    }
+                    if (activeEnquiry.customerDecision === "Approved") {
+                      return (
+                        <Button
+                          onClick={() => handleConvert(activeEnquiry.id)}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs gap-1.5 shadow-xs font-semibold"
+                        >
+                          <Sparkles className="h-4 w-4" /> Convert To Project
+                        </Button>
+                      );
+                    }
+                    return null;
+                  })()}
                   <Button
                     variant="outline"
                     onClick={() => setActiveEnquiry(null)}
