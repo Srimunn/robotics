@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { uploadImage } from "~/server/upload";
 import { cn } from "@/lib/utils";
 import { useRobotics } from "@/lib/robotics-context";
 import type { Enquiry, CustomerDecision, SiteVisitStatus } from "@/lib/robotics-types";
@@ -98,6 +99,40 @@ function EnquiriesComponent() {
 
   // Active Enquiry Cockpit Modal
   const [activeEnquiry, setActiveEnquiry] = useState<Enquiry | null>(null);
+
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+
+  const handleQuotationPdfFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeEnquiry) return;
+
+    try {
+      setIsUploadingPdf(true);
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Data = reader.result as string;
+        const res = await uploadImage({ data: { image: base64Data, folder: "quotations" } });
+        if (res?.url) {
+          updateEnquiry(activeEnquiry.id, { quotationPdfUrl: res.url });
+          setActiveEnquiry({ ...activeEnquiry, quotationPdfUrl: res.url });
+          toast.success("Quotation PDF uploaded to Cloudinary successfully!");
+        } else {
+          toast.error("Failed to upload Quotation PDF");
+        }
+        setIsUploadingPdf(false);
+      };
+      reader.onerror = () => {
+        toast.error("Failed to read selected PDF file");
+        setIsUploadingPdf(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error("PDF upload error:", err);
+      toast.error(err?.message || "Failed to upload Quotation PDF");
+      setIsUploadingPdf(false);
+    }
+  };
 
   const filteredEnquiries = enquiries.filter((e) => {
     const matchesSearch =
@@ -673,11 +708,34 @@ function EnquiriesComponent() {
                 <CardContent className="p-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs font-semibold">Assigned Engineer</Label>
-                    <SmartComboBox
-                      category="Engineer Names"
-                      value={activeEnquiry.assignedEngineerName || ""}
-                      onChange={(val) => handleEngineerSelectInEdit(val)}
-                    />
+                    <Select
+                      value={engineers.find((e) => e.name === activeEnquiry.assignedEngineerName)?.id || activeEnquiry.assignedEngineerId || ""}
+                      onValueChange={(engId) => {
+                        const eng = engineers.find((e) => e.id === engId);
+                        if (eng) {
+                          updateEnquiry(activeEnquiry.id, {
+                            assignedEngineerId: eng.id,
+                            assignedEngineerName: eng.name,
+                          });
+                          setActiveEnquiry({
+                            ...activeEnquiry,
+                            assignedEngineerId: eng.id,
+                            assignedEngineerName: eng.name,
+                          });
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-9 text-xs rounded-lg bg-background">
+                        <SelectValue placeholder="Select Engineer..." />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        {engineers.map((eng) => (
+                          <SelectItem key={eng.id} value={eng.id} className="text-xs">
+                            {eng.name} ({eng.phone})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-1">
@@ -746,15 +804,47 @@ function EnquiriesComponent() {
 
                     <div className="space-y-1">
                       <Label className="text-xs font-semibold">Upload Quotation PDF</Label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => toast.success("Quotation PDF attached to Enquiry")}
-                        className="h-9 w-full gap-1 text-xs rounded-lg"
-                      >
-                        <Upload className="h-3.5 w-3.5" /> Select PDF
-                      </Button>
+                      <input
+                        type="file"
+                        ref={pdfInputRef}
+                        accept="application/pdf,image/*"
+                        className="hidden"
+                        onChange={handleQuotationPdfFileChange}
+                      />
+                      {activeEnquiry.quotationPdfUrl ? (
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(activeEnquiry.quotationPdfUrl, "_blank")}
+                            className="h-9 flex-1 gap-1 text-xs rounded-lg bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold hover:bg-emerald-100"
+                          >
+                            <FileText className="h-3.5 w-3.5 text-emerald-600" /> View PDF
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={isUploadingPdf}
+                            onClick={() => pdfInputRef.current?.click()}
+                            className="h-9 px-2 text-[11px] rounded-lg"
+                          >
+                            {isUploadingPdf ? "..." : "Replace"}
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isUploadingPdf}
+                          onClick={() => pdfInputRef.current?.click()}
+                          className="h-9 w-full gap-1 text-xs rounded-lg border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 font-semibold"
+                        >
+                          <Upload className="h-3.5 w-3.5 text-blue-600" /> {isUploadingPdf ? "Uploading..." : "Select PDF File"}
+                        </Button>
+                      )}
                     </div>
                   </div>
 

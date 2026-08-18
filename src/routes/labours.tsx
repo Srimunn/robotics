@@ -349,6 +349,7 @@ function LaboursComponent() {
   const activeLabours = (labours || []).filter((l) => showInactive || l?.isActive !== false);
   const permanentCount = activeLabours.filter((l) => l?.type === "Permanent").length;
   const contractCount = activeLabours.filter((l) => l?.type === "Contract").length;
+  const allCount = activeLabours.length;
 
   const filteredLabours = (labours || []).filter((l) => {
     if (!l) return false;
@@ -472,15 +473,15 @@ function LaboursComponent() {
               </div>
 
               {/* PERMANENT VS CONTRACT LABOUR SELECTION TABS */}
-              <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap p-1 bg-muted/50 rounded-xl border border-border">
+              <div className="grid grid-cols-3 gap-1 p-1 bg-muted/50 rounded-xl border border-border">
                 <button
                   type="button"
                   onClick={() => {
                     setLabourTypeFilter("PERMANENT");
-                    const perms = labours.filter((l) => l.type === "Permanent");
+                    const perms = activeLabours.filter((l) => l.type === "Permanent");
                     if (perms.length > 0) setSelectedLabourProfile(perms[0]);
                   }}
-                  className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all text-center flex-1 ${
+                  className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all text-center ${
                     labourTypeFilter === "PERMANENT"
                       ? "bg-blue-600 text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
@@ -492,7 +493,7 @@ function LaboursComponent() {
                   type="button"
                   onClick={() => {
                     setLabourTypeFilter("CONTRACT");
-                    const cnts = labours.filter((l) => l.type === "Contract");
+                    const cnts = activeLabours.filter((l) => l.type === "Contract");
                     if (cnts.length > 0) setSelectedLabourProfile(cnts[0]);
                   }}
                   className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all text-center ${
@@ -512,7 +513,7 @@ function LaboursComponent() {
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  All ({labours.length})
+                  All ({allCount})
                 </button>
               </div>
             </CardHeader>

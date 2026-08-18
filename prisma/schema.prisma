@@ -272,6 +272,7 @@ model Project {
   siteVisitStatus          SiteVisitStatus?
   quotationDate            DateTime?
   quotationAmount          Decimal?           @db.Decimal(12, 2)
+  quotationPdfUrl          String?
   projectValue             Decimal            @db.Decimal(12, 2)
   scheduledDate            DateTime
   workCommittedDate        DateTime?

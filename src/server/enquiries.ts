@@ -235,6 +235,7 @@ export const approveAndConvertEnquiryToProject = createServerFn({ method: "POST"
           siteVisitStatus: enq.siteVisitStatus,
           quotationDate: enq.quotationDate,
           quotationAmount: enq.quotationAmount ?? undefined,
+          quotationPdfUrl: enq.quotationPdfUrl ?? undefined,
           projectValue: costValue,
           scheduledDate: enq.siteVisitDate ?? new Date(),
           workCommittedDate: enq.workCommittedDate,

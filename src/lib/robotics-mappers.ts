@@ -305,6 +305,7 @@ export function mapProjectFromDb(
     siteVisitStatus: (p.siteVisitStatus as SiteVisitStatus) ?? undefined,
     quotationDate: isoDate(p.quotationDate),
     quotationAmount: optNum(p.quotationAmount),
+    quotationPdfUrl: (p as any).quotationPdfUrl ?? undefined,
     projectValue: num(p.projectValue),
     scheduledDate: isoDate(p.scheduledDate)!,
     workCommittedDate: isoDate(p.workCommittedDate),

@@ -243,6 +243,7 @@ export interface Project {
   siteVisitStatus?: SiteVisitStatus;
   quotationDate?: string;
   quotationAmount?: number;
+  quotationPdfUrl?: string;
   projectValue: number;
   scheduledDate: string; // YYYY-MM-DD
   workCommittedDate?: string; // YYYY-MM-DD

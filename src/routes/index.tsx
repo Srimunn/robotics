@@ -1760,16 +1760,25 @@ function DashboardComponent() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">Assign Lead Engineer</Label>
-                  <SmartComboBox
-                    category="Engineer Names"
-                    value={enqEngineerName}
-                    onChange={(val) => {
-                      setEnqEngineerName(val);
-                      const eng = engineers.find((x) => x.name === val);
-                      if (eng) setEnqEngineerId(eng.id);
+                  <Select
+                    value={enqEngineerId}
+                    onValueChange={(val) => {
+                      setEnqEngineerId(val);
+                      const eng = engineers.find((x) => x.id === val);
+                      if (eng) setEnqEngineerName(eng.name);
                     }}
-                    siteVisitDate={enqSiteVisitDate}
-                  />
+                  >
+                    <SelectTrigger className="h-9 text-xs rounded-xl bg-background">
+                      <SelectValue placeholder="Select Lead Engineer..." />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      {engineers.map((eng) => (
+                        <SelectItem key={eng.id} value={eng.id} className="text-xs">
+                          {eng.name} ({eng.phone})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-1">

@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
+import { uploadImage } from "~/server/upload";
 import { useRobotics, calculateHoursFromTimes, calculateEarnedWage } from "@/lib/robotics-context";
 import type { Project, ProjectStatus, ProjectLabourLog, LabourType, MachineCondition, MachineIssueRecord, PaymentStageItem, PaymentStatus, ProjectLabourAssignment } from "@/lib/robotics-types";
 import { SmartComboBox } from "@/components/ui/SmartComboBox";
@@ -43,11 +44,11 @@ import {
   Trash2,
   Wallet,
   Percent,
+  Upload,
   ShieldAlert,
   AlertTriangle,
   Save,
   Camera,
-  Upload,
   Pencil,
   Check,
   X,
@@ -1587,80 +1588,57 @@ function ProjectsComponent() {
                       <p className="text-[11px] text-muted-foreground">Inherited from Enquiry {activeProject.enquiryId || "Original"}</p>
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const pdfUrl = (activeProject as any).quotationPdfUrl;
-                      if (pdfUrl) {
-                        window.open(pdfUrl, "_blank");
+                  {activeProject.quotationPdfUrl ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        window.open(activeProject.quotationPdfUrl, "_blank");
                         toast.success("Opening Quotation PDF...");
-                      } else {
-                        const printWin = window.open("", "_blank");
-                        if (!printWin) {
-                          toast.error("Please allow popups to view/download PDF");
-                          return;
-                        }
-                        const dateStr = activeProject.quotationDate || activeProject.scheduledDate || new Date().toISOString().slice(0, 10);
-                        printWin.document.write(`
-                          <!DOCTYPE html>
-                          <html>
-                            <head>
-                              <title>Quotation_${activeProject.id}</title>
-                              <style>
-                                body { font-family: system-ui, -apple-system, sans-serif; margin: 30px; color: #0f172a; }
-                                .header { border-bottom: 2px solid #2563eb; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
-                                .title { font-size: 22px; font-weight: 800; color: #1e3a8a; }
-                                .subtitle { font-size: 12px; color: #64748b; margin-top: 4px; }
-                                .info-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-                                .info-table th, .info-table td { border: 1px solid #cbd5e1; padding: 10px; font-size: 13px; text-align: left; }
-                                .info-table th { background: #f8fafc; font-weight: 700; width: 30%; }
-                                .amount-box { background: #f0fdf4; border: 1px solid #86efac; padding: 15px; border-radius: 8px; margin-top: 20px; font-size: 16px; font-weight: 700; color: #166534; }
-                                .footer { margin-top: 40px; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; }
-                              </style>
-                            </head>
-                            <body>
-                              <div class="header">
-                                <div>
-                                  <div class="title">Robotics ERP — Official Quotation Artifact</div>
-                                  <div class="subtitle">Project Reference: ${activeProject.id}</div>
-                                </div>
-                                <div style="text-align: right; font-size: 12px; color: #475569;">
-                                  Date: ${dateStr}<br/>
-                                  Status: ${activeProject.status || "Scheduled"}
-                                </div>
-                              </div>
-
-                              <table class="info-table">
-                                <tr><th>Customer Name</th><td>${activeProject.customerName || "N/A"}</td></tr>
-                                <tr><th>Location / Address</th><td>${activeProject.location || "N/A"}</td></tr>
-                                <tr><th>Nature of Work</th><td>${activeProject.natureOfWork || "N/A"}</td></tr>
-                                <tr><th>Lead Source</th><td>${activeProject.leadSource || "Direct / Internal"}</td></tr>
-                                <tr><th>Assigned Engineer</th><td>${activeProject.assignedEngineerName || "Unassigned"}</td></tr>
-                              </table>
-
-                              <div class="amount-box">
-                                Quotation Amount: ₹${(activeProject.quotationAmount || activeProject.projectValue || 0).toLocaleString("en-IN")}
-                              </div>
-
-                              <div class="footer">
-                                Generated automatically by Robotics ERP • Authorized Copy
-                              </div>
-
-                              <script>
-                                window.onload = function() { window.print(); };
-                              </script>
-                            </body>
-                          </html>
-                        `);
-                        printWin.document.close();
-                        toast.success("Quotation PDF generated for download/print!");
-                      }
-                    }}
-                    className="text-xs gap-1.5 rounded-lg"
-                  >
-                    <FileDown className="h-3.5 w-3.5" /> Download PDF
-                  </Button>
+                      }}
+                      className="text-xs gap-1.5 rounded-lg bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold hover:bg-emerald-100 shadow-2xs"
+                    >
+                      <FileDown className="h-3.5 w-3.5 text-emerald-600" /> Download PDF
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="file"
+                        id={`proj-quotation-pdf-input-${activeProject.id}`}
+                        accept="application/pdf,image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            const reader = new FileReader();
+                            reader.onload = async () => {
+                              const base64Data = reader.result as string;
+                              const res = await uploadImage({ data: { image: base64Data, folder: "quotations" } });
+                              if (res?.url) {
+                                updateProject(activeProject.id, { quotationPdfUrl: res.url });
+                                setActiveProject({ ...activeProject, quotationPdfUrl: res.url });
+                                toast.success("Quotation PDF uploaded and saved to Project!");
+                              } else {
+                                toast.error("Failed to upload Quotation PDF");
+                              }
+                            };
+                            reader.readAsDataURL(file);
+                          } catch (err: any) {
+                            toast.error("Failed to upload Quotation PDF");
+                          }
+                        }}
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => document.getElementById(`proj-quotation-pdf-input-${activeProject.id}`)?.click()}
+                        className="text-xs gap-1.5 rounded-lg border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 font-semibold shadow-2xs"
+                      >
+                        <Upload className="h-3.5 w-3.5 text-blue-600" /> Upload Quotation PDF
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
