@@ -4,7 +4,7 @@ export * from "./materials-basic";
 
 import { createServerFn } from "@tanstack/react-start";
 import { db } from "~/lib/db";
-import { toNullableNumber } from "./utils";
+import { toNullableNumber, generateSafeId } from "./utils";
 import type { StockItemType } from "@prisma/client";
 
 function formatMaterialIssue<T extends Record<string, any>>(mi: T | null) {
@@ -36,8 +36,7 @@ export const issueMaterialToProject = createServerFn({ method: "POST" })
       if (!project) throw new Error("Project not found");
 
       const year = new Date().getFullYear();
-      const count = await tx.materialIssueRecord.count();
-      const id = `MAT-ISS-${year}-${String(count + 1).padStart(3, "0")}`;
+      const id = await generateSafeId(tx.materialIssueRecord, `MAT-ISS-${year}`);
       const totalCost = data.quantity * Number(mat.purchaseCost);
 
       const record = await tx.materialIssueRecord.create({
@@ -158,8 +157,7 @@ export const addProjectMaterialNote = createServerFn({ method: "POST" })
       if (!project) throw new Error("Project not found");
 
       const year = new Date().getFullYear();
-      const count = await tx.materialIssueRecord.count();
-      const id = `MAT-NOTE-${year}-${String(count + 1).padStart(3, "0")}`;
+      const id = await generateSafeId(tx.materialIssueRecord, `MAT-NOTE-${year}`);
 
       const record = await tx.materialIssueRecord.create({
         data: {

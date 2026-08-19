@@ -1906,11 +1906,11 @@ function DashboardComponent() {
             {/* INITIAL REMARKS */}
             <div className="space-y-1 pt-1">
               <Label className="text-xs font-semibold">Initial Remarks & Notes</Label>
-              <SmartComboBox
-                category="Remarks Templates"
+              <Textarea
+                placeholder="Enter comments / notes for reference..."
                 value={enqRemarks}
-                placeholder="Select or type custom..."
-                onChange={(val) => setEnqRemarks(val)}
+                onChange={(e) => setEnqRemarks(e.target.value)}
+                className="text-xs rounded-xl bg-background min-h-[80px] resize-y"
               />
             </div>
 

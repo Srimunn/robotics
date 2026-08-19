@@ -3,7 +3,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "~/lib/db";
-import { cleanPhone } from "./utils";
+import { cleanPhone, generateSafeId } from "./utils";
 
 export const listLabours = createServerFn({ method: "GET" }).handler(async () => {
   return db.labour.findMany({
@@ -28,8 +28,7 @@ const labourInput = z.object({
 export const addLabour = createServerFn({ method: "POST" })
   .validator((input: unknown) => labourInput.parse(input))
   .handler(async ({ data }) => {
-    const count = await db.labour.count();
-    const id = `LBR-${String(count + 1).padStart(3, "0")}`;
+    const id = await generateSafeId(db.labour, "LBR");
     const cleanName = data.name.trim().split(" ")[0].replace(/[^a-zA-Z0-9]/g, "");
     const loginId = data.loginId?.trim() || cleanName.toLowerCase() || id.toLowerCase();
     const pin = data.pin?.trim() || String(Math.floor(1000 + Math.random() * 9000));

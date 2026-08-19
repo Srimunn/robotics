@@ -3,7 +3,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "~/lib/db";
-import { toNumber } from "./utils";
+import { toNumber, generateSafeId } from "./utils";
 
 const materialInput = z.object({
   name: z.string(),
@@ -19,8 +19,8 @@ const materialInput = z.object({
 export const addMaterial = createServerFn({ method: "POST" })
   .validator((input: unknown) => materialInput.parse(input))
   .handler(async ({ data }) => {
-    const count = await db.material.count();
-    const id = `MAT-${new Date().getFullYear()}-${String(count + 1).padStart(3, "0")}`;
+    const year = new Date().getFullYear();
+    const id = await generateSafeId(db.material, `MAT-${year}`);
     const material = await db.material.create({
       data: {
         id,

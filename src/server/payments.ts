@@ -3,7 +3,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "~/lib/db";
-import { toNumber } from "./utils";
+import { toNumber, generateSafeId } from "./utils";
 import { recalculateProject } from "./recalc";
 
 function formatPayment<T extends Record<string, any>>(p: T | null) {
@@ -56,12 +56,7 @@ export const addPayment = createServerFn({ method: "POST" })
 
     return db.$transaction(async (tx) => {
       const year = new Date().getFullYear();
-      let count = (await tx.payment.count()) + 1;
-      let id = `PAY-${year}-${String(count).padStart(3, "0")}`;
-      while (await tx.payment.findUnique({ where: { id } })) {
-        count++;
-        id = `PAY-${year}-${String(count).padStart(3, "0")}`;
-      }
+      const id = await generateSafeId(tx.payment, `PAY-${year}`);
 
       const payment = await tx.payment.create({
         data: {

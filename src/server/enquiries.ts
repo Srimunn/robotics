@@ -3,7 +3,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "~/lib/db";
-import { cleanPhone, toNumber, toNullableNumber } from "./utils";
+import { cleanPhone, toNumber, toNullableNumber, generateSafeId } from "./utils";
 
 function formatEnquiry<T extends Record<string, any>>(e: T | null) {
   if (!e) return null;
@@ -55,12 +55,7 @@ export const addEnquiry = createServerFn({ method: "POST" })
   .validator((input: unknown) => enquiryCreate.parse(input))
   .handler(async ({ data }) => {
     const year = new Date().getFullYear();
-    let count = (await db.enquiry.count()) + 1;
-    let id = `ENQ-${year}-${String(count).padStart(3, "0")}`;
-    while (await db.enquiry.findUnique({ where: { id } })) {
-      count++;
-      id = `ENQ-${year}-${String(count).padStart(3, "0")}`;
-    }
+    const id = await generateSafeId(db.enquiry, `ENQ-${year}`);
 
     let engName = data.assignedEngineerName ?? undefined;
     if (data.assignedEngineerId) {
@@ -218,12 +213,7 @@ export const approveAndConvertEnquiryToProject = createServerFn({ method: "POST"
       }
 
       const year = new Date().getFullYear();
-      let projCount = (await tx.project.count()) + 1;
-      let newProjectId = `PRJ-${year}-${String(projCount).padStart(3, "0")}`;
-      while (await tx.project.findUnique({ where: { id: newProjectId } })) {
-        projCount++;
-        newProjectId = `PRJ-${year}-${String(projCount).padStart(3, "0")}`;
-      }
+      const newProjectId = await generateSafeId(tx.project, `PRJ-${year}`);
       const costValue = enq.quotationAmount ? Number(enq.quotationAmount) : 0;
 
       const project = await tx.project.create({

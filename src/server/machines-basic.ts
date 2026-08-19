@@ -3,6 +3,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "~/lib/db";
+import { generateSafeId } from "./utils";
 
 const machineInput = z.object({
   toolName: z.string(),
@@ -19,8 +20,8 @@ const machineInput = z.object({
 export const addMachine = createServerFn({ method: "POST" })
   .validator((input: unknown) => machineInput.parse(input))
   .handler(async ({ data }) => {
-    const count = await db.machine.count();
-    const id = `MCH-${new Date().getFullYear()}-${String(count + 1).padStart(3, "0")}`;
+    const year = new Date().getFullYear();
+    const id = await generateSafeId(db.machine, `MCH-${year}`);
     const machine = await db.machine.create({
       data: {
         id,

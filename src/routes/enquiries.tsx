@@ -963,13 +963,15 @@ function EnquiriesComponent() {
 
                   <div className="space-y-1">
                     <Label className="text-xs font-semibold">Remarks & Special Notes</Label>
-                    <SmartComboBox
-                      category="Remarks Templates"
+                    <Textarea
+                      placeholder="Enter comments / notes for reference..."
                       value={activeEnquiry.remarks || ""}
-                      onChange={(val) => {
+                      onChange={(e) => {
+                        const val = e.target.value;
                         updateEnquiry(activeEnquiry.id, { remarks: val });
                         setActiveEnquiry({ ...activeEnquiry, remarks: val });
                       }}
+                      className="text-xs rounded-xl bg-background min-h-[80px] resize-y"
                     />
                   </div>
 
@@ -1177,10 +1179,11 @@ function EnquiriesComponent() {
               {/* SECTION 3: NOTES */}
               <div className="space-y-1 pt-1">
                 <Label className="text-xs font-semibold">Notes</Label>
-                <SmartComboBox
-                  category="Remarks Templates"
-                  value={createData.remarks}
-                  onChange={(val) => setCreateData({ ...createData, remarks: val })}
+                <Textarea
+                  placeholder="Enter comments / notes for reference..."
+                  value={createData.remarks || ""}
+                  onChange={(e) => setCreateData({ ...createData, remarks: e.target.value })}
+                  className="text-xs rounded-xl bg-background min-h-[80px] resize-y"
                 />
               </div>
 

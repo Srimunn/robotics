@@ -4,6 +4,7 @@ export * from "./machines-basic";
 
 import { createServerFn } from "@tanstack/react-start";
 import { db } from "~/lib/db";
+import { generateSafeId } from "./utils";
 import type { MachineCondition, StockActionType } from "@prisma/client";
 
 export const issueMachineToProject = createServerFn({ method: "POST" })
@@ -27,12 +28,7 @@ export const issueMachineToProject = createServerFn({ method: "POST" })
       if (!project) throw new Error("Project not found");
 
       const year = new Date().getFullYear();
-      let count = (await tx.machineIssueRecord.count()) + 1;
-      let id = `MIR-${year}-${String(count).padStart(3, "0")}`;
-      while (await tx.machineIssueRecord.findUnique({ where: { id } })) {
-        count++;
-        id = `MIR-${year}-${String(count).padStart(3, "0")}`;
-      }
+      const id = await generateSafeId(tx.machineIssueRecord, `MIR-${year}`);
 
       const record = await tx.machineIssueRecord.create({
         data: {

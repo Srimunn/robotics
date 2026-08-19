@@ -3,6 +3,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "~/lib/db";
+import { generateSafeId } from "./utils";
 
 export const listDocuments = createServerFn({ method: "GET" }).handler(async () => {
   return db.projectDocument.findMany({ orderBy: { uploadedAt: "desc" } });
@@ -23,8 +24,8 @@ const docInput = z.object({
 export const addDocument = createServerFn({ method: "POST" })
   .validator((input: unknown) => docInput.parse(input))
   .handler(async ({ data }) => {
-    const count = await db.projectDocument.count();
-    const id = `DOC-${new Date().getFullYear()}-${String(count + 1).padStart(3, "0")}`;
+    const year = new Date().getFullYear();
+    const id = await generateSafeId(db.projectDocument, `DOC-${year}`);
     return db.projectDocument.create({
       data: {
         id,
