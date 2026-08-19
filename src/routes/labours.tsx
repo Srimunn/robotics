@@ -799,7 +799,7 @@ function LaboursComponent() {
                             <div className="space-y-3">
                               {currentProjectsList.map((p) => {
                                 const assignment = p.labourAssignments?.find((a) => a.labourId === activeLabour.id);
-                                const projWage = assignment ? assignment.weeklyWage : activeLabour.defaultWeeklyWage || 1400;
+                                const projWage = assignment?.weeklyWage ?? (activeLabour.defaultWeeklyWage ?? 1400);
                                 const projHours = (p.labourLogs || [])
                                   .filter((lg) => lg.labourId === activeLabour.id)
                                   .reduce((acc, lg) => acc + (lg.hoursWorked || 0), 0);
@@ -882,7 +882,7 @@ function LaboursComponent() {
                                 ) : (
                                   recentProjectsList.map((p) => {
                                     const assignment = p.labourAssignments?.find((a) => a.labourId === activeLabour.id);
-                                    const projWage = assignment ? assignment.weeklyWage : activeLabour.defaultWeeklyWage || 1400;
+                                    const projWage = assignment ? assignment.weeklyWage : (activeLabour.defaultWeeklyWage ?? 1400);
 
                                     return (
                                       <tr key={p.id} className="hover:bg-accent/40 transition-colors">
@@ -1097,7 +1097,7 @@ function LaboursComponent() {
                 <tbody className="divide-y">
                   {globalAttendanceList.map((rec) => {
                     const lab = labours.find((l) => l.id === rec.labourId);
-                    const wage = rec.weeklyWage || lab?.defaultWeeklyWage || 1400;
+                    const wage = rec.weeklyWage ?? lab?.defaultWeeklyWage ?? 1400;
 
                     return (
                       <tr key={rec.id} className="hover:bg-accent/40 transition-colors">

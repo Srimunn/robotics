@@ -442,7 +442,7 @@ function ProjectsComponent() {
       const existingAssignment = activeProject.labourAssignments?.find((a) => a.labourId === l.id);
       return {
         labourId: l.id,
-        weeklyWage: existingAssignment ? existingAssignment.weeklyWage : l.defaultWeeklyWage || 1400,
+        weeklyWage: existingAssignment ? existingAssignment.weeklyWage : (l.defaultWeeklyWage ?? 1400),
       };
     });
     setLabourAssignmentsState(initial);
@@ -1211,7 +1211,7 @@ function ProjectsComponent() {
                               ) : (
                                 activeAssignments.map((assignment) => {
                                   const lab = labours.find((x) => x.id === assignment.labourId);
-                                  const weeklyWage = assignment.weeklyWage || lab?.defaultWeeklyWage || 1400;
+                                  const weeklyWage = assignment.weeklyWage ?? lab?.defaultWeeklyWage ?? 1400;
 
                                   return (
                                     <tr key={assignment.labourId} className="hover:bg-accent/40 transition-colors">
@@ -1262,7 +1262,7 @@ function ProjectsComponent() {
                                   </tr>
                                   {inactiveAssignments.map((assignment) => {
                                     const lab = labours.find((x) => x.id === assignment.labourId);
-                                    const weeklyWage = assignment.weeklyWage || lab?.defaultWeeklyWage || 1400;
+                                    const weeklyWage = assignment.weeklyWage ?? lab?.defaultWeeklyWage ?? 1400;
                                     const logCount = (activeProject.labourLogs || []).filter(
                                       (lg) => lg.labourId === assignment.labourId
                                     ).length;
@@ -1346,7 +1346,7 @@ function ProjectsComponent() {
                           (activeProject.assignedLabourIds || []).map((lId) => {
                             const lab = labours.find((x) => x.id === lId);
                             const assignment = (activeProject.labourAssignments || []).find((a) => a.labourId === lId);
-                            const weeklyWage = assignment ? assignment.weeklyWage : lab?.defaultWeeklyWage || 1400;
+                            const weeklyWage = assignment ? assignment.weeklyWage : (lab?.defaultWeeklyWage ?? 1400);
 
                             const existingLog = (activeProject.labourLogs || []).find((lg) => lg.labourId === lId);
                             const inTime = existingLog?.inTime || "";
@@ -2927,7 +2927,7 @@ function ProjectsComponent() {
                               onCheckedChange={(checked) => {
                                 if (checked) {
                                   setSelectedLabourIds((prev) => [...prev, l.id]);
-                                  if (!customWeeklyWages[l.id]) {
+                                  if (customWeeklyWages[l.id] === undefined) {
                                     setCustomWeeklyWages((prev) => ({
                                       ...prev,
                                       [l.id]: 0,

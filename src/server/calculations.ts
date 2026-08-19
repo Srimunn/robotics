@@ -30,7 +30,7 @@ export function calculateHoursFromTimes(inTime?: string | null, outTime?: string
 
 export function calculateEarnedWage(weeklyWage: number, hoursWorked: number): number {
   if (!hoursWorked || hoursWorked <= 0) return 0;
-  const hourlyRate = (weeklyWage || 1400) / 48;
+  const hourlyRate = (weeklyWage ?? 1400) / 48;
   return Math.round(hoursWorked * hourlyRate);
 }
 
