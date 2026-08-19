@@ -274,9 +274,11 @@ function ProjectsComponent() {
 
     const assignmentsToSubmit = selectedLabourIds.map((id) => {
       const l = labours.find((x) => x.id === id);
+      const date = customAssignedDates[id] || new Date().toISOString().slice(0, 10);
       return {
         labourId: id,
         weeklyWage: customWeeklyWages[id] ?? 0,
+        assignedDate: date,
       };
     });
 
@@ -455,17 +457,28 @@ function ProjectsComponent() {
       activeProject.assignedLabourIds.includes(a.labourId)
     );
 
-    assignLaboursToProject(activeProject.id, selected);
+    const assignmentsToSubmit = selected.map((s) => {
+      const existing = activeProject.labourAssignments?.find((a) => a.labourId === s.labourId);
+      return {
+        labourId: s.labourId,
+        weeklyWage: s.weeklyWage,
+        assignedDate: existing?.assignedDate || new Date().toISOString().slice(0, 10),
+      };
+    });
+
+    assignLaboursToProject(activeProject.id, assignmentsToSubmit);
 
     // Synchronously update activeProject local state so Section 4 renders assigned staff immediately
     const updatedAssignments: ProjectLabourAssignment[] = selected.map((s) => {
       const l = labours.find((x) => x.id === s.labourId);
+      const existing = activeProject.labourAssignments?.find((a) => a.labourId === s.labourId);
       return {
         labourId: s.labourId,
         labourName: l?.name || s.labourId,
         labourType: l?.type || "Permanent",
         weeklyWage: s.weeklyWage,
-        assignedDate: new Date().toISOString().slice(0, 10),
+        assignedDate: existing?.assignedDate || new Date().toISOString().slice(0, 10),
+        isActive: true,
       };
     });
 

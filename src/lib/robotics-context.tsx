@@ -238,7 +238,7 @@ type RoboticsContextType = {
   updateProject: (id: string, p: Partial<Project>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   updateProjectStatus: (id: string, status: ProjectStatus, note?: string) => Promise<void>;
-  assignLaboursToProject: (projectId: string, assignments: { labourId: string; weeklyWage: number }[]) => Promise<void>;
+  assignLaboursToProject: (projectId: string, assignments: { labourId: string; weeklyWage: number; assignedDate?: string }[]) => Promise<void>;
   unassignLabourFromProject: (projectId: string, labourId: string) => Promise<void>;
   updateProjectLabourLog: (projectId: string, log: ProjectLabourLog) => Promise<void>;
   updateFollowUpTag: (projectId: string, followUpTag: "MD" | "Team" | null) => Promise<void>;
@@ -717,7 +717,7 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const assignLaboursM = useMutation({
-    mutationFn: async (v: { projectId: string; assignments: { labourId: string; weeklyWage: number }[] }) => assignLaboursToProjectFn({ data: v }),
+    mutationFn: async (v: { projectId: string; assignments: { labourId: string; weeklyWage: number; assignedDate?: string }[] }) => assignLaboursToProjectFn({ data: v }),
     onSuccess: () => { invalidate("projects", "labours"); toast.success("Labours assigned"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });

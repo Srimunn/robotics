@@ -140,7 +140,7 @@ export const updateProjectStatus = createServerFn({ method: "POST" })
 
 /** Assign labours to a project (with per-labour weekly wage, conflict-checked). */
 export const assignLaboursToProject = createServerFn({ method: "POST" })
-  .validator((input: { projectId: string; assignments: Array<{ labourId: string; weeklyWage: number }> }) => input)
+  .validator((input: { projectId: string; assignments: Array<{ labourId: string; weeklyWage: number; assignedDate?: string }> }) => input)
   .handler(async ({ data }) => {
     return db.$transaction(async (tx) => {
       const project = await tx.project.findUnique({ where: { id: data.projectId } });
@@ -155,6 +155,8 @@ export const assignLaboursToProject = createServerFn({ method: "POST" })
           results.push({ labourId: asgn.labourId, ok: false, reason: "Labour not found" });
           continue;
         }
+
+        const asgnDate = asgn.assignedDate ? new Date(asgn.assignedDate) : today;
 
         // Deactivate any active assignments on other projects for this labourer
         await tx.projectLabourAssignment.updateMany({
@@ -177,10 +179,10 @@ export const assignLaboursToProject = createServerFn({ method: "POST" })
             labourName: lab.name,
             labourType: lab.type,
             weeklyWage: asgn.weeklyWage,
-            assignedDate: today,
+            assignedDate: asgnDate,
             isActive: true,
           },
-          update: { weeklyWage: asgn.weeklyWage, assignedDate: today, isActive: true },
+          update: { weeklyWage: asgn.weeklyWage, assignedDate: asgnDate, isActive: true },
         });
 
         await tx.labourWageHistory.create({
@@ -189,7 +191,7 @@ export const assignLaboursToProject = createServerFn({ method: "POST" })
             projectId: data.projectId,
             projectName: project.customerName,
             weeklyWage: asgn.weeklyWage,
-            assignedDate: today,
+            assignedDate: asgnDate,
           },
         });
 
