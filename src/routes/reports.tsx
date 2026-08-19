@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useRobotics } from "@/lib/robotics-context";
+import * as XLSX from "xlsx";
 import {
   BarChart3,
   Download,
@@ -566,20 +567,57 @@ function ReportsComponent() {
     }
   };
 
-  // Export CSV Helper
+  // Export Excel (.xlsx) Helper with Auto-Fit Column Widths (Fixes ##### issue in Excel!)
   const handleExportCSV = (filename: string, headers: string[], rows: (string | number)[][]) => {
+    try {
+      const cleanRows = rows.map((row) =>
+        row.map((val) => {
+          if (val === null || val === undefined) return "";
+          const str = String(val);
+          // If value is full ISO date like 2026-08-19T00:00:00.000Z, format to YYYY-MM-DD
+          if (/^\d{4}-\d{2}-\d{2}T/.test(str)) {
+            return str.slice(0, 10);
+          }
+          return str;
+        })
+      );
 
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...rows.map((e) => e.map((x) => `"${x}"`).join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `${filename}_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success(`Exported ${filename}.csv successfully!`);
+      const aoa = [headers, ...cleanRows];
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+      // Auto-fit column widths so Excel never shows ##### for dates or numbers
+      const colWidths = headers.map((header, colIndex) => {
+        let maxLen = header.length;
+        for (const row of cleanRows) {
+          const cellValue = row[colIndex] || "";
+          if (cellValue.length > maxLen) {
+            maxLen = cellValue.length;
+          }
+        }
+        return { wch: Math.max(maxLen + 5, 16) }; // Minimum width 16 to guarantee dates never show #####
+      });
+      ws["!cols"] = colWidths;
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Report");
+
+      const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([excelBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${filename}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success(`Exported ${filename}.xlsx successfully!`);
+    } catch (err: any) {
+      toast.error("Export failed: " + (err?.message || err));
+    }
   };
 
   // Export Printable PDF Helper

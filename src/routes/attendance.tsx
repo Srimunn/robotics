@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useRobotics, calculateHoursFromTimes, calculateEarnedWage } from "@/lib/robotics-context";
 import type { AttendanceRecord, LabourType } from "@/lib/robotics-types";
+import * as XLSX from "xlsx";
 import { DataPagination } from "@/components/ui/DataPagination";
 import {
   CalendarCheck,
@@ -283,7 +284,7 @@ function AttendancePageComponent() {
               }
 
               const headers = ["Labour Name", "Date", "Project", "In Time", "Out Time", "Hours", "Status"];
-              const rows = allAttendanceLogs.map((log) => {
+              const cleanRows = allAttendanceLogs.map((log) => {
                 const labName = log.labourName || labours.find((l) => l.id === log.labourId)?.name || log.labourId;
                 const projName = log.projectName || log.projectId || "N/A";
                 const dateStr = log.date ? String(log.date).slice(0, 10) : "N/A";
@@ -292,29 +293,41 @@ function AttendancePageComponent() {
                 const hrs = log.hoursWorked !== undefined && log.hoursWorked !== null ? String(log.hoursWorked) : "0";
                 const st = log.status || "N/A";
 
-                return [
-                  `"${labName.replace(/"/g, '""')}"`,
-                  `"${dateStr}"`,
-                  `"${projName.replace(/"/g, '""')}"`,
-                  `"${inT}"`,
-                  `"${outT}"`,
-                  `"${hrs}"`,
-                  `"${st}"`,
-                ].join(",");
+                return [labName, dateStr, projName, inT, outT, hrs, st];
               });
 
-              const csvContent = [headers.join(","), ...rows].join("\n");
-              const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+              const aoa = [headers, ...cleanRows];
+              const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+              const colWidths = headers.map((header, colIndex) => {
+                let maxLen = header.length;
+                for (const row of cleanRows) {
+                  const cellValue = String(row[colIndex] || "");
+                  if (cellValue.length > maxLen) {
+                    maxLen = cellValue.length;
+                  }
+                }
+                return { wch: Math.max(maxLen + 5, 16) };
+              });
+              ws["!cols"] = colWidths;
+
+              const wb = XLSX.utils.book_new();
+              XLSX.utils.book_append_sheet(wb, ws, "Attendance Summary");
+
+              const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+              const blob = new Blob([excelBuffer], {
+                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              });
               const url = URL.createObjectURL(blob);
               const link = document.createElement("a");
-              link.setAttribute("href", url);
-              link.setAttribute("download", `Attendance_Summary_${new Date().toISOString().slice(0, 10)}.csv`);
+              link.href = url;
+              link.download = `Attendance_Summary_${new Date().toISOString().slice(0, 10)}.xlsx`;
               document.body.appendChild(link);
               link.click();
               document.body.removeChild(link);
               URL.revokeObjectURL(url);
 
-              toast.success(`Exported ${allAttendanceLogs.length} attendance records to CSV!`);
+              toast.success(`Exported ${allAttendanceLogs.length} attendance records to Excel!`);
             }}
             className="text-xs font-semibold h-9 rounded-xl gap-1.5"
           >
