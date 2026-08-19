@@ -59,40 +59,66 @@ export const updateProject = createServerFn({ method: "POST" })
       const balance = Math.max(0, newValue - received);
       const paymentStatus = received >= newValue && newValue > 0 ? "Paid" : received > 0 ? "Partial" : "Pending";
 
+      let engName: string | null | undefined = parsed.assignedEngineerName;
+      let engId: string | null | undefined = parsed.assignedEngineerId;
+
+      if (engId) {
+        const eng = await tx.engineer.findUnique({ where: { id: engId } });
+        if (eng) {
+          engName = eng.name;
+        } else {
+          engId = null;
+        }
+      } else if (engId === "") {
+        engId = null;
+        engName = null;
+      }
+
+      if (!engId && engName) {
+        const eng = await tx.engineer.findFirst({ where: { name: engName } });
+        if (eng) engId = eng.id;
+      }
+
+      const projectUpdateData: any = {
+        ...parsed,
+        phone: parsed.phone ? cleanPhone(parsed.phone) : undefined,
+        balanceAmount: balance,
+        paymentStatus,
+      };
+      if (parsed.assignedEngineerId !== undefined || engId !== undefined) projectUpdateData.assignedEngineerId = engId;
+      if (parsed.assignedEngineerName !== undefined || engName !== undefined) projectUpdateData.assignedEngineerName = engName;
+
       const updated = await tx.project.update({
         where: { id: data.id },
-        data: {
-          ...parsed,
-          phone: parsed.phone ? cleanPhone(parsed.phone) : undefined,
-          balanceAmount: balance,
-          paymentStatus,
-        } as any,
+        data: projectUpdateData,
       });
 
       // Sync back to linked Enquiry
       const linkedEnq = await tx.enquiry.findFirst({ where: { projectId: data.id } });
       if (linkedEnq) {
+        const enqUpdateData: any = {
+          customerName: parsed.customerName ?? undefined,
+          phone: parsed.phone ? cleanPhone(parsed.phone) : undefined,
+          location: parsed.location ?? undefined,
+          leadSource: parsed.leadSource ?? undefined,
+          leakageType: parsed.leakageType ?? parsed.natureOfWork ?? undefined,
+          siteVisitDate: parsed.siteVisitDate ?? undefined,
+          siteVisitStatus: parsed.siteVisitStatus ?? undefined,
+          quotationDate: parsed.quotationDate ?? undefined,
+          quotationAmount: parsed.quotationAmount ?? parsed.projectValue ?? undefined,
+          quotationPdfUrl: parsed.quotationPdfUrl ?? undefined,
+          workCommittedDate: parsed.workCommittedDate ?? undefined,
+          actualWorkStartedDate: parsed.actualWorkStartedDate ?? undefined,
+          remarks: parsed.remarks ?? undefined,
+          customerDecision: parsed.customerDecision ?? undefined,
+          cancellationReason: parsed.cancellationReason ?? undefined,
+        };
+        if (parsed.assignedEngineerId !== undefined || engId !== undefined) enqUpdateData.assignedEngineerId = engId;
+        if (parsed.assignedEngineerName !== undefined || engName !== undefined) enqUpdateData.assignedEngineerName = engName;
+
         await tx.enquiry.update({
           where: { id: linkedEnq.id },
-          data: {
-            customerName: parsed.customerName ?? undefined,
-            phone: parsed.phone ? cleanPhone(parsed.phone) : undefined,
-            location: parsed.location ?? undefined,
-            leadSource: parsed.leadSource ?? undefined,
-            leakageType: parsed.leakageType ?? parsed.natureOfWork ?? undefined,
-            assignedEngineerId: parsed.assignedEngineerId ?? undefined,
-            assignedEngineerName: parsed.assignedEngineerName ?? undefined,
-            siteVisitDate: parsed.siteVisitDate ?? undefined,
-            siteVisitStatus: parsed.siteVisitStatus ?? undefined,
-            quotationDate: parsed.quotationDate ?? undefined,
-            quotationAmount: parsed.quotationAmount ?? parsed.projectValue ?? undefined,
-            quotationPdfUrl: parsed.quotationPdfUrl ?? undefined,
-            workCommittedDate: parsed.workCommittedDate ?? undefined,
-            actualWorkStartedDate: parsed.actualWorkStartedDate ?? undefined,
-            remarks: parsed.remarks ?? undefined,
-            customerDecision: parsed.customerDecision ?? undefined,
-            cancellationReason: parsed.cancellationReason ?? undefined,
-          },
+          data: enqUpdateData,
         });
       }
 

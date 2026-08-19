@@ -610,7 +610,7 @@ export const generateSingleProjectReport = createServerFn({ method: "POST" })
       doc.text(`Site Location: ${project.location}`, 40, startY + 36);
 
       doc.text(`Nature of Work: ${project.natureOfWork}`, 300, startY + 8);
-      doc.text(`Lead Engineer: ${project.assignedEngineerName || project.assignedEngineer?.name || "Er. Rajesh Kumar"}`, 300, startY + 22);
+      doc.text(`Lead Engineer: ${project.assignedEngineerName || project.assignedEngineer?.name || "Unassigned"}`, 300, startY + 22);
       doc.text(`Lead Source: ${project.leadSource || "Direct"}`, 300, startY + 36);
 
       doc.y = startY + 68;

@@ -27,6 +27,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 import { useRobotics } from "@/lib/robotics-context";
@@ -48,6 +49,13 @@ const items = [
 export function AppSidebar() {
   const currentPath = useRouterState({ select: (r) => r.location.pathname });
   const { currentUser, logout } = useRobotics();
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  const handleNavClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
 
   const filteredItems = items.filter((item) => {
     if (currentUser?.role === "Worker" && item.title === "Settings") {
@@ -59,14 +67,14 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-slate-200 bg-white text-slate-900">
       <SidebarHeader className="border-b border-slate-200 p-3 bg-white">
-        <div className="flex items-center gap-3">
+        <Link to="/" onClick={handleNavClick} className="flex items-center gap-3">
           <img src="/logo.png" alt="RPC Logo" className="h-8 w-8 object-contain shrink-0" />
           <div className="min-w-0">
             <div className="truncate text-base font-extrabold tracking-tight text-slate-900">
               Robotics ERP
             </div>
           </div>
-        </div>
+        </Link>
       </SidebarHeader>
 
       <SidebarContent className="px-2 py-3 bg-white">
@@ -93,7 +101,7 @@ export function AppSidebar() {
                           : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/90 active:bg-blue-100 active:text-blue-950"
                       }`}
                     >
-                      <Link to={item.url} className="flex items-center gap-3 px-3">
+                      <Link to={item.url} onClick={handleNavClick} className="flex items-center gap-3 px-3">
                         <item.icon className={`h-4.5 w-4.5 shrink-0 ${isActive ? "text-blue-700 dark:text-blue-300" : "text-slate-400 group-hover:text-slate-700"}`} />
                         <span className="text-[14px] font-bold">{item.title}</span>
                       </Link>
@@ -121,7 +129,10 @@ export function AppSidebar() {
           </div>
         </div>
         <button
-          onClick={() => logout()}
+          onClick={() => {
+            handleNavClick();
+            logout();
+          }}
           className="w-full flex items-center justify-center gap-1.5 h-8 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 text-[11px] font-bold cursor-pointer transition-colors"
         >
           <LogOut className="h-3.5 w-3.5" /> Sign Out

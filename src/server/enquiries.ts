@@ -176,7 +176,7 @@ export const updateEnquiry = createServerFn({ method: "POST" })
           status: newStatus,
         };
 
-        if (parsed.assignedEngineerId !== undefined) projectUpdateData.assignedEngineerId = engId;
+        if (parsed.assignedEngineerId !== undefined || engId !== undefined) projectUpdateData.assignedEngineerId = engId;
         if (parsed.assignedEngineerName !== undefined || engName !== undefined) projectUpdateData.assignedEngineerName = engName;
 
         await tx.project.update({

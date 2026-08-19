@@ -146,7 +146,7 @@ function DashboardComponent() {
   const [enqLeakageType, setEnqLeakageType] = useState("Robotic Arm Oil Leakage & Joint Seal");
   const [enqLeadSource, setEnqLeadSource] = useState("Phone Call");
   const [enqReferredBy, setEnqReferredBy] = useState("");
-  const [enqEngineerName, setEnqEngineerName] = useState("Er. Rajesh Kumar");
+  const [enqEngineerName, setEnqEngineerName] = useState("");
   const [enqEngineerId, setEnqEngineerId] = useState("");
   const [enqSiteVisitDate, setEnqSiteVisitDate] = useState("2026-08-07");
   const [enqQuotationAmount, setEnqQuotationAmount] = useState<number>(0);
@@ -416,7 +416,7 @@ function DashboardComponent() {
           time: info.displayStr,
           timestampMs: info.timestampMs,
           title: `Project ${proj.id} (${proj.customerName}) marked COMPLETED`,
-          subtitle: `Contract Value: ₹${(proj.projectValue || 0).toLocaleString("en-IN")} • Lead Engineer: ${proj.assignedEngineerName || "Er. Rajesh Kumar"}`,
+          subtitle: `Contract Value: ₹${(proj.projectValue || 0).toLocaleString("en-IN")} • Lead Engineer: ${proj.assignedEngineerName || "Unassigned"}`,
           category: "PROJECTS",
           type: "completed",
           badgeText: "Project Completed",
@@ -568,7 +568,7 @@ function DashboardComponent() {
       referredBy: enqReferredBy,
       leakageType: enqLeakageType || "Robotic Arm Oil Leakage & Joint Seal",
       assignedEngineerId: eng?.id || undefined,
-      assignedEngineerName: eng?.name || enqEngineerName || "Er. Rajesh Kumar",
+      assignedEngineerName: eng?.name || (enqEngineerName ? enqEngineerName : undefined),
       siteVisitDate: enqSiteVisitDate || "2026-08-07",
       quotationAmount: (enqQuotationAmount as any) === "" || enqQuotationAmount === undefined || enqQuotationAmount === null ? undefined : Number(enqQuotationAmount),
       workCommittedDate: enqWorkCommittedDate || "2026-08-15",
@@ -1474,7 +1474,7 @@ function DashboardComponent() {
                               <span className="text-muted-foreground font-normal">• {proj.natureOfWork}</span>
                             </div>
                             <div className="text-[11px] text-muted-foreground flex items-center gap-3">
-                              <span>Engineer: {proj.assignedEngineerName || "Er. Rajesh Kumar"}</span>
+                              <span>Engineer: {proj.assignedEngineerName || "Unassigned"}</span>
                               <span>• {proj.assignedLabourIds.length} Labours</span>
                               <span>• Collected: ₹{proj.receivedAmount.toLocaleString("en-IN")}</span>
                             </div>

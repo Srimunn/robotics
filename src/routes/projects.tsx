@@ -106,6 +106,7 @@ function ProjectsComponent() {
   const {
     projects,
     labours,
+    engineers,
     payments,
     enquiries,
     machines,
@@ -737,9 +738,41 @@ function ProjectsComponent() {
                           </div>
                         </td>
                         <td className="p-3 whitespace-nowrap">
-                          <span className="font-semibold text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 whitespace-nowrap inline-block">
-                            {p.assignedEngineerName || "Er. Rajesh Kumar"}
-                          </span>
+                          <Select
+                            value={engineers.find((e) => e.name === p.assignedEngineerName)?.id || p.assignedEngineerId || "unassigned"}
+                            onValueChange={(val) => {
+                              if (val === "unassigned") {
+                                updateProject(p.id, { assignedEngineerId: "", assignedEngineerName: "" });
+                              } else {
+                                const eng = engineers.find((e) => e.id === val);
+                                if (eng) {
+                                  updateProject(p.id, { assignedEngineerId: eng.id, assignedEngineerName: eng.name });
+                                }
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="h-7 text-xs rounded-md font-semibold text-blue-700 bg-blue-50/80 border-blue-200 w-[150px] focus:ring-1">
+                              <SelectValue placeholder="Assign Engineer">
+                                {p.assignedEngineerName ? (
+                                  <span className="font-semibold text-xs text-blue-700 truncate">
+                                    {p.assignedEngineerName}
+                                  </span>
+                                ) : (
+                                  <span className="text-amber-600 text-xs font-medium">Unassigned</span>
+                                )}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl">
+                              <SelectItem value="unassigned" className="text-xs text-amber-600 font-medium">
+                                Unassigned
+                              </SelectItem>
+                              {engineers.map((eng) => (
+                                <SelectItem key={eng.id} value={eng.id} className="text-xs">
+                                  {eng.name} ({eng.phone})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </td>
                         <td className="p-3 font-semibold text-xs text-blue-700 whitespace-nowrap font-mono">
                           {p.workCommittedDate ? p.workCommittedDate : "Not Set"}
@@ -856,7 +889,33 @@ function ProjectsComponent() {
                 </div>
                 <div className="text-left sm:text-right bg-white px-3 py-1.5 rounded-lg border border-blue-200 shadow-2xs">
                   <span className="text-[10px] uppercase font-bold text-slate-400 block">Lead Engineer</span>
-                  <span className="text-xs font-bold text-blue-700">{activeProject.assignedEngineerName || "Er. Rajesh Kumar"}</span>
+                  <Select
+                    value={engineers.find((e) => e.name === activeProject.assignedEngineerName)?.id || activeProject.assignedEngineerId || "unassigned"}
+                    onValueChange={(val) => {
+                      const eng = engineers.find((e) => e.id === val);
+                      const updates = val === "unassigned" 
+                        ? { assignedEngineerId: "", assignedEngineerName: "" }
+                        : eng ? { assignedEngineerId: eng.id, assignedEngineerName: eng.name } : {};
+                      updateProject(activeProject.id, updates);
+                      setActiveProject({ ...activeProject, ...updates });
+                    }}
+                  >
+                    <SelectTrigger className="h-6 text-xs font-bold text-blue-700 p-0 border-0 bg-transparent shadow-none focus:ring-0">
+                      <SelectValue placeholder="Assign Engineer">
+                        {activeProject.assignedEngineerName || "Unassigned"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="unassigned" className="text-xs text-amber-600 font-medium">
+                        Unassigned
+                      </SelectItem>
+                      {engineers.map((eng) => (
+                        <SelectItem key={eng.id} value={eng.id} className="text-xs">
+                          {eng.name} ({eng.phone})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </DialogHeader>
@@ -900,7 +959,13 @@ function ProjectsComponent() {
                       <UserCheck className="h-4 w-4 text-blue-600" /> Details
                     </CardTitle>
                     <Badge variant="outline" className="text-[10px] bg-blue-100/80 text-blue-800 border-blue-300 font-bold">
-                      Er. {activeProject.assignedEngineerName || "Er. Rajesh Kumar"}
+                      {activeProject.assignedEngineerName ? (
+                        activeProject.assignedEngineerName.startsWith("Er.")
+                          ? activeProject.assignedEngineerName
+                          : `Er. ${activeProject.assignedEngineerName}`
+                      ) : (
+                        "Unassigned"
+                      )}
                     </Badge>
                   </CardHeader>
                   <CardContent className="p-4 space-y-3">

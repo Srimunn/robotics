@@ -329,7 +329,7 @@ function ReportsComponent() {
         projectId: p.id,
         customerName: p.customerName,
         workCategory: p.natureOfWork || "General Servicing",
-        engineerName: p.assignedEngineerName || "Er. Rajesh Kumar",
+        engineerName: p.assignedEngineerName || "Unassigned",
         location: p.location || "Hyderabad",
         status: p.status,
         contractValue: p.projectValue || 0,
@@ -992,7 +992,7 @@ function ReportsComponent() {
                         p.id,
                         p.customerName,
                         p.natureOfWork,
-                        p.assignedEngineerName || "Er. Rajesh Kumar",
+                        p.assignedEngineerName || "Unassigned",
                         p.scheduledDate || "N/A",
                         p.location || "N/A",
                         p.projectValue,
@@ -1149,7 +1149,7 @@ function ReportsComponent() {
                         </td>
                         <td className="p-3 font-semibold text-foreground">{p.customerName}</td>
                         <td className="p-3 font-medium text-foreground">{p.natureOfWork}</td>
-                        <td className="p-3 font-semibold text-purple-700">{p.assignedEngineerName || "Er. Rajesh Kumar"}</td>
+                        <td className="p-3 font-semibold text-purple-700">{p.assignedEngineerName || "Unassigned"}</td>
                         <td className="p-3 text-muted-foreground font-mono">{p.scheduledDate || "N/A"}</td>
                         <td className="p-3 text-muted-foreground">{p.location || "Hyderabad"}</td>
                         <td className="p-3 font-bold text-foreground">₹{p.projectValue.toLocaleString("en-IN")}</td>

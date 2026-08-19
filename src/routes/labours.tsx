@@ -835,7 +835,7 @@ function LaboursComponent() {
                                         </div>
                                         <div className="text-muted-foreground flex items-center gap-1">
                                           <span>Lead Engineer:</span>
-                                          <span className="font-semibold text-blue-700">{p.assignedEngineerName || "Er. Rajesh Kumar"}</span>
+                                          <span className="font-semibold text-blue-700">{p.assignedEngineerName || "Unassigned"}</span>
                                         </div>
                                       </div>
                                       <div className="space-y-1">
