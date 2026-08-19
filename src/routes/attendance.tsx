@@ -488,8 +488,14 @@ function AttendancePageComponent() {
                       )}
                     </TableCell>
 
-                    <TableCell className="text-center font-mono text-xs font-bold text-purple-600 dark:text-purple-400">
-                      {overtimeHours > 0 ? `${overtimeHours} hrs` : "—"}
+                    <TableCell className="text-center">
+                      {overtimeHours > 0 ? (
+                        <span className="inline-block text-xs font-bold font-mono px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                          {overtimeHours} hrs
+                        </span>
+                      ) : (
+                        <span className="text-xs font-bold text-muted-foreground">—</span>
+                      )}
                     </TableCell>
 
                     <TableCell className="text-right font-mono text-xs font-medium text-slate-600">

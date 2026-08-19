@@ -271,12 +271,51 @@ function DashboardComponent() {
   // State for Timeline Category Quick Filter
   const [timelineCategoryFilter, setTimelineCategoryFilter] = useState<"ALL" | "SHIFTS" | "PROJECTS" | "PAYMENTS" | "EQUIPMENT">("ALL");
 
+  // Helper to format timestamps into real local IST date and time (e.g., "18 Aug 2026, 2:04 PM")
+  const formatISTActivity = (rawVal: any, fallbackTime?: string) => {
+    if (!rawVal) {
+      const d = new Date();
+      return {
+        timestampMs: d.getTime(),
+        displayStr: new Intl.DateTimeFormat("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+          timeZone: "Asia/Kolkata",
+        }).format(d),
+      };
+    }
+    const d = rawVal instanceof Date ? rawVal : new Date(rawVal);
+    if (isNaN(d.getTime())) {
+      return {
+        timestampMs: Date.now(),
+        displayStr: fallbackTime ? `${String(rawVal).slice(0, 10)}, ${fallbackTime}` : String(rawVal),
+      };
+    }
+    const formatted = new Intl.DateTimeFormat("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "Asia/Kolkata",
+    }).format(d);
+    return {
+      timestampMs: d.getTime(),
+      displayStr: formatted,
+    };
+  };
+
   // Dynamic Live Recent Activity Timeline (Tracks status changes to Ongoing, machines added, labour shifts, site visits & payments)
   const recentActivitiesTimeline = (() => {
     const events: Array<{
       id: string;
       time: string;
-      date: string;
+      timestampMs: number;
       title: string;
       subtitle: string;
       category: "SHIFTS" | "PROJECTS" | "PAYMENTS" | "EQUIPMENT";
@@ -287,11 +326,10 @@ function DashboardComponent() {
       enquiryObj?: Enquiry;
     }> = [];
 
-    const realTodayStr = new Date().toISOString().slice(0, 10);
     const uniqueKeys = new Set<string>();
 
     const pushUnique = (evt: typeof events[0]) => {
-      const key = `${evt.title}_${evt.time}_${evt.date}`;
+      const key = `${evt.title}_${evt.time}`;
       if (!uniqueKeys.has(key)) {
         uniqueKeys.add(key);
         events.push(evt);
@@ -300,11 +338,12 @@ function DashboardComponent() {
 
     // 1. SHIFT LOGS & LABOUR CHECK-INS (FROM ALL PROJECTS)
     projects.forEach((proj) => {
-      (proj.labourLogs || []).forEach((log) => {
+      (proj.labourLogs || []).forEach((log: any) => {
+        const info = formatISTActivity(log.createdAt || log.date, log.inTime);
         pushUnique({
           id: `log_${log.labourId}_${log.date}_${log.inTime}`,
-          time: log.inTime || "09:00 AM",
-          date: log.date || realTodayStr,
+          time: info.displayStr,
+          timestampMs: info.timestampMs,
           title: `${log.labourName} checked in on ${proj.customerName} (${proj.id})`,
           subtitle: log.workDescription || "On-site robotic servicing check-in",
           category: "SHIFTS",
@@ -318,11 +357,12 @@ function DashboardComponent() {
       });
 
       // 2. PROJECT ACTIVITIES & AUDIT LOGS
-      (proj.activities || []).forEach((act) => {
+      (proj.activities || []).forEach((act: any) => {
+        const info = formatISTActivity(act.timestamp || act.createdAt);
         pushUnique({
           id: `act_${act.id}`,
-          time: act.timestamp?.slice(11, 16) || "10:00 AM",
-          date: act.timestamp?.slice(0, 10) || realTodayStr,
+          time: info.displayStr,
+          timestampMs: info.timestampMs,
           title: `${act.event} on ${proj.customerName} (${proj.id})`,
           subtitle: `${act.details || "Project update logged"} • By ${act.actor || "Engineer"}`,
           category: "PROJECTS",
@@ -335,11 +375,11 @@ function DashboardComponent() {
 
       // 3. PROJECT STATUS TRANSITIONS & HISTORY
       (proj.statusHistory || []).forEach((sh: any, idx) => {
-        const dateStr = String(sh.timestamp || sh.updatedAt || realTodayStr);
+        const info = formatISTActivity(sh.timestamp || sh.updatedAt || sh.createdAt);
         pushUnique({
           id: `sh_${proj.id}_${idx}`,
-          time: dateStr.length >= 16 ? dateStr.slice(11, 16) : "09:00 AM",
-          date: dateStr.length >= 10 ? dateStr.slice(0, 10) : realTodayStr,
+          time: info.displayStr,
+          timestampMs: info.timestampMs,
           title: `Project ${proj.id} (${proj.customerName}) status changed to ${(sh.status || "").toUpperCase()}`,
           subtitle: `Updated by ${sh.updatedBy || "Supervisor"} • Nature of Work: ${proj.natureOfWork}`,
           category: "PROJECTS",
@@ -356,10 +396,11 @@ function DashboardComponent() {
 
       // Current Project status fallback
       if (proj.status === "Ongoing") {
+        const info = formatISTActivity(proj.actualWorkStartedDate || proj.scheduledDate || proj.createdAt);
         pushUnique({
           id: `status_ongoing_${proj.id}`,
-          time: "09:00 AM",
-          date: proj.actualWorkStartedDate || proj.scheduledDate || realTodayStr,
+          time: info.displayStr,
+          timestampMs: info.timestampMs,
           title: `Project ${proj.id} (${proj.customerName}) status set to ONGOING`,
           subtitle: `Nature of Work: ${proj.natureOfWork} • Location: ${proj.location}`,
           category: "PROJECTS",
@@ -369,10 +410,11 @@ function DashboardComponent() {
           projectObj: proj,
         });
       } else if (proj.status === "Completed") {
+        const info = formatISTActivity(proj.scheduledDate || proj.createdAt);
         pushUnique({
           id: `status_completed_${proj.id}`,
-          time: "05:30 PM",
-          date: proj.scheduledDate || realTodayStr,
+          time: info.displayStr,
+          timestampMs: info.timestampMs,
           title: `Project ${proj.id} (${proj.customerName}) marked COMPLETED`,
           subtitle: `Contract Value: ₹${(proj.projectValue || 0).toLocaleString("en-IN")} • Lead Engineer: ${proj.assignedEngineerName || "Er. Rajesh Kumar"}`,
           category: "PROJECTS",
@@ -384,11 +426,12 @@ function DashboardComponent() {
       }
 
       // 4. CREW / WORKER ASSIGNMENTS TO PROJECTS
-      (proj.labourAssignments || []).forEach((la) => {
+      (proj.labourAssignments || []).forEach((la: any) => {
+        const info = formatISTActivity(la.assignedDate || la.createdAt);
         pushUnique({
           id: `la_${proj.id}_${la.labourId}`,
-          time: "08:30 AM",
-          date: la.assignedDate || realTodayStr,
+          time: info.displayStr,
+          timestampMs: info.timestampMs,
           title: `Labour ${la.labourName} (${la.labourType}) assigned to ${proj.customerName} (${proj.id})`,
           subtitle: `Weekly Wage: ₹${la.weeklyWage} • Site Location: ${proj.location}`,
           category: "SHIFTS",
@@ -400,11 +443,12 @@ function DashboardComponent() {
       });
 
       // 5. PAYMENT MILESTONE STAGES
-      (proj.paymentStages || []).forEach((stg) => {
+      (proj.paymentStages || []).forEach((stg: any) => {
+        const info = formatISTActivity(stg.paidDate || stg.dueDate || stg.createdAt);
         pushUnique({
           id: `stg_${stg.id}`,
-          time: "02:30 PM",
-          date: stg.paidDate || stg.dueDate || realTodayStr,
+          time: info.displayStr,
+          timestampMs: info.timestampMs,
           title: `Milestone Stage (${stg.stageName}): ₹${(stg.amount || 0).toLocaleString("en-IN")} for ${proj.customerName} (${proj.id})`,
           subtitle: `Stage Status: ${stg.status} • Reference: ${stg.referenceNumber || "Bank Transfer"}`,
           category: "PAYMENTS",
@@ -421,11 +465,11 @@ function DashboardComponent() {
     // 3. MACHINES & EQUIPMENT ALLOCATED
     machineIssues.forEach((mi: any) => {
       const proj = projects.find((p) => p.id === mi.projectId);
-      const issueDateStr = String(mi.issueDate || realTodayStr);
+      const info = formatISTActivity(mi.createdAt || mi.issueDate);
       pushUnique({
         id: `mi_${mi.id}`,
-        time: "10:15 AM",
-        date: issueDateStr.length >= 10 ? issueDateStr.slice(0, 10) : realTodayStr,
+        time: info.displayStr,
+        timestampMs: info.timestampMs,
         title: `Machine Added: ${mi.machineName}`,
         subtitle: `Issued by ${mi.issuedBy || mi.issuedTo || "Site Crew"} for Project ${mi.projectId} (${proj?.customerName || "Site"})`,
         category: "EQUIPMENT",
@@ -439,10 +483,11 @@ function DashboardComponent() {
     machines.forEach((m: any) => {
       if (m.issuedQuantity > 0) {
         const linkedProj = projects.find((p) => p.natureOfWork?.toLowerCase().includes((m.category || "").toLowerCase()) || p.id === m.assignedProjectId);
+        const info = formatISTActivity(m.createdAt || m.updatedAt);
         pushUnique({
           id: `m_${m.id}`,
-          time: "10:30 AM",
-          date: realTodayStr,
+          time: info.displayStr,
+          timestampMs: info.timestampMs,
           title: `Equipment Deployed: ${m.toolName || m.name}`,
           subtitle: `${m.category} active on site (${m.issuedQuantity} unit(s) in service)`,
           category: "EQUIPMENT",
@@ -455,12 +500,13 @@ function DashboardComponent() {
     });
 
     // 4. PAYMENTS RECEIVED
-    payments.forEach((pay) => {
+    payments.forEach((pay: any) => {
       const proj = projects.find((p) => p.id === pay.projectId);
+      const info = formatISTActivity(pay.paymentDate || pay.createdAt);
       pushUnique({
         id: `pay_${pay.id}`,
-        time: "02:30 PM",
-        date: pay.paymentDate || realTodayStr,
+        time: info.displayStr,
+        timestampMs: info.timestampMs,
         title: `Payment Received: ₹${pay.amount.toLocaleString("en-IN")} for ${proj ? proj.customerName : pay.projectId}`,
         subtitle: `Payment Mode: ${pay.mode} • Ref Number: ${pay.referenceNumber}`,
         category: "PAYMENTS",
@@ -472,12 +518,13 @@ function DashboardComponent() {
     });
 
     // 5. ENQUIRIES & SITE VISITS
-    enquiries.forEach((enq) => {
+    enquiries.forEach((enq: any) => {
       if (enq.assignedEngineerName) {
+        const info = formatISTActivity(enq.enquiryDate || enq.createdAt);
         pushUnique({
           id: `enq_${enq.id}`,
-          time: "09:00 AM",
-          date: enq.enquiryDate || realTodayStr,
+          time: info.displayStr,
+          timestampMs: info.timestampMs,
           title: `Engineer ${enq.assignedEngineerName} assigned for site visit`,
           subtitle: `Customer: ${enq.customerName} • Location: ${enq.location}`,
           category: "PROJECTS",
@@ -489,8 +536,8 @@ function DashboardComponent() {
       }
     });
 
-    // Sort strictly by 24-hour time descending (e.g. 05:30 PM at top, 02:30 PM, 11:49 AM, 10:42 AM, 09:15 AM, 09:00 AM, 08:30 AM)
-    return events.sort((a, b) => parseTimeToMinutes(b.time) - parseTimeToMinutes(a.time));
+    // Sort strictly chronologically descending by timestampMs
+    return events.sort((a, b) => b.timestampMs - a.timestampMs);
   })();
 
   // Quick Action Handlers

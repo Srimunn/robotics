@@ -112,7 +112,7 @@ function EnquiriesComponent() {
       const reader = new FileReader();
       reader.onload = async () => {
         const base64Data = reader.result as string;
-        const res = await uploadImage({ data: { image: base64Data, folder: "quotations" } });
+        const res = await uploadImage({ data: { image: base64Data, folder: "quotations", isRaw: true } });
         if (res?.url) {
           updateEnquiry(activeEnquiry.id, { quotationPdfUrl: res.url });
           setActiveEnquiry({ ...activeEnquiry, quotationPdfUrl: res.url });

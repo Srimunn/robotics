@@ -276,7 +276,7 @@ function ProjectsComponent() {
       const l = labours.find((x) => x.id === id);
       return {
         labourId: id,
-        weeklyWage: customWeeklyWages[id] ?? l?.defaultWeeklyWage ?? 1400,
+        weeklyWage: customWeeklyWages[id] ?? 0,
       };
     });
 
@@ -388,7 +388,7 @@ function ProjectsComponent() {
   const [projIssueMachineReturnDate, setProjIssueMachineReturnDate] = useState(
     new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
   );
-  const [projIssueMachineBy, setProjIssueMachineBy] = useState("Er. Rajesh Kumar");
+  const [projIssueMachineBy, setProjIssueMachineBy] = useState("");
   const [projIssueMachineRemarks, setProjIssueMachineRemarks] = useState("");
 
   const [projReturnMachineTarget, setProjReturnMachineTarget] = useState<MachineIssueRecord | null>(null);
@@ -400,7 +400,7 @@ function ProjectsComponent() {
   const [projIssueMaterialOpen, setProjIssueMaterialOpen] = useState(false);
   const [projIssueMaterialId, setProjIssueMaterialId] = useState("");
   const [projIssueMaterialQty, setProjIssueMaterialQty] = useState(1);
-  const [projIssueMaterialBy, setProjIssueMaterialBy] = useState("Er. Rajesh Kumar");
+  const [projIssueMaterialBy, setProjIssueMaterialBy] = useState("");
   const [projIssueMaterialRemarks, setProjIssueMaterialRemarks] = useState("");
 
   // Project Material Note Modal
@@ -1499,7 +1499,7 @@ function ProjectsComponent() {
                       if (avail.length > 0) setProjIssueMachineId(avail[0].id);
                       setProjIssueMachineQty(1);
                       setProjIssueMachineReturnDate(new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10));
-                      setProjIssueMachineBy("Er. Rajesh Kumar");
+                      setProjIssueMachineBy("");
                       setProjIssueMachineRemarks("");
                       setProjIssueMachineOpen(true);
                     }}
@@ -2062,7 +2062,7 @@ function ProjectsComponent() {
             <div className="space-y-2 border rounded-lg p-2 max-h-72 overflow-y-auto">
               {labours.map((l) => {
                 const isAssigned = activeProject?.assignedLabourIds.includes(l.id);
-                const currentWageState = labourAssignmentsState.find((x) => x.labourId === l.id)?.weeklyWage || l.defaultWeeklyWage || 1400;
+                const currentWageState = labourAssignmentsState.find((x) => x.labourId === l.id)?.weeklyWage ?? 0;
 
                 return (
                   <div
@@ -2086,7 +2086,7 @@ function ProjectsComponent() {
                               if (!labourAssignmentsState.some((x) => x.labourId === l.id)) {
                                 setLabourAssignmentsState((prev) => [
                                   ...prev,
-                                  { labourId: l.id, weeklyWage: l.defaultWeeklyWage || 1400 },
+                                  { labourId: l.id, weeklyWage: 0 },
                                 ]);
                               }
                             } else {
@@ -2861,7 +2861,7 @@ function ProjectsComponent() {
 
                   return availableLabours.map((l) => {
                     const isSelected = selectedLabourIds.includes(l.id);
-                    const wageVal = customWeeklyWages[l.id] ?? l.defaultWeeklyWage ?? 1400;
+                    const wageVal = customWeeklyWages[l.id] ?? 0;
                     const dateVal = customAssignedDates[l.id] || new Date().toISOString().slice(0, 10);
 
                     return (
@@ -2881,7 +2881,7 @@ function ProjectsComponent() {
                                   if (!customWeeklyWages[l.id]) {
                                     setCustomWeeklyWages((prev) => ({
                                       ...prev,
-                                      [l.id]: l.defaultWeeklyWage || 1400,
+                                      [l.id]: 0,
                                     }));
                                   }
                                   if (!customAssignedDates[l.id]) {

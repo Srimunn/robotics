@@ -117,7 +117,7 @@ function MachinesPageComponent() {
   const [issueReturnDate, setIssueReturnDate] = useState(
     new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
   );
-  const [issueBy, setIssueBy] = useState("Er. Rajesh Kumar");
+  const [issueBy, setIssueBy] = useState("");
   const [issueRemarks, setIssueRemarks] = useState("");
 
   // Return Machine Form
@@ -238,7 +238,7 @@ function MachinesPageComponent() {
     }
     setIssueDate(new Date().toISOString().slice(0, 10));
     setIssueReturnDate(new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10));
-    setIssueBy("Er. Rajesh Kumar");
+    setIssueBy("");
     setIssueRemarks("");
   };
 

@@ -9,32 +9,105 @@ if (typeof (globalThis as any).__filename === "undefined") {
 
 import { createServerFn } from "@tanstack/react-start";
 import type PDFDocumentType from "pdfkit";
-// @ts-ignore
-import PDFDocument from "pdfkit/js/pdfkit.standalone.js";
+import PDFDocument from "pdfkit";
 import { db } from "~/lib/db";
 import { toNumber } from "./utils";
 
-/** Fetch image from URL safely into a Buffer, returning null on error or timeout */
-async function fetchImageBuffer(url: string | null | undefined, timeoutMs = 4000): Promise<Buffer | null> {
+/** Helper to validate if a buffer has JPEG or PNG magic byte headers for PDFKit image parser */
+function isValidPdfImageBuffer(buf: Buffer | null): boolean {
+  if (!buf || !Buffer.isBuffer(buf) || buf.length < 4) return false;
+  // JPEG: 0xFF 0xD8 0xFF
+  const isJpeg = buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+  // PNG: 0x89 0x50 0x4E 0x47 ('\x89PNG')
+  const isPng = buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+  return isJpeg || isPng;
+}
+
+/** Fetch image from URL safely into a Buffer, returning null on error or non-JPEG/PNG data */
+async function fetchImageBuffer(url: string | null | undefined, timeoutMs = 8000): Promise<Buffer | null> {
   if (!url || typeof url !== "string" || !url.startsWith("http")) return null;
+
+  // 1. Try fetching transformed baseline JPG from Cloudinary
+  try {
+    let targetUrl = url;
+    if (targetUrl.includes("res.cloudinary.com") && targetUrl.includes("/upload/")) {
+      if (!targetUrl.includes("f_jpg")) {
+        targetUrl = targetUrl.replace("/upload/", "/upload/f_jpg,fl_lossy,q_80,w_600/");
+      }
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const res = await fetch(targetUrl, { signal: controller.signal });
+    clearTimeout(timer);
+
+    if (res.ok) {
+      const arrayBuffer = await res.arrayBuffer();
+      const buf = Buffer.from(arrayBuffer);
+      if (isValidPdfImageBuffer(buf)) {
+        return buf;
+      }
+    }
+  } catch (err) {
+    console.error(`[fetchImageBuffer] Error fetching transformed URL ${url}:`, err);
+  }
+
+  // 2. Fallback to fetching original URL
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     const res = await fetch(url, { signal: controller.signal });
     clearTimeout(timer);
-    if (!res.ok) return null;
-    const arrayBuffer = await res.arrayBuffer();
-    return Buffer.from(arrayBuffer);
-  } catch {
-    return null;
+
+    if (res.ok) {
+      const arrayBuffer = await res.arrayBuffer();
+      const buf = Buffer.from(arrayBuffer);
+      if (isValidPdfImageBuffer(buf)) {
+        return buf;
+      }
+      console.error(`[fetchImageBuffer] URL returned non-JPEG/PNG bytes for ${url}`);
+    }
+  } catch (err) {
+    console.error(`[fetchImageBuffer] Error fetching original URL ${url}:`, err);
   }
+
+  return null;
+}
+
+/** Format dates into short, clean DD-MM-YY format to avoid column overflow ###### */
+function formatPdfDate(val: any): string {
+  if (!val) return "N/A";
+  const d = val instanceof Date ? val : new Date(val);
+  if (isNaN(d.getTime())) return String(val).slice(0, 10) || "N/A";
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = String(d.getFullYear()).slice(-2);
+  return `${day}-${month}-${year}`;
+}
+
+/** Format timestamps into clean short DD-MM-YY HH:MM AM/PM format */
+function formatPdfDateTime(val: any): string {
+  if (!val) return "N/A";
+  const d = val instanceof Date ? val : new Date(val);
+  if (isNaN(d.getTime())) return String(val).slice(0, 16) || "N/A";
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = String(d.getFullYear()).slice(-2);
+  let hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+  return `${day}-${month}-${year} ${hours}:${minutes} ${ampm}`;
 }
 
 /** Utility to generate PDF buffer using pdfkit with standard built-in Helvetica fonts */
-function renderPdf(builder: (doc: InstanceType<typeof PDFDocument>) => Promise<void>): Promise<Buffer> {
+async function renderPdf(builder: (doc: any) => Promise<void>): Promise<Buffer> {
+  const pdfModule = await import("pdfkit");
+  const PDFDocumentClass = pdfModule.default || pdfModule;
+
   return new Promise(async (resolve, reject) => {
     try {
-      const doc = new PDFDocument({ margin: 30, size: "A4" });
+      const doc = new PDFDocumentClass({ margin: 30, size: "A4" });
       doc.font("Helvetica");
 
       const chunks: Buffer[] = [];
@@ -82,7 +155,7 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
       return true;
     });
 
-    const nowStr = new Date().toISOString().slice(0, 10);
+    const nowStr = formatPdfDate(new Date());
 
     const pdfBuffer = await renderPdf(async (doc) => {
       // Title Header
@@ -149,17 +222,33 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
         const photoY = infoY;
 
         doc.fontSize(7.5).fillColor("#64748b").text("Before", beforeX, photoY - 9);
-        if (beforeBuffer) {
-          try { doc.image(beforeBuffer, beforeX, photoY, { fit: [50, 50], align: "center", valign: "center" }); }
-          catch { doc.rect(beforeX, photoY, 50, 50).fillAndStroke("#f1f5f9", "#cbd5e1"); }
+        if (beforeBuffer && isValidPdfImageBuffer(beforeBuffer)) {
+          try {
+            doc.image(beforeBuffer, beforeX, photoY, { fit: [50, 50], align: "center", valign: "center" });
+          } catch (err) {
+            console.error("[PDFKit] Error embedding before photo in projects report:", err);
+            doc.rect(beforeX, photoY, 50, 50).fillAndStroke("#fef2f2", "#fca5a5");
+            doc.fontSize(6).fillColor("#dc2626").text("Photo N/A", beforeX + 2, photoY + 20);
+          }
+        } else if (p.beforeWorkPhotoUrl) {
+          doc.rect(beforeX, photoY, 50, 50).fillAndStroke("#fef2f2", "#fca5a5");
+          doc.fontSize(6).fillColor("#dc2626").text("Photo N/A", beforeX + 2, photoY + 20);
         } else {
           doc.rect(beforeX, photoY, 50, 50).fillAndStroke("#f1f5f9", "#cbd5e1");
         }
 
         doc.fontSize(7.5).fillColor("#64748b").text("After", afterX, photoY - 9);
-        if (afterBuffer) {
-          try { doc.image(afterBuffer, afterX, photoY, { fit: [50, 50], align: "center", valign: "center" }); }
-          catch { doc.rect(afterX, photoY, 50, 50).fillAndStroke("#f1f5f9", "#cbd5e1"); }
+        if (afterBuffer && isValidPdfImageBuffer(afterBuffer)) {
+          try {
+            doc.image(afterBuffer, afterX, photoY, { fit: [50, 50], align: "center", valign: "center" });
+          } catch (err) {
+            console.error("[PDFKit] Error embedding after photo in projects report:", err);
+            doc.rect(afterX, photoY, 50, 50).fillAndStroke("#fef2f2", "#fca5a5");
+            doc.fontSize(6).fillColor("#dc2626").text("Photo N/A", afterX + 2, photoY + 20);
+          }
+        } else if (p.afterWorkPhotoUrl) {
+          doc.rect(afterX, photoY, 50, 50).fillAndStroke("#fef2f2", "#fca5a5");
+          doc.fontSize(6).fillColor("#dc2626").text("Photo N/A", afterX + 2, photoY + 20);
         } else {
           doc.rect(afterX, photoY, 50, 50).fillAndStroke("#f1f5f9", "#cbd5e1");
         }
@@ -183,10 +272,10 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
             const totalEarned = labLogs.reduce((sum: number, l: any) => sum + (toNumber(l.earnedMoney) || 0), 0);
 
             const statusTag = (asgn as any).isActive !== false ? "[Active]" : "[Previously Assigned / Inactive]";
-            const dateStr = asgn.assignedDate ? (asgn.assignedDate instanceof Date ? asgn.assignedDate.toISOString().slice(0, 10) : String(asgn.assignedDate).slice(0, 10)) : "";
+            const dateStr = formatPdfDate(asgn.assignedDate);
 
             doc.fontSize(8).font("Helvetica-Bold").fillColor("#1e293b").text(`• ${asgn.labourName} (${asgn.labourType || "Permanent"}) ${statusTag}:`, 40, doc.y);
-            doc.font("Helvetica").fillColor("#475569").text(`   Wage: INR ${(asgn.weeklyWage || 0).toLocaleString("en-IN")}/wk | Assigned: ${dateStr || "N/A"} | Days Present: ${daysPresent} | Hours: ${totalHours} hrs | Earned: INR ${Math.round(totalEarned).toLocaleString("en-IN")}`);
+            doc.font("Helvetica").fillColor("#475569").text(`   Wage: INR ${(asgn.weeklyWage || 0).toLocaleString("en-IN")}/wk | Assigned: ${dateStr} | Days Present: ${daysPresent} | Hours: ${totalHours} hrs | Earned: INR ${Math.round(totalEarned).toLocaleString("en-IN")}`);
             doc.moveDown(0.2);
           }
           doc.moveDown(0.3);
@@ -203,7 +292,7 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
         } else {
           for (const pay of payList) {
             if (doc.y > 730) doc.addPage();
-            const payDate = pay.paymentDate ? (pay.paymentDate instanceof Date ? pay.paymentDate.toISOString().slice(0, 10) : String(pay.paymentDate).slice(0, 10)) : "";
+            const payDate = formatPdfDate(pay.paymentDate);
             const pAmt = toNumber(pay.amount);
             doc.fontSize(8).font("Helvetica").fillColor("#334155").text(`• Date: ${payDate} | Amount: INR ${pAmt.toLocaleString("en-IN")} | Mode: ${pay.mode} | Received By: ${pay.receivedBy || "Accounts Desk"}`, 40, doc.y);
             doc.moveDown(0.15);
@@ -215,14 +304,14 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
         doc.fillColor("#0f172a").fontSize(8.5).font("Helvetica-Bold").text("PROJECT TIMELINE & STATUS HISTORY:", 35, doc.y);
         doc.moveDown(0.2);
 
-        const createdDateStr = p.createdAt instanceof Date ? p.createdAt.toISOString().slice(0, 10) : String(p.createdAt).slice(0, 10);
+        const createdDateStr = formatPdfDate(p.createdAt);
         doc.fontSize(8).font("Helvetica").fillColor("#475569").text(`• Created: ${createdDateStr}`, 40, doc.y);
         doc.moveDown(0.15);
 
         const history = p.statusHistory || [];
         for (const st of history) {
           if (doc.y > 730) doc.addPage();
-          const stTime = st.timestamp ? (st.timestamp instanceof Date ? st.timestamp.toISOString().slice(0, 10) : String(st.timestamp).slice(0, 10)) : "";
+          const stTime = formatPdfDate(st.timestamp);
           doc.fontSize(8).font("Helvetica").fillColor("#475569").text(`• ${stTime}: Status changed to ${st.status}${st.note ? ` (${st.note})` : ""}`, 40, doc.y);
           doc.moveDown(0.15);
         }
@@ -238,7 +327,6 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
     };
   });
 
-/** Server function to generate Attendance Report PDF with embedded check-in/out photos */
 export const generateAttendanceReport = createServerFn({ method: "POST" })
   .validator((input: { startDate?: string; endDate?: string; labourId?: string }) => input)
   .handler(async ({ data }) => {
@@ -299,7 +387,6 @@ export const generateAttendanceReport = createServerFn({ method: "POST" })
       }
     }
 
-
     let logs = Array.from(logMap.values());
     if (labourId && labourId !== "ALL") {
       logs = logs.filter((l) => l.labourId === labourId);
@@ -319,7 +406,7 @@ export const generateAttendanceReport = createServerFn({ method: "POST" })
       grouped.get(gName)!.push(l);
     }
 
-    const dateRangeStr = startDate && endDate ? `${startDate} to ${endDate}` : "All Recorded Dates";
+    const dateRangeStr = startDate && endDate ? `${formatPdfDate(startDate)} to ${formatPdfDate(endDate)}` : "All Recorded Dates";
 
     const pdfBuffer = await renderPdf(async (doc) => {
       // Header
@@ -358,7 +445,7 @@ export const generateAttendanceReport = createServerFn({ method: "POST" })
           const startY = doc.y;
           doc.rect(30, startY, 535, 52).fillAndStroke("#f8fafc", "#e2e8f0");
 
-          doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#0f172a").text(`Date: ${log.date}`, 40, startY + 8);
+          doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#0f172a").text(`Date: ${formatPdfDate(log.date)}`, 40, startY + 8);
           doc
             .font("Helvetica")
             .fillColor("#475569")
@@ -371,7 +458,7 @@ export const generateAttendanceReport = createServerFn({ method: "POST" })
 
           // In Photo
           const inBuffer = await fetchImageBuffer(log.inPhotoUrl);
-          if (inBuffer) {
+          if (inBuffer && isValidPdfImageBuffer(inBuffer)) {
             try {
               doc.image(inBuffer, inX, photoY, { fit: [40, 40], align: "center", valign: "center" });
             } catch {
@@ -385,16 +472,16 @@ export const generateAttendanceReport = createServerFn({ method: "POST" })
 
           // Out Photo
           const outBuffer = await fetchImageBuffer(log.outPhotoUrl);
-          if (outBuffer) {
+          if (outBuffer && isValidPdfImageBuffer(outBuffer)) {
             try {
               doc.image(outBuffer, outX, photoY, { fit: [40, 40], align: "center", valign: "center" });
             } catch {
               doc.rect(outX, photoY, 40, 40).fillAndStroke("#f1f5f9", "#cbd5e1");
-              doc.fontSize(7).fillColor("#94a3b8").text("No Photo", inX + 3, photoY + 15);
+              doc.fontSize(7).fillColor("#94a3b8").text("No Photo", outX + 3, photoY + 15);
             }
           } else {
             doc.rect(outX, photoY, 40, 40).fillAndStroke("#f1f5f9", "#cbd5e1");
-            doc.fontSize(7).fillColor("#94a3b8").text("No Photo", inX + 3, photoY + 15);
+            doc.fontSize(7).fillColor("#94a3b8").text("No Photo", outX + 3, photoY + 15);
           }
 
           doc.y = startY + 58;
@@ -404,7 +491,7 @@ export const generateAttendanceReport = createServerFn({ method: "POST" })
       }
     });
 
-    const fileDateStr = startDate && endDate ? `${startDate}-to-${endDate}` : new Date().toISOString().slice(0, 10);
+    const fileDateStr = startDate && endDate ? `${formatPdfDate(startDate)}-to-${formatPdfDate(endDate)}` : formatPdfDate(new Date());
     return {
       base64: pdfBuffer.toString("base64"),
       filename: `attendance-report-${fileDateStr}.pdf`,
@@ -431,7 +518,7 @@ export const generateSingleProjectReport = createServerFn({ method: "POST" })
 
     if (!project) throw new Error(`Project ${projectId} not found`);
 
-    const nowStr = new Date().toISOString().slice(0, 10);
+    const nowStr = formatPdfDate(new Date());
     const projVal = toNumber(project.projectValue);
     const recAmt = toNumber(project.receivedAmount);
     const balAmt = toNumber(project.balanceAmount);
@@ -480,17 +567,17 @@ export const generateSingleProjectReport = createServerFn({ method: "POST" })
       doc.rect(30, datesY, 535, 50).fillAndStroke("#f8fafc", "#cbd5e1");
       doc.fontSize(8.5).font("Helvetica").fillColor("#334155");
 
-      const enquiryDateStr = project.enquiry?.enquiryDate ? (project.enquiry.enquiryDate instanceof Date ? project.enquiry.enquiryDate.toISOString().slice(0, 10) : String(project.enquiry.enquiryDate).slice(0, 10)) : "N/A";
-      const siteVisitStr = project.siteVisitDate ? (project.siteVisitDate instanceof Date ? project.siteVisitDate.toISOString().slice(0, 10) : String(project.siteVisitDate).slice(0, 10)) : "N/A";
-      const scheduledStr = project.scheduledDate ? (project.scheduledDate instanceof Date ? project.scheduledDate.toISOString().slice(0, 10) : String(project.scheduledDate).slice(0, 10)) : "N/A";
-      const committedStr = project.workCommittedDate ? (project.workCommittedDate instanceof Date ? project.workCommittedDate.toISOString().slice(0, 10) : String(project.workCommittedDate).slice(0, 10)) : "Not Set";
-      const actualStartStr = project.actualWorkStartedDate ? (project.actualWorkStartedDate instanceof Date ? project.actualWorkStartedDate.toISOString().slice(0, 10) : String(project.actualWorkStartedDate).slice(0, 10)) : "Work Pending";
+      const enquiryDateStr = formatPdfDate(project.enquiry?.enquiryDate);
+      const siteVisitStr = formatPdfDate(project.siteVisitDate);
+      const scheduledStr = formatPdfDate(project.scheduledDate);
+      const committedStr = formatPdfDate(project.workCommittedDate);
+      const actualStartStr = formatPdfDate(project.actualWorkStartedDate);
 
       doc.text(`Enquiry Date: ${enquiryDateStr}`, 40, datesY + 8);
       doc.text(`Site Visit Date: ${siteVisitStr}`, 40, datesY + 24);
-      doc.text(`Scheduled Date: ${scheduledStr}`, 210, datesY + 8);
-      doc.text(`Work Committed Date: ${committedStr}`, 210, datesY + 24);
-      doc.text(`Actual Work Started: ${actualStartStr}`, 390, datesY + 8);
+      doc.text(`Scheduled Date: ${scheduledStr}`, 200, datesY + 8);
+      doc.text(`Work Committed: ${committedStr}`, 200, datesY + 24);
+      doc.text(`Actual Start: ${actualStartStr}`, 380, datesY + 8);
 
       doc.y = datesY + 58;
 
@@ -516,7 +603,7 @@ export const generateSingleProjectReport = createServerFn({ method: "POST" })
 
         for (const st of project.statusHistory) {
           if (doc.y > 720) doc.addPage();
-          const tsStr = st.timestamp instanceof Date ? st.timestamp.toISOString().slice(0, 16).replace("T", " ") : String(st.timestamp).slice(0, 16).replace("T", " ");
+          const tsStr = formatPdfDateTime(st.timestamp);
           doc.fontSize(8.5).font("Helvetica").fillColor("#334155").text(`• ${tsStr} — Status: ${st.status}${st.note ? ` (${st.note})` : ""}`, 40, doc.y);
           doc.moveDown(0.2);
         }
@@ -531,7 +618,7 @@ export const generateSingleProjectReport = createServerFn({ method: "POST" })
 
         for (const asgn of project.labourAssignments) {
           if (doc.y > 720) doc.addPage();
-          const asgnDateStr = asgn.assignedDate instanceof Date ? asgn.assignedDate.toISOString().slice(0, 10) : String(asgn.assignedDate).slice(0, 10);
+          const asgnDateStr = formatPdfDate(asgn.assignedDate);
           const logs = (project.labourLogs || []).filter((l) => l.labourId === asgn.labourId);
           const totalDays = logs.length;
           const totalHours = logs.reduce((s, l) => s + (toNumber(l.hoursWorked) || 0), 0);
@@ -552,7 +639,7 @@ export const generateSingleProjectReport = createServerFn({ method: "POST" })
 
         for (const pay of project.payments) {
           if (doc.y > 720) doc.addPage();
-          const payDateStr = pay.paymentDate instanceof Date ? pay.paymentDate.toISOString().slice(0, 10) : String(pay.paymentDate).slice(0, 10);
+          const payDateStr = formatPdfDate(pay.paymentDate);
           const pAmt = toNumber(pay.amount);
           doc.fontSize(8.5).font("Helvetica").fillColor("#334155").text(`• Date: ${payDateStr} | ID: ${pay.id} | Amount: INR ${pAmt.toLocaleString("en-IN")} | Mode: ${pay.mode} | Received By: ${pay.receivedBy || "Accounts"}`, 40, doc.y);
           doc.moveDown(0.2);
@@ -562,7 +649,7 @@ export const generateSingleProjectReport = createServerFn({ method: "POST" })
 
       // Section 7: Before / After Work Photos
       if (project.beforeWorkPhotoUrl || project.afterWorkPhotoUrl) {
-        if (doc.y > 650) doc.addPage();
+        if (doc.y > 640) doc.addPage();
         doc.fontSize(11).font("Helvetica-Bold").fillColor("#1e293b").text("7. Work Verification Photos", 30, doc.y);
         doc.moveDown(0.5);
 
@@ -570,22 +657,39 @@ export const generateSingleProjectReport = createServerFn({ method: "POST" })
         const beforeBuf = await fetchImageBuffer(project.beforeWorkPhotoUrl);
         const afterBuf = await fetchImageBuffer(project.afterWorkPhotoUrl);
 
-        if (beforeBuf) {
-          try {
-            doc.fontSize(8).font("Helvetica-Bold").fillColor("#475569").text("Before Work Photo:", 40, photoBoxY);
-            doc.image(beforeBuf, 40, photoBoxY + 12, { fit: [200, 120] });
-          } catch {}
-        }
-        if (afterBuf) {
-          try {
-            doc.fontSize(8).font("Helvetica-Bold").fillColor("#475569").text("After Work Photo:", 280, photoBoxY);
-            doc.image(afterBuf, 280, photoBoxY + 12, { fit: [200, 120] });
-          } catch {}
+        if (project.beforeWorkPhotoUrl) {
+          doc.fontSize(8).font("Helvetica-Bold").fillColor("#475569").text("Before Work Photo:", 40, photoBoxY);
+          if (beforeBuf && isValidPdfImageBuffer(beforeBuf)) {
+            try {
+              doc.image(beforeBuf, 40, photoBoxY + 14, { fit: [200, 120] });
+            } catch (err) {
+              console.error("[PDFKit] Failed to embed before work photo:", err);
+              doc.rect(40, photoBoxY + 14, 200, 100).fillAndStroke("#f8fafc", "#e2e8f0");
+              doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#dc2626").text("Photo unavailable", 50, photoBoxY + 55);
+            }
+          } else {
+            doc.rect(40, photoBoxY + 14, 200, 100).fillAndStroke("#f8fafc", "#e2e8f0");
+            doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#dc2626").text("Photo unavailable", 50, photoBoxY + 55);
+          }
         }
 
-        if (beforeBuf || afterBuf) {
-          doc.y = photoBoxY + 140;
+        if (project.afterWorkPhotoUrl) {
+          doc.fontSize(8).font("Helvetica-Bold").fillColor("#475569").text("After Work Photo:", 280, photoBoxY);
+          if (afterBuf && isValidPdfImageBuffer(afterBuf)) {
+            try {
+              doc.image(afterBuf, 280, photoBoxY + 14, { fit: [200, 120] });
+            } catch (err) {
+              console.error("[PDFKit] Failed to embed after work photo:", err);
+              doc.rect(280, photoBoxY + 14, 200, 100).fillAndStroke("#f8fafc", "#e2e8f0");
+              doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#dc2626").text("Photo unavailable", 290, photoBoxY + 55);
+            }
+          } else {
+            doc.rect(280, photoBoxY + 14, 200, 100).fillAndStroke("#f8fafc", "#e2e8f0");
+            doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#dc2626").text("Photo unavailable", 290, photoBoxY + 55);
+          }
         }
+
+        doc.y = photoBoxY + 140;
         doc.moveDown(0.5);
       }
 
@@ -597,7 +701,7 @@ export const generateSingleProjectReport = createServerFn({ method: "POST" })
 
         for (const act of project.activities) {
           if (doc.y > 720) doc.addPage();
-          const actTs = act.timestamp instanceof Date ? act.timestamp.toISOString().slice(0, 16).replace("T", " ") : String(act.timestamp).slice(0, 16).replace("T", " ");
+          const actTs = formatPdfDateTime(act.timestamp);
           doc.fontSize(8).font("Helvetica").fillColor("#475569").text(`[${actTs}] ${act.actor}: ${act.event} — ${act.details}`, 40, doc.y);
           doc.moveDown(0.2);
         }

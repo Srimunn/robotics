@@ -95,7 +95,7 @@ function MaterialsPageComponent() {
   const [issueProjectId, setIssueProjectId] = useState("");
   const [issueQty, setIssueQty] = useState(1);
   const [issueDate, setIssueDate] = useState(new Date().toISOString().slice(0, 10));
-  const [issueBy, setIssueBy] = useState("Er. Rajesh Kumar");
+  const [issueBy, setIssueBy] = useState("");
   const [issueRemarks, setIssueRemarks] = useState("");
 
   // Stock Adjust Form
@@ -200,7 +200,7 @@ function MaterialsPageComponent() {
       setIssueProjectId(projects[0].id);
     }
     setIssueDate(new Date().toISOString().slice(0, 10));
-    setIssueBy("Er. Rajesh Kumar");
+    setIssueBy("");
     setIssueRemarks("");
   };
 
