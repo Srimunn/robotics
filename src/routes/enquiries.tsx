@@ -109,10 +109,23 @@ function EnquiriesComponent() {
 
     try {
       setIsUploadingPdf(true);
+      console.log("[Client Enquiry] Starting PDF read for file:", {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      });
+
       const reader = new FileReader();
       reader.onload = async () => {
         const base64Data = reader.result as string;
+        console.log("[Client Enquiry] FileReader complete:", {
+          base64Length: base64Data?.length,
+          base64Prefix: base64Data?.slice(0, 60),
+        });
+
         const res = await uploadImage({ data: { image: base64Data, folder: "quotations", isRaw: true } });
+        console.log("[Client Enquiry] uploadImage response:", res);
+
         if (res?.url) {
           updateEnquiry(activeEnquiry.id, { quotationPdfUrl: res.url });
           setActiveEnquiry({ ...activeEnquiry, quotationPdfUrl: res.url });
@@ -122,13 +135,14 @@ function EnquiriesComponent() {
         }
         setIsUploadingPdf(false);
       };
-      reader.onerror = () => {
+      reader.onerror = (readErr) => {
+        console.error("[Client Enquiry] FileReader error:", readErr);
         toast.error("Failed to read selected PDF file");
         setIsUploadingPdf(false);
       };
       reader.readAsDataURL(file);
     } catch (err: any) {
-      console.error("PDF upload error:", err);
+      console.error("[Client Enquiry] PDF upload error:", err);
       toast.error(err?.message || "Failed to upload Quotation PDF");
       setIsUploadingPdf(false);
     }

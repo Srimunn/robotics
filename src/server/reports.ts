@@ -32,62 +32,98 @@ import PDFDocument from "pdfkit/js/pdfkit.standalone.js";
 import { db } from "~/lib/db";
 import { toNumber } from "./utils";
 
-/** Helper to validate if a buffer has JPEG or PNG magic byte headers for PDFKit image parser */
-function isValidPdfImageBuffer(buf: Buffer | null): boolean {
-  if (!buf || !Buffer.isBuffer(buf) || buf.length < 4) return false;
+/** Helper to validate if an ArrayBuffer has JPEG or PNG magic byte headers for PDFKit image parser */
+function isValidPdfImageBuffer(buf: ArrayBuffer | Buffer | null): boolean {
+  if (!buf) return false;
+  const uint8 = buf instanceof ArrayBuffer ? new Uint8Array(buf) : new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+  if (uint8.length < 4) return false;
   // JPEG: 0xFF 0xD8 0xFF
-  const isJpeg = buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+  const isJpeg = uint8[0] === 0xff && uint8[1] === 0xd8;
   // PNG: 0x89 0x50 0x4E 0x47 ('\x89PNG')
-  const isPng = buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+  const isPng = uint8[0] === 0x89 && uint8[1] === 0x50 && uint8[2] === 0x4e && uint8[3] === 0x47;
   return isJpeg || isPng;
 }
 
-/** Fetch image from URL safely into a Buffer, returning null on error or non-JPEG/PNG data */
-async function fetchImageBuffer(url: string | null | undefined, timeoutMs = 8000): Promise<Buffer | null> {
-  if (!url || typeof url !== "string" || !url.startsWith("http")) return null;
+/** Fetch image from URL safely into an ArrayBuffer for PDFKit standalone */
+async function fetchImageBuffer(url: string | null | undefined, timeoutMs = 10000): Promise<ArrayBuffer | null> {
+  if (!url || typeof url !== "string" || !url.startsWith("http")) {
+    console.log("[reports.ts fetchImageBuffer] Skipped empty or non-HTTP URL:", url);
+    return null;
+  }
+
+  let targetUrl = url;
+  if (targetUrl.includes("res.cloudinary.com") && targetUrl.includes("/upload/")) {
+    if (!targetUrl.includes("f_jpg")) {
+      targetUrl = targetUrl.replace("/upload/", "/upload/w_600,c_limit,q_auto,f_jpg/");
+    }
+  }
+
+  console.log(`[reports.ts fetchImageBuffer] Fetching image from: ${targetUrl} (original: ${url})`);
 
   // 1. Try fetching transformed baseline JPG from Cloudinary
   try {
-    let targetUrl = url;
-    if (targetUrl.includes("res.cloudinary.com") && targetUrl.includes("/upload/")) {
-      if (!targetUrl.includes("f_jpg")) {
-        targetUrl = targetUrl.replace("/upload/", "/upload/f_jpg,fl_lossy,q_80,w_600/");
-      }
-    }
-
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const res = await fetch(targetUrl, { signal: controller.signal });
+    const res = await fetch(targetUrl, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "RoboticsERP/1.0",
+        "Accept": "image/*,*/*",
+      },
+    });
     clearTimeout(timer);
+
+    console.log(`[reports.ts fetchImageBuffer] HTTP Status: ${res.status} ${res.statusText}`);
+    console.log(`[reports.ts fetchImageBuffer] Content-Type: ${res.headers.get("content-type")}, Content-Length: ${res.headers.get("content-length")}`);
 
     if (res.ok) {
       const arrayBuffer = await res.arrayBuffer();
-      const buf = Buffer.from(arrayBuffer);
-      if (isValidPdfImageBuffer(buf)) {
-        return buf;
+      const uint8 = new Uint8Array(arrayBuffer);
+      console.log(`[reports.ts fetchImageBuffer] Received ${arrayBuffer.byteLength} bytes. First 4 bytes (hex): ${Buffer.from(uint8.slice(0, 4)).toString("hex")}`);
+
+      const isJpeg = uint8[0] === 0xff && uint8[1] === 0xd8;
+      const isPng = uint8[0] === 0x89 && uint8[1] === 0x50 && uint8[2] === 0x4e && uint8[3] === 0x47;
+      console.log(`[reports.ts fetchImageBuffer] isJpeg: ${isJpeg}, isPng: ${isPng}`);
+
+      if (isJpeg || isPng) {
+        return arrayBuffer;
       }
+    } else {
+      console.error(`[reports.ts fetchImageBuffer] Non-200 HTTP status returned: ${res.status}`);
     }
-  } catch (err) {
-    console.error(`[fetchImageBuffer] Error fetching transformed URL ${url}:`, err);
+  } catch (err: any) {
+    console.error(`[reports.ts fetchImageBuffer] Error fetching transformed URL ${targetUrl}:`, err?.message || err);
   }
 
   // 2. Fallback to fetching original URL
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timer);
+  if (targetUrl !== url) {
+    console.log(`[reports.ts fetchImageBuffer] Falling back to original URL: ${url}`);
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "RoboticsERP/1.0",
+          "Accept": "image/*,*/*",
+        },
+      });
+      clearTimeout(timer);
 
-    if (res.ok) {
-      const arrayBuffer = await res.arrayBuffer();
-      const buf = Buffer.from(arrayBuffer);
-      if (isValidPdfImageBuffer(buf)) {
-        return buf;
+      console.log(`[reports.ts fetchImageBuffer fallback] HTTP Status: ${res.status} ${res.statusText}`);
+      if (res.ok) {
+        const arrayBuffer = await res.arrayBuffer();
+        const uint8 = new Uint8Array(arrayBuffer);
+        console.log(`[reports.ts fetchImageBuffer fallback] Received ${arrayBuffer.byteLength} bytes.`);
+        const isJpeg = uint8[0] === 0xff && uint8[1] === 0xd8;
+        const isPng = uint8[0] === 0x89 && uint8[1] === 0x50 && uint8[2] === 0x4e && uint8[3] === 0x47;
+        if (isJpeg || isPng) {
+          return arrayBuffer;
+        }
       }
-      console.error(`[fetchImageBuffer] URL returned non-JPEG/PNG bytes for ${url}`);
+    } catch (err: any) {
+      console.error(`[reports.ts fetchImageBuffer fallback] Error fetching original URL:`, err?.message || err);
     }
-  } catch (err) {
-    console.error(`[fetchImageBuffer] Error fetching original URL ${url}:`, err);
   }
 
   return null;
@@ -241,6 +277,7 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
         if (beforeBuffer && isValidPdfImageBuffer(beforeBuffer)) {
           try {
             doc.image(beforeBuffer, beforeX, photoY, { fit: [50, 50], align: "center", valign: "center" });
+            console.log(`[reports.ts] Embedded before photo in projects report for ${p.id}`);
           } catch (err) {
             console.error("[PDFKit] Error embedding before photo in projects report:", err);
             doc.rect(beforeX, photoY, 50, 50).fillAndStroke("#fef2f2", "#fca5a5");
@@ -257,6 +294,7 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
         if (afterBuffer && isValidPdfImageBuffer(afterBuffer)) {
           try {
             doc.image(afterBuffer, afterX, photoY, { fit: [50, 50], align: "center", valign: "center" });
+            console.log(`[reports.ts] Embedded after photo in projects report for ${p.id}`);
           } catch (err) {
             console.error("[PDFKit] Error embedding after photo in projects report:", err);
             doc.rect(afterX, photoY, 50, 50).fillAndStroke("#fef2f2", "#fca5a5");
@@ -266,7 +304,7 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
           doc.rect(afterX, photoY, 50, 50).fillAndStroke("#fef2f2", "#fca5a5");
           doc.fontSize(6).fillColor("#dc2626").text("Photo N/A", afterX + 2, photoY + 20);
         } else {
-          doc.rect(afterX, photoY, 50, 50).fillAndStroke("#f1f5f9", "#cbd5e1");
+          doc.rect(beforeX, photoY, 50, 50).fillAndStroke("#f1f5f9", "#cbd5e1");
         }
 
         doc.y = Math.max(infoY + 38, photoY + 55);
@@ -477,7 +515,8 @@ export const generateAttendanceReport = createServerFn({ method: "POST" })
           if (inBuffer && isValidPdfImageBuffer(inBuffer)) {
             try {
               doc.image(inBuffer, inX, photoY, { fit: [40, 40], align: "center", valign: "center" });
-            } catch {
+            } catch (err) {
+              console.error("[PDFKit] Error embedding inPhoto:", err);
               doc.rect(inX, photoY, 40, 40).fillAndStroke("#f1f5f9", "#cbd5e1");
               doc.fontSize(7).fillColor("#94a3b8").text("No Photo", inX + 3, photoY + 15);
             }
@@ -491,7 +530,8 @@ export const generateAttendanceReport = createServerFn({ method: "POST" })
           if (outBuffer && isValidPdfImageBuffer(outBuffer)) {
             try {
               doc.image(outBuffer, outX, photoY, { fit: [40, 40], align: "center", valign: "center" });
-            } catch {
+            } catch (err) {
+              console.error("[PDFKit] Error embedding outPhoto:", err);
               doc.rect(outX, photoY, 40, 40).fillAndStroke("#f1f5f9", "#cbd5e1");
               doc.fontSize(7).fillColor("#94a3b8").text("No Photo", outX + 3, photoY + 15);
             }
@@ -670,14 +710,16 @@ export const generateSingleProjectReport = createServerFn({ method: "POST" })
         doc.moveDown(0.5);
 
         const photoBoxY = doc.y;
-        const beforeBuf = await fetchImageBuffer(project.beforeWorkPhotoUrl);
-        const afterBuf = await fetchImageBuffer(project.afterWorkPhotoUrl);
+        console.log(`[reports.ts Section 7] Fetching verification photos: before=${project.beforeWorkPhotoUrl}, after=${project.afterWorkPhotoUrl}`);
+        const beforeBuffer = await fetchImageBuffer(project.beforeWorkPhotoUrl);
+        const afterBuffer = await fetchImageBuffer(project.afterWorkPhotoUrl);
 
         if (project.beforeWorkPhotoUrl) {
           doc.fontSize(8).font("Helvetica-Bold").fillColor("#475569").text("Before Work Photo:", 40, photoBoxY);
-          if (beforeBuf && isValidPdfImageBuffer(beforeBuf)) {
+          if (beforeBuffer && isValidPdfImageBuffer(beforeBuffer)) {
             try {
-              doc.image(beforeBuf, 40, photoBoxY + 14, { fit: [200, 120] });
+              doc.image(beforeBuffer, 40, photoBoxY + 14, { fit: [200, 120] });
+              console.log("[reports.ts Section 7] Successfully embedded before work photo into single project report");
             } catch (err) {
               console.error("[PDFKit] Failed to embed before work photo:", err);
               doc.rect(40, photoBoxY + 14, 200, 100).fillAndStroke("#f8fafc", "#e2e8f0");
@@ -691,9 +733,10 @@ export const generateSingleProjectReport = createServerFn({ method: "POST" })
 
         if (project.afterWorkPhotoUrl) {
           doc.fontSize(8).font("Helvetica-Bold").fillColor("#475569").text("After Work Photo:", 280, photoBoxY);
-          if (afterBuf && isValidPdfImageBuffer(afterBuf)) {
+          if (afterBuffer && isValidPdfImageBuffer(afterBuffer)) {
             try {
-              doc.image(afterBuf, 280, photoBoxY + 14, { fit: [200, 120] });
+              doc.image(afterBuffer, 280, photoBoxY + 14, { fit: [200, 120] });
+              console.log("[reports.ts Section 7] Successfully embedded after work photo into single project report");
             } catch (err) {
               console.error("[PDFKit] Failed to embed after work photo:", err);
               doc.rect(280, photoBoxY + 14, 200, 100).fillAndStroke("#f8fafc", "#e2e8f0");
@@ -718,7 +761,7 @@ export const generateSingleProjectReport = createServerFn({ method: "POST" })
         for (const act of project.activities) {
           if (doc.y > 720) doc.addPage();
           const actTs = formatPdfDateTime(act.timestamp);
-          doc.fontSize(8).font("Helvetica").fillColor("#475569").text(`[${actTs}] ${act.actor}: ${act.event} — ${act.details}`, 40, doc.y);
+          doc.fontSize(8.5).font("Helvetica").fillColor("#475569").text(`[${actTs}] ${act.actor}: ${act.event} — ${act.details}`, 40, doc.y);
           doc.moveDown(0.2);
         }
       }

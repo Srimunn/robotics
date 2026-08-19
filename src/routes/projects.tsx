@@ -1752,10 +1752,23 @@ function ProjectsComponent() {
                             const file = e.target.files?.[0];
                             if (!file) return;
                             try {
+                              console.log("[Client Project] Starting PDF read for file:", {
+                                name: file.name,
+                                size: file.size,
+                                type: file.type,
+                              });
+
                               const reader = new FileReader();
                               reader.onload = async () => {
                                 const base64Data = reader.result as string;
+                                console.log("[Client Project] FileReader complete:", {
+                                  base64Length: base64Data?.length,
+                                  base64Prefix: base64Data?.slice(0, 60),
+                                });
+
                                 const res = await uploadImage({ data: { image: base64Data, folder: "quotations", isRaw: true } });
+                                console.log("[Client Project] uploadImage response:", res);
+
                                 if (res?.url) {
                                   updateProject(activeProject.id, { quotationPdfUrl: res.url });
                                   setActiveProject({ ...activeProject, quotationPdfUrl: res.url });
@@ -1764,8 +1777,13 @@ function ProjectsComponent() {
                                   toast.error("Failed to upload Quotation PDF");
                                 }
                               };
+                              reader.onerror = (readErr) => {
+                                console.error("[Client Project] FileReader error:", readErr);
+                                toast.error("Failed to read selected PDF file");
+                              };
                               reader.readAsDataURL(file);
                             } catch (err: any) {
+                              console.error("[Client Project] PDF upload error:", err);
                               toast.error("Failed to upload Quotation PDF");
                             }
                           }}
