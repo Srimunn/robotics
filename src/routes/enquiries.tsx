@@ -451,48 +451,13 @@ function EnquiriesComponent() {
                           </div>
                         </td>
                         <td className="p-3 whitespace-nowrap">
-                          <Select
-                            value={engineers.find((e) => e.name === enq.assignedEngineerName)?.id || enq.assignedEngineerId || "unassigned"}
-                            onValueChange={(val) => {
-                              if (val === "unassigned") {
-                                updateEnquiry(enq.id, {
-                                  assignedEngineerId: "",
-                                  assignedEngineerName: "",
-                                });
-                              } else {
-                                const eng = engineers.find((e) => e.id === val);
-                                if (eng) {
-                                  updateEnquiry(enq.id, {
-                                    assignedEngineerId: eng.id,
-                                    assignedEngineerName: eng.name,
-                                    siteVisitStatus: enq.siteVisitStatus === "Pending" ? "Assigned" : enq.siteVisitStatus,
-                                  });
-                                }
-                              }
-                            }}
-                          >
-                            <SelectTrigger className="h-7 text-xs rounded-md font-semibold text-blue-700 bg-blue-50/80 border-blue-200 w-[150px] focus:ring-1">
-                              <SelectValue placeholder="Assign Engineer">
-                                {enq.assignedEngineerName ? (
-                                  <span className="font-semibold text-xs text-blue-700 truncate">
-                                    {enq.assignedEngineerName}
-                                  </span>
-                                ) : (
-                                  <span className="text-amber-600 text-xs font-medium">Unassigned</span>
-                                )}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent className="rounded-xl">
-                              <SelectItem value="unassigned" className="text-xs text-amber-600 font-medium">
-                                Unassigned
-                              </SelectItem>
-                              {engineers.map((eng) => (
-                                <SelectItem key={eng.id} value={eng.id} className="text-xs">
-                                  {eng.name} ({eng.phone})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          {enq.assignedEngineerName ? (
+                            <span className="font-semibold text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 whitespace-nowrap inline-block">
+                              {enq.assignedEngineerName}
+                            </span>
+                          ) : (
+                            <span className="text-amber-600 text-[11px] font-medium">Unassigned</span>
+                          )}
                         </td>
                         <td className="p-3 font-bold text-xs text-foreground whitespace-nowrap">
                           {enq.quotationAmount ? `₹${enq.quotationAmount.toLocaleString("en-IN")}` : "—"}

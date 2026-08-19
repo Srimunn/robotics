@@ -94,6 +94,7 @@ function DashboardComponent() {
     currentUser,
     enquiries,
     projects,
+    customers,
     payments,
     labours,
     attendance,
@@ -718,7 +719,21 @@ function DashboardComponent() {
       {/* ===========================================================================
           TOP KPI CARDS SUMMARY (10 HIGH-LEVEL EXECUTIVE TILES)
           =========================================================================== */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-3">
+        <Card
+          className="rounded-xl border border-blue-200/80 bg-blue-50/30 dark:bg-blue-950/20 shadow-xs hover:shadow-sm transition-all cursor-pointer"
+          onClick={() => navigate({ to: "/customers" })}
+        >
+          <CardContent className="p-3.5">
+            <div className="flex items-center justify-between text-blue-700 dark:text-blue-400 mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider">Total Customers</span>
+              <Users className="h-4 w-4 text-blue-600" />
+            </div>
+            <div className="text-xl font-bold text-blue-700 dark:text-blue-300">{(customers || []).length}</div>
+            <p className="text-[10px] text-blue-600/80 font-medium">Registered clients</p>
+          </CardContent>
+        </Card>
+
         <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm transition-all">
           <CardContent className="p-3.5">
             <div className="flex items-center justify-between text-muted-foreground mb-1">
