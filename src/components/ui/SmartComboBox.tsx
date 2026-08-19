@@ -167,7 +167,7 @@ export function SmartComboBox({
           </Button>
         </PopoverTrigger>
 
-        <PopoverContent className="w-[340px] p-0 shadow-lg rounded-xl border border-border" align="start">
+        <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[300px] max-w-[calc(100vw-32px)] p-0 shadow-lg rounded-xl border border-border" align="start">
           <Command className="rounded-xl" shouldFilter={false}>
             {/* Popover Header with Quick Add & Settings */}
             <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/20">
@@ -176,6 +176,7 @@ export function SmartComboBox({
               </span>
               <div className="flex items-center gap-1">
                 <Button
+                  type="button"
                   size="sm"
                   variant="ghost"
                   onClick={() => {
@@ -191,6 +192,7 @@ export function SmartComboBox({
                 </Button>
 
                 <Button
+                  type="button"
                   size="icon"
                   variant="ghost"
                   onClick={() => {
@@ -284,6 +286,7 @@ export function SmartComboBox({
 
       {/* QUICK INLINE + ADD BUTTON */}
       <Button
+        type="button"
         size="icon"
         variant="ghost"
         disabled={disabled}
@@ -299,6 +302,7 @@ export function SmartComboBox({
 
       {/* QUICK INLINE SETTINGS GEAR BUTTON */}
       <Button
+        type="button"
         size="icon"
         variant="ghost"
         disabled={disabled}
@@ -419,11 +423,12 @@ export function SmartComboBox({
                         <td className="p-2.5 text-right pr-3">
                           <div className="flex items-center justify-end gap-1">
                             {editingItem?.id === item.id ? (
-                              <Button size="sm" onClick={handleSaveEditInModal} className="h-6 text-[10px] bg-emerald-600 text-white rounded-md">
+                              <Button type="button" size="sm" onClick={handleSaveEditInModal} className="h-6 text-[10px] bg-emerald-600 text-white rounded-md">
                                 Save
                               </Button>
                             ) : (
                               <Button
+                                type="button"
                                 size="icon"
                                 variant="ghost"
                                 onClick={() => {
@@ -438,6 +443,7 @@ export function SmartComboBox({
                             )}
 
                             <Button
+                              type="button"
                               size="icon"
                               variant="ghost"
                               onClick={() => toggleMasterDataItemActive(item.id)}
@@ -448,6 +454,7 @@ export function SmartComboBox({
                             </Button>
 
                             <Button
+                              type="button"
                               size="icon"
                               variant="ghost"
                               onClick={() => {
