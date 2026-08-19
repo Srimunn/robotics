@@ -1,5 +1,7 @@
 "use server";
 
+import nodeFs from "fs";
+
 if (typeof (globalThis as any).__dirname === "undefined") {
   (globalThis as any).__dirname = typeof process !== "undefined" && process.cwd ? process.cwd() : "/";
 }
@@ -7,9 +9,26 @@ if (typeof (globalThis as any).__filename === "undefined") {
   (globalThis as any).__filename = typeof process !== "undefined" && process.cwd ? process.cwd() : "/";
 }
 
+// Polyfill globalThis.fs for PDFKit standalone bundle in Node/Vite SSR
+if (typeof (globalThis as any).fs === "undefined") {
+  (globalThis as any).fs = {};
+}
+if (!(globalThis as any).fs.readFileSync) {
+  (globalThis as any).fs.readFileSync = (filePath: string) => {
+    try {
+      if (nodeFs && typeof nodeFs.readFileSync === "function") {
+        return nodeFs.readFileSync(filePath);
+      }
+    } catch {
+      // ignore
+    }
+    return Buffer.from("");
+  };
+}
+
 import { createServerFn } from "@tanstack/react-start";
-import type PDFDocumentType from "pdfkit";
-import PDFDocument from "pdfkit";
+// @ts-ignore
+import PDFDocument from "pdfkit/js/pdfkit.standalone.js";
 import { db } from "~/lib/db";
 import { toNumber } from "./utils";
 
@@ -100,14 +119,11 @@ function formatPdfDateTime(val: any): string {
   return `${day}-${month}-${year} ${hours}:${minutes} ${ampm}`;
 }
 
-/** Utility to generate PDF buffer using pdfkit with standard built-in Helvetica fonts */
-async function renderPdf(builder: (doc: any) => Promise<void>): Promise<Buffer> {
-  const pdfModule = await import("pdfkit");
-  const PDFDocumentClass = pdfModule.default || pdfModule;
-
+/** Utility to generate PDF buffer using pdfkit standalone bundle with inlined fonts */
+function renderPdf(builder: (doc: any) => Promise<void>): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
     try {
-      const doc = new PDFDocumentClass({ margin: 30, size: "A4" });
+      const doc = new PDFDocument({ margin: 30, size: "A4" });
       doc.font("Helvetica");
 
       const chunks: Buffer[] = [];
