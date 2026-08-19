@@ -106,44 +106,60 @@ function EnquiriesComponent() {
   const handleQuotationPdfFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !activeEnquiry) return;
+    e.target.value = ""; // Reset input so re-selection works
+
+    console.log("[Client Enquiry] Selected file details:", {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: file.lastModified,
+    });
 
     try {
       setIsUploadingPdf(true);
-      console.log("[Client Enquiry] Starting PDF read for file:", {
-        name: file.name,
-        size: file.size,
-        type: file.type,
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === "string") {
+            resolve(reader.result);
+          } else {
+            reject(new Error("FileReader did not return a valid string"));
+          }
+        };
+        reader.onerror = () => reject(reader.error || new Error("Failed to read selected PDF file"));
+        reader.readAsDataURL(file);
       });
 
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64Data = reader.result as string;
-        console.log("[Client Enquiry] FileReader complete:", {
-          base64Length: base64Data?.length,
-          base64Prefix: base64Data?.slice(0, 60),
-        });
+      const expectedMinBase64Len = Math.floor(file.size * 1.33);
+      console.log("[Client Enquiry] Base64 encoding complete:", {
+        fileSizeOriginal: file.size,
+        expectedBase64MinLen: expectedMinBase64Len,
+        actualBase64Len: base64Data.length,
+        base64Prefix: base64Data.slice(0, 50),
+        isComplete: base64Data.length >= expectedMinBase64Len,
+      });
 
-        const res = await uploadImage({ data: { image: base64Data, folder: "quotations", isRaw: true } });
-        console.log("[Client Enquiry] uploadImage response:", res);
+      const res = await uploadImage({
+        data: {
+          image: base64Data,
+          folder: "quotations",
+          isRaw: true,
+        },
+      });
 
-        if (res?.url) {
-          updateEnquiry(activeEnquiry.id, { quotationPdfUrl: res.url });
-          setActiveEnquiry({ ...activeEnquiry, quotationPdfUrl: res.url });
-          toast.success("Quotation PDF uploaded to Cloudinary successfully!");
-        } else {
-          toast.error("Failed to upload Quotation PDF");
-        }
-        setIsUploadingPdf(false);
-      };
-      reader.onerror = (readErr) => {
-        console.error("[Client Enquiry] FileReader error:", readErr);
-        toast.error("Failed to read selected PDF file");
-        setIsUploadingPdf(false);
-      };
-      reader.readAsDataURL(file);
+      console.log("[Client Enquiry] Server upload response:", res);
+
+      if (res?.url) {
+        updateEnquiry(activeEnquiry.id, { quotationPdfUrl: res.url });
+        setActiveEnquiry({ ...activeEnquiry, quotationPdfUrl: res.url });
+        toast.success("Quotation PDF uploaded to Cloudinary successfully!");
+      } else {
+        toast.error("Failed to upload Quotation PDF");
+      }
     } catch (err: any) {
       console.error("[Client Enquiry] PDF upload error:", err);
       toast.error(err?.message || "Failed to upload Quotation PDF");
+    } finally {
       setIsUploadingPdf(false);
     }
   };

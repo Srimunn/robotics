@@ -8,12 +8,14 @@ export const uploadImage = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     try {
       const { image, folder = "robotics-erp", isRaw } = data;
-      console.log("[uploadImage] Incoming upload request:", {
+      const dataLength = image?.length || 0;
+      const dataPrefix = image ? image.slice(0, 40) : "";
+
+      console.log("[uploadImage Server] Received upload request:", {
+        dataLength,
+        dataPrefix,
         folder,
         isRaw,
-        imageType: typeof image,
-        imageLength: image?.length,
-        imagePrefix: image?.slice(0, 60),
       });
 
       const isPdf =
@@ -22,40 +24,25 @@ export const uploadImage = createServerFn({ method: "POST" })
         image.includes("application/pdf") ||
         image.toLowerCase().includes(".pdf");
 
-      console.log("[uploadImage] isPdf detected:", isPdf);
+      console.log("[uploadImage Server] isPdf detected:", isPdf);
 
       if (isPdf) {
-        // Strip base64 data URI header if present and upload via upload_stream buffer
-        const base64Clean = image.includes(",") ? image.split(",")[1] : image;
-        const fileBuffer = Buffer.from(base64Clean, "base64");
         const publicId = `${folder}/quotation_${Date.now()}.pdf`;
+        const uploadParams = {
+          resource_type: "raw" as const,
+          public_id: publicId,
+        };
 
-        console.log("[uploadImage PDF] Prepared binary buffer:", {
+        console.log("[uploadImage Server PDF] Calling cloudinary.uploader.upload with params:", {
           publicId,
-          bufferByteLength: fileBuffer.length,
-          magicBytesHex: fileBuffer.slice(0, 8).toString("hex"),
-          magicBytesAscii: fileBuffer.slice(0, 5).toString("utf8"),
+          resource_type: uploadParams.resource_type,
+          dataLength,
+          dataPrefix,
         });
 
-        const res = await new Promise<any>((resolve, reject) => {
-          const uploadStream = cloudinary.uploader.upload_stream(
-            {
-              resource_type: "raw",
-              public_id: publicId,
-            },
-            (error, result) => {
-              if (error || !result) {
-                console.error("[uploadImage] Cloudinary upload_stream error:", error);
-                reject(error || new Error("Cloudinary upload_stream failed"));
-              } else {
-                resolve(result);
-              }
-            }
-          );
-          uploadStream.end(fileBuffer);
-        });
+        const res = await cloudinary.uploader.upload(image, uploadParams);
 
-        console.log("[uploadImage PDF] Cloudinary raw upload response:", {
+        console.log("[uploadImage Server PDF] Cloudinary raw upload success:", {
           public_id: res.public_id,
           resource_type: res.resource_type,
           bytes: res.bytes,
@@ -65,13 +52,16 @@ export const uploadImage = createServerFn({ method: "POST" })
 
         return { url: res.secure_url };
       } else {
-        console.log("[uploadImage Photo] Uploading standard image to Cloudinary...");
-        const res = await cloudinary.uploader.upload(image, {
+        const uploadParams = {
           folder,
-          resource_type: "image",
-        });
+          resource_type: "image" as const,
+        };
 
-        console.log("[uploadImage Photo] Cloudinary image upload response:", {
+        console.log("[uploadImage Server Photo] Calling cloudinary.uploader.upload with params:", uploadParams);
+
+        const res = await cloudinary.uploader.upload(image, uploadParams);
+
+        console.log("[uploadImage Server Photo] Cloudinary image upload success:", {
           public_id: res.public_id,
           resource_type: res.resource_type,
           format: res.format,
@@ -82,7 +72,7 @@ export const uploadImage = createServerFn({ method: "POST" })
         return { url: res.secure_url };
       }
     } catch (err: any) {
-      console.error("[uploadImage] Cloudinary upload error:", err);
+      console.error("[uploadImage Server] Cloudinary upload error:", err);
       throw new Error(`Upload failed: ${err?.message || String(err)}`);
     }
   });
