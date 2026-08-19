@@ -326,6 +326,8 @@ function LaboursComponent() {
       }
     }
 
+    totalHours = Math.round(totalHours * 10) / 10;
+
     const totalDays = Math.ceil(presentCount + absentCount + halfDayCount);
     const attendancePct = totalDays > 0 ? Math.round((presentCount / totalDays) * 100) : 100;
 

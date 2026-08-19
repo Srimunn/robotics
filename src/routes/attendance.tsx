@@ -182,12 +182,13 @@ function AttendancePageComponent() {
       const halfDayCount = labLogs.filter((l) => l.status === "Half Day").length;
       const absentCount = labLogs.filter((l) => l.status === "Absent").length;
 
-      const overtimeHours = labLogs.reduce((acc, l) => {
+      const rawOvertimeHours = labLogs.reduce((acc, l) => {
         if (l.hoursWorked && l.hoursWorked > 8) {
           return acc + (l.hoursWorked - 8);
         }
         return acc + (l.status === "Overtime" ? (l.hoursWorked || 2) : 0);
       }, 0);
+      const overtimeHours = Math.round(rawOvertimeHours * 10) / 10;
 
       const defaultWage = lab.defaultWeeklyWage || 1400;
 
@@ -218,7 +219,7 @@ function AttendancePageComponent() {
 
   const totalDaysLogged = allAttendanceLogs.length;
   const totalPresentCount = aggregatedPayroll.reduce((acc, a) => acc + a.presentCount, 0);
-  const totalOvertimeHours = aggregatedPayroll.reduce((acc, a) => acc + a.overtimeHours, 0);
+  const totalOvertimeHours = Math.round(aggregatedPayroll.reduce((acc, a) => acc + a.overtimeHours, 0) * 10) / 10;
   const totalMonthlyPayroll = aggregatedPayroll.reduce((acc, a) => acc + a.calculatedMonthlyWage, 0);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -491,7 +492,7 @@ function AttendancePageComponent() {
                     <TableCell className="text-center">
                       {overtimeHours > 0 ? (
                         <span className="inline-block text-xs font-bold font-mono px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
-                          {overtimeHours} hrs
+                          {Math.round(overtimeHours * 10) / 10} hrs
                         </span>
                       ) : (
                         <span className="text-xs font-bold text-muted-foreground">—</span>
