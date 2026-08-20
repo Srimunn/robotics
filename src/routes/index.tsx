@@ -185,6 +185,7 @@ function DashboardComponent() {
 
   // Card 3: Permanent Labour Yet To Check In (Assigned today, type === "Permanent", no In Time logged)
   const permanentLabourPendingCheckIn = labours.filter((l) => {
+    if (l.isActive === false) return false;
     if (l.type !== "Permanent") return false;
     const attRecord = attendance[`${l.id}_${todayStr}`] || attendance[`${l.id}_${seedTodayStr}`];
     const isCheckedIn = attRecord && attRecord.status === "Present" && Boolean(attRecord.inTime);
@@ -239,12 +240,14 @@ function DashboardComponent() {
   const totalOutstandingAmount = Math.max(0, totalRevenue - amountCollected);
 
   const permanentLabourWorkingCount = labours.filter((l) => {
+    if (l.isActive === false) return false;
     if (l.type !== "Permanent") return false;
     const rec = attendance[`${l.id}_${todayStr}`] || attendance[`${l.id}_${seedTodayStr}`];
     return rec && rec.status === "Present";
   }).length;
 
   const contractLabourWorkingCount = labours.filter((l) => {
+    if (l.isActive === false) return false;
     if (l.type !== "Contract") return false;
     const rec = attendance[`${l.id}_${todayStr}`] || attendance[`${l.id}_${seedTodayStr}`];
     return rec && rec.status === "Present";
@@ -795,7 +798,7 @@ function DashboardComponent() {
               <span className="text-[10px] font-bold uppercase tracking-wider">Permanent Staff</span>
               <Users className="h-4 w-4 text-blue-600" />
             </div>
-            <div className="text-xl font-bold text-blue-600">{permanentLabourWorkingCount} / {labours.filter(l=>l.type==="Permanent").length}</div>
+            <div className="text-xl font-bold text-blue-600">{permanentLabourWorkingCount} / {labours.filter(l=>l.isActive !== false && l.type==="Permanent").length}</div>
             <p className="text-[10px] text-muted-foreground">Present today</p>
           </CardContent>
         </Card>
@@ -806,7 +809,7 @@ function DashboardComponent() {
               <span className="text-[10px] font-bold uppercase tracking-wider">Contract Staff</span>
               <HardHat className="h-4 w-4 text-slate-900 dark:text-slate-100" />
             </div>
-            <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{contractLabourWorkingCount} / {labours.filter(l=>l.type==="Contract").length}</div>
+            <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{contractLabourWorkingCount} / {labours.filter(l=>l.isActive !== false && l.type==="Contract").length}</div>
             <p className="text-[10px] text-slate-700 dark:text-slate-300 font-medium">Present today</p>
           </CardContent>
         </Card>
@@ -2098,7 +2101,7 @@ function DashboardComponent() {
                   <SelectValue placeholder="Choose Labour..." />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  {labours.map((l) => (
+                  {labours.filter((l) => l.isActive !== false).map((l) => (
                     <SelectItem key={l.id} value={l.id}>
                       {l.name} ({l.type})
                     </SelectItem>

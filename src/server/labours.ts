@@ -67,13 +67,30 @@ export const updateLabour = createServerFn({ method: "POST" })
 export const deleteLabour = createServerFn({ method: "POST" })
   .validator((input: { id: string }) => input)
   .handler(async ({ data }) => {
-    await db.labour.delete({ where: { id: data.id } });
+    try {
+      await db.projectLabourAssignment.deleteMany({ where: { labourId: data.id } });
+      await db.labourWageHistory.deleteMany({ where: { labourId: data.id } });
+      await db.labour.delete({ where: { id: data.id } });
+    } catch {
+      await db.projectLabourAssignment.updateMany({
+        where: { labourId: data.id, isActive: true },
+        data: { isActive: false },
+      });
+      await db.labour.update({
+        where: { id: data.id },
+        data: { isActive: false } as any,
+      });
+    }
     return { ok: true };
   });
 
 export const deactivateLabour = createServerFn({ method: "POST" })
   .validator((input: { id: string }) => input)
   .handler(async ({ data }) => {
+    await db.projectLabourAssignment.updateMany({
+      where: { labourId: data.id, isActive: true },
+      data: { isActive: false },
+    });
     return db.labour.update({
       where: { id: data.id },
       data: { isActive: false } as any,

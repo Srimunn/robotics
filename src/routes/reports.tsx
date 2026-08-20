@@ -486,6 +486,7 @@ function ReportsComponent() {
   // Attendance Summary calculation per labour
   const filteredLaboursSummary = labours
     .filter((l) => {
+      if (l.isActive === false && attMemberFilter !== l.id) return false;
       if (attMemberFilter !== "ALL" && l.id !== attMemberFilter) return false;
       if (attTypeFilter !== "ALL" && l.type !== attTypeFilter) return false;
       return true;
@@ -1772,8 +1773,8 @@ function ReportsComponent() {
                   onChange={(e) => setAttMemberFilter(e.target.value)}
                   className="w-full h-8 text-xs font-medium rounded-lg border border-border bg-white dark:bg-card px-2.5 text-foreground focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
-                  <option value="ALL">All Staff Members ({labours.length})</option>
-                  {labours.map((l) => (
+                  <option value="ALL">All Staff Members ({labours.filter((l) => l.isActive !== false).length})</option>
+                  {labours.filter((l) => l.isActive !== false).map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.name} ({l.type} - ₹{l.defaultWeeklyWage || 1400}/wk)
                     </option>

@@ -152,7 +152,7 @@ function AttendancePageComponent() {
 
   // Aggregate attendance and calculate weekly & monthly wages per labour
   const aggregatedPayroll = useMemo(() => {
-    let targetLabours = labours;
+    let targetLabours = labours.filter((l) => l.isActive !== false);
     if (projectFilter !== "all") {
       const proj = projects.find((p) => p.id === projectFilter);
       if (proj && proj.assignedLabourIds && proj.assignedLabourIds.length > 0) {
@@ -665,7 +665,7 @@ function AttendancePageComponent() {
                   <SelectValue placeholder="Choose Labour..." />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  {labours.map((l) => (
+                  {labours.filter((l) => l.isActive !== false).map((l) => (
                     <SelectItem key={l.id} value={l.id}>
                       {l.name} ({l.type} - ₹{(l.defaultWeeklyWage || 1400).toLocaleString("en-IN")}/wk)
                     </SelectItem>

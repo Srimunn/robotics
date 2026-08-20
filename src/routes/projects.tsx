@@ -439,13 +439,15 @@ function ProjectsComponent() {
 
   const handleOpenAssignLabourModal = () => {
     if (!activeProject) return;
-    const initial: LabourAssignmentState[] = labours.map((l) => {
-      const existingAssignment = activeProject.labourAssignments?.find((a) => a.labourId === l.id);
-      return {
-        labourId: l.id,
-        weeklyWage: existingAssignment ? existingAssignment.weeklyWage : (l.defaultWeeklyWage ?? 1400),
-      };
-    });
+    const initial: LabourAssignmentState[] = labours
+      .filter((l) => l.isActive !== false || (activeProject.assignedLabourIds || []).includes(l.id))
+      .map((l) => {
+        const existingAssignment = activeProject.labourAssignments?.find((a) => a.labourId === l.id);
+        return {
+          labourId: l.id,
+          weeklyWage: existingAssignment ? existingAssignment.weeklyWage : (l.defaultWeeklyWage ?? 1400),
+        };
+      });
     setLabourAssignmentsState(initial);
     setAssignOpen(true);
   };
@@ -2120,7 +2122,9 @@ function ProjectsComponent() {
             </div>
 
             <div className="space-y-2 border rounded-lg p-2 max-h-72 overflow-y-auto">
-              {labours.map((l) => {
+              {labours
+                .filter((l) => l.isActive !== false || (activeProject?.assignedLabourIds || []).includes(l.id))
+                .map((l) => {
                 const isAssigned = activeProject?.assignedLabourIds.includes(l.id);
                 const currentWageState = labourAssignmentsState.find((x) => x.labourId === l.id)?.weeklyWage ?? 0;
 
@@ -2898,6 +2902,7 @@ function ProjectsComponent() {
               <div className="space-y-2 max-h-80 overflow-y-auto p-1 border rounded-xl divide-y">
                 {(() => {
                   const availableLabours = labours.filter((l) => {
+                    if (l.isActive === false) return false;
                     const isCurrentlyActive = activeProject?.labourAssignments?.some(
                       (a) => a.labourId === l.id && a.isActive !== false
                     );

@@ -385,7 +385,8 @@ function LaboursComponent() {
         <div className="flex items-center gap-2">
           <Button
             onClick={() => {
-              if (labours.length > 0) setAttLabourId(labours[0].id);
+              const activeList = labours.filter((l) => l.isActive !== false);
+              if (activeList.length > 0) setAttLabourId(activeList[0].id);
               if (projects.length > 0) setAttProjectId(projects[0].id);
               setMarkAttendanceOpen(true);
             }}
@@ -1418,7 +1419,7 @@ function LaboursComponent() {
                   <SelectValue placeholder="Choose Labour..." />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  {labours.map((l) => (
+                  {labours.filter((l) => l.isActive !== false).map((l) => (
                     <SelectItem key={l.id} value={l.id}>
                       {l.name} ({l.type} - ₹{(l.defaultWeeklyWage || 1400).toLocaleString("en-IN")}/wk)
                     </SelectItem>
