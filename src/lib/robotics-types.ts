@@ -147,6 +147,7 @@ export interface Enquiry {
 
   // Sync reference
   projectId?: string;
+  createdByRole?: string;
   createdAt: string;
 }
 
@@ -163,6 +164,7 @@ export interface ProjectLabourAssignment {
   labourName: string;
   labourType: LabourType;
   weeklyWage: number;
+  dailyWage?: number;
   assignedDate: string;
   isActive?: boolean;
 }
@@ -273,6 +275,7 @@ export interface Project {
   materialIssues?: MaterialIssueRecord[];
   paymentStages?: PaymentStageItem[];
   documents?: ProjectDocument[];
+  createdByRole?: string;
 }
 
 export type MachineCondition = "Good" | "Damaged" | "Repair Required" | "Lost";
@@ -413,6 +416,7 @@ export interface AttendanceRecord {
   labourName?: string;
   projectId?: string;
   projectName?: string;
+  projectLocation?: string;
   date: string; // YYYY-MM-DD
   status: AttendanceStatus;
   inTime?: string;
@@ -421,6 +425,7 @@ export interface AttendanceRecord {
   earnedMoney?: number;
   workDescription?: string;
   weeklyWage?: number;
+  dailyWage?: number;
   remarks?: string;
   inPhotoUrl?: string;
   outPhotoUrl?: string;
@@ -435,6 +440,7 @@ export interface AttendanceRecord {
 
 export interface CurrentUser {
   role: "CEO" | "Worker" | "Labor";
+  subRole?: "RS" | "CS" | "BS";
   id?: string;
   name: string;
 }

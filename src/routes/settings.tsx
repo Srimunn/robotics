@@ -187,10 +187,10 @@ function SettingsComponent() {
               </div>
 
               <div className="border-t pt-4 space-y-3">
-                <span className="font-bold text-foreground">Default Weekly Wage Rates Master</span>
+                <span className="font-bold text-foreground">Default Daily Wage Rates Master</span>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Permanent Labour (₹/Week)</Label>
+                    <Label className="text-xs font-semibold">Permanent Labour (₹/Day)</Label>
                     <Input
                       type="number"
                       value={formState.defaultWeeklyWagePermanent}
@@ -202,7 +202,7 @@ function SettingsComponent() {
                   </div>
 
                   <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Contract Labour (₹/Week)</Label>
+                    <Label className="text-xs font-semibold">Contract Labour (₹/Day)</Label>
                     <Input
                       type="number"
                       value={formState.defaultWeeklyWageContract}

@@ -2,11 +2,20 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import type { VerificationStatus } from "@prisma/client";
+import type { VerificationStatus, AttendanceStatus } from "@prisma/client";
 import { db } from "~/lib/db";
 import { cleanPhone, toNumber, toNullableNumber } from "./utils";
 
 import { calculateHoursFromTimes, calculateEarnedWage } from "./calculations";
+
+function mapAttendanceStatusToDb(s?: string | null): AttendanceStatus {
+  if (!s) return "Present";
+  if (s === "Half Day" || s === "HalfDay") return "HalfDay";
+  if (s === "Absent") return "Absent";
+  if (s === "Leave") return "Leave";
+  if (s === "Overtime") return "Overtime";
+  return "Present";
+}
 
 function formatProject<T extends Record<string, any>>(p: T | null) {
   if (!p) return null;
@@ -164,9 +173,9 @@ export const updateProjectStatus = createServerFn({ method: "POST" })
     }, { timeout: 30000, maxWait: 10000 });
   });
 
-/** Assign labours to a project (with per-labour weekly wage, conflict-checked). */
+/** Assign labours to a project (with per-labour daily wage, conflict-checked). */
 export const assignLaboursToProject = createServerFn({ method: "POST" })
-  .validator((input: { projectId: string; assignments: Array<{ labourId: string; weeklyWage: number; assignedDate?: string }> }) => input)
+  .validator((input: { projectId: string; assignments: Array<{ labourId: string; weeklyWage?: number; dailyWage?: number; assignedDate?: string }> }) => input)
   .handler(async ({ data }) => {
     return db.$transaction(async (tx) => {
       const project = await tx.project.findUnique({ where: { id: data.projectId } });
@@ -183,6 +192,8 @@ export const assignLaboursToProject = createServerFn({ method: "POST" })
         }
 
         const asgnDate = asgn.assignedDate ? new Date(asgn.assignedDate) : today;
+        const asgnDailyWage = asgn.dailyWage ?? (asgn.weeklyWage ? Math.round(asgn.weeklyWage / 6) : (lab.dailyWage ?? Math.round(lab.defaultWeeklyWage / 6)));
+        const asgnWeeklyWage = asgn.weeklyWage ?? (asgnDailyWage * 6);
 
         // Deactivate any active assignments on other projects for this labourer
         await tx.projectLabourAssignment.updateMany({
@@ -204,11 +215,11 @@ export const assignLaboursToProject = createServerFn({ method: "POST" })
             labourId: asgn.labourId,
             labourName: lab.name,
             labourType: lab.type,
-            weeklyWage: asgn.weeklyWage,
+            weeklyWage: asgnWeeklyWage,
             assignedDate: asgnDate,
             isActive: true,
           },
-          update: { weeklyWage: asgn.weeklyWage, assignedDate: asgnDate, isActive: true },
+          update: { weeklyWage: asgnWeeklyWage, assignedDate: asgnDate, isActive: true },
         });
 
         await tx.labourWageHistory.create({
@@ -216,7 +227,7 @@ export const assignLaboursToProject = createServerFn({ method: "POST" })
             labourId: asgn.labourId,
             projectId: data.projectId,
             projectName: project.customerName,
-            weeklyWage: asgn.weeklyWage,
+            weeklyWage: asgnWeeklyWage,
             assignedDate: asgnDate,
           },
         });
@@ -285,7 +296,9 @@ const updateLabourLogInput = z.object({
     date: z.string().min(1, "Date is required"),
     inTime: z.string().optional().nullable(),
     outTime: z.string().optional().nullable(),
-    weeklyWage: z.number().int().min(0, "Weekly wage must be a non-negative integer"),
+    weeklyWage: z.number().int().min(0, "Weekly wage must be a non-negative integer").optional().nullable(),
+    dailyWage: z.number().int().min(0, "Daily wage must be a non-negative integer").optional().nullable(),
+    attendance: z.string().optional().nullable(),
     workDescription: z.string().default("On-site servicing"),
     remarks: z.string().optional().nullable(),
     inPhotoUrl: z.string().optional().nullable(),
@@ -317,8 +330,11 @@ export const updateProjectLabourLog = createServerFn({ method: "POST" })
 
       const hasIn = Boolean(data.log.inTime && data.log.inTime.trim());
       const hours = hasIn ? calculateHoursFromTimes(data.log.inTime, data.log.outTime) : 0;
-      const earned = calculateEarnedWage(data.log.weeklyWage, hours);
-      const attendance = hasIn ? "Present" : "Absent";
+      const attendanceRaw = data.log.attendance || (hasIn ? "Present" : "Absent");
+      const attendanceEnum = mapAttendanceStatusToDb(attendanceRaw);
+      const recordedDailyWage = data.log.dailyWage ?? (data.log.weeklyWage ? Math.round(data.log.weeklyWage / 6) : (lab.dailyWage ?? Math.round(lab.defaultWeeklyWage / 6)));
+      const recordedWeeklyWage = data.log.weeklyWage ?? (recordedDailyWage * 6);
+      const earned = calculateEarnedWage(recordedDailyWage, attendanceRaw, hours);
       const date = new Date(data.log.date);
 
       const verStatus = mapVerStatusToDb(data.log.verificationStatus);
@@ -333,12 +349,12 @@ export const updateProjectLabourLog = createServerFn({ method: "POST" })
           labourId: data.log.labourId,
           labourName: lab.name,
           labourType: lab.type,
-          weeklyWage: Math.round(Number(data.log.weeklyWage)),
-          dailyWage: Math.round(Number(data.log.weeklyWage) / 6),
+          weeklyWage: recordedWeeklyWage,
+          dailyWage: recordedDailyWage,
           date,
           inTime: data.log.inTime ?? undefined,
           outTime: data.log.outTime ?? undefined,
-          attendance,
+          attendance: attendanceEnum,
           hoursWorked: Number(hours),
           earnedMoney: Math.round(Number(earned)),
           workDescription: data.log.workDescription,
@@ -353,12 +369,13 @@ export const updateProjectLabourLog = createServerFn({ method: "POST" })
         update: {
           inTime: data.log.inTime ?? undefined,
           outTime: data.log.outTime ?? undefined,
-          attendance,
+          attendance: attendanceEnum,
           hoursWorked: Number(hours),
           earnedMoney: Math.round(Number(earned)),
           workDescription: data.log.workDescription,
           remarks: data.log.remarks ?? undefined,
-          weeklyWage: Math.round(Number(data.log.weeklyWage)),
+          weeklyWage: recordedWeeklyWage,
+          dailyWage: recordedDailyWage,
           inPhotoUrl: data.log.inPhotoUrl ? data.log.inPhotoUrl : undefined,
           outPhotoUrl: data.log.outPhotoUrl ? data.log.outPhotoUrl : undefined,
           inLocation: safeInLocation,
@@ -378,13 +395,13 @@ export const updateProjectLabourLog = createServerFn({ method: "POST" })
           projectId: data.projectId,
           projectName: proj.customerName,
           date,
-          status: attendance,
+          status: attendanceEnum,
           inTime: data.log.inTime ?? undefined,
           outTime: data.log.outTime ?? undefined,
           hoursWorked: Number(hours),
           earnedMoney: Math.round(Number(earned)),
           workDescription: data.log.workDescription,
-          weeklyWage: Math.round(Number(data.log.weeklyWage)),
+          weeklyWage: recordedWeeklyWage,
           remarks: data.log.remarks ?? undefined,
           inPhotoUrl: data.log.inPhotoUrl ?? undefined,
           outPhotoUrl: data.log.outPhotoUrl ?? undefined,
@@ -396,11 +413,11 @@ export const updateProjectLabourLog = createServerFn({ method: "POST" })
         update: {
           inTime: data.log.inTime ?? undefined,
           outTime: data.log.outTime ?? undefined,
-          status: attendance,
+          status: attendanceEnum,
           hoursWorked: Number(hours),
           earnedMoney: Math.round(Number(earned)),
           workDescription: data.log.workDescription,
-          weeklyWage: Math.round(Number(data.log.weeklyWage)),
+          weeklyWage: recordedWeeklyWage,
           remarks: data.log.remarks ?? undefined,
           inPhotoUrl: data.log.inPhotoUrl ? data.log.inPhotoUrl : undefined,
           outPhotoUrl: data.log.outPhotoUrl ? data.log.outPhotoUrl : undefined,

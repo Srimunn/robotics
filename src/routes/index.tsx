@@ -159,7 +159,7 @@ function DashboardComponent() {
   const [labourName, setLabourName] = useState("");
   const [labourPhone, setLabourPhone] = useState("");
   const [labourType, setLabourType] = useState<LabourType>("Permanent");
-  const [labourWage, setLabourWage] = useState<number>(1400);
+  const [labourWage, setLabourWage] = useState<number>(233);
   const [labourSkillsStr, setLabourSkillsStr] = useState("Robotic Joint Seals, Servicing");
 
   // Details Cockpit Dialog States
@@ -432,12 +432,13 @@ function DashboardComponent() {
       // 4. CREW / WORKER ASSIGNMENTS TO PROJECTS
       (proj.labourAssignments || []).forEach((la: any) => {
         const info = formatISTActivity(la.assignedDate || la.createdAt);
+        const dailyVal = la.dailyWage ?? (la.weeklyWage ? Math.round(la.weeklyWage / 6) : 233);
         pushUnique({
           id: `la_${proj.id}_${la.labourId}`,
           time: info.displayStr,
           timestampMs: info.timestampMs,
           title: `Labour ${la.labourName} (${la.labourType}) assigned to ${proj.customerName} (${proj.id})`,
-          subtitle: `Weekly Wage: ₹${la.weeklyWage} • Site Location: ${proj.location}`,
+          subtitle: `Daily Wage: ₹${dailyVal}/day • Site Location: ${proj.location}`,
           category: "SHIFTS",
           type: "assignment",
           badgeText: "Labour Assigned",
@@ -684,8 +685,8 @@ function DashboardComponent() {
       name: labourName,
       phone: labourPhone,
       type: labourType,
-      defaultWeeklyWage: labourWage,
       dailyWage: labourWage,
+      defaultWeeklyWage: labourWage * 6,
       status: "Available",
       skills: [],
       wageHistory: [],
@@ -723,96 +724,109 @@ function DashboardComponent() {
           TOP KPI CARDS SUMMARY (10 HIGH-LEVEL EXECUTIVE TILES)
           =========================================================================== */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-3">
-        <Card
-          className="rounded-xl border border-blue-200/80 bg-blue-50/30 dark:bg-blue-950/20 shadow-xs hover:shadow-sm transition-all cursor-pointer"
-          onClick={() => navigate({ to: "/customers" })}
-        >
-          <CardContent className="p-3.5">
-            <div className="flex items-center justify-between text-blue-700 dark:text-blue-400 mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider">Total Customers</span>
-              <Users className="h-4 w-4 text-blue-600" />
-            </div>
-            <div className="text-xl font-bold text-blue-700 dark:text-blue-300">{(customers || []).length}</div>
-            <p className="text-[10px] text-blue-600/80 font-medium">Registered clients</p>
-          </CardContent>
-        </Card>
+        <Link to="/customers" className="block focus:outline-hidden">
+          <Card className="rounded-xl border border-blue-200/80 bg-blue-50/30 dark:bg-blue-950/20 shadow-xs hover:shadow-sm hover:border-blue-300 transition-all cursor-pointer h-full">
+            <CardContent className="p-3.5">
+              <div className="flex items-center justify-between text-blue-700 dark:text-blue-400 mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Total Customers</span>
+                <Users className="h-4 w-4 text-blue-600" />
+              </div>
+              <div className="text-xl font-bold text-blue-700 dark:text-blue-300">{(customers || []).length}</div>
+              <p className="text-[10px] text-blue-600/80 font-medium">Registered clients</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm transition-all">
-          <CardContent className="p-3.5">
-            <div className="flex items-center justify-between text-muted-foreground mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider">New Enquiries</span>
-              <PhoneCall className="h-4 w-4 text-blue-500" />
-            </div>
-            <div className="text-xl font-bold text-foreground">{newEnquiriesToday}</div>
-            <p className="text-[10px] text-muted-foreground">Action required</p>
-          </CardContent>
-        </Card>
+        <Link to="/enquiries" className="block focus:outline-hidden">
+          <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm hover:border-blue-300 transition-all cursor-pointer h-full">
+            <CardContent className="p-3.5">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider">New Enquiries</span>
+                <PhoneCall className="h-4 w-4 text-blue-500" />
+              </div>
+              <div className="text-xl font-bold text-foreground">{newEnquiriesToday}</div>
+              <p className="text-[10px] text-muted-foreground">Action required</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="rounded-xl border border-slate-300/80 bg-slate-100/50 dark:bg-slate-900/40 shadow-xs hover:shadow-sm transition-all">
-          <CardContent className="p-3.5">
-            <div className="flex items-center justify-between text-slate-800 dark:text-slate-200 mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider">Today's Visits</span>
-              <UserCheck className="h-4 w-4 text-slate-900 dark:text-slate-100" />
-            </div>
-            <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{todaysSiteVisits.length}</div>
-            <p className="text-[10px] text-slate-700 dark:text-slate-300 font-medium">Engineers assigned</p>
-          </CardContent>
-        </Card>
+        <Link to="/enquiries" search={{ filter: "todayVisits" }} className="block focus:outline-hidden">
+          <Card className="rounded-xl border border-slate-300/80 bg-slate-100/50 dark:bg-slate-900/40 shadow-xs hover:shadow-sm hover:border-blue-300 transition-all cursor-pointer h-full">
+            <CardContent className="p-3.5">
+              <div className="flex items-center justify-between text-slate-800 dark:text-slate-200 mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Today's Visits</span>
+                <UserCheck className="h-4 w-4 text-slate-900 dark:text-slate-100" />
+              </div>
+              <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{todaysSiteVisits.length}</div>
+              <p className="text-[10px] text-slate-700 dark:text-slate-300 font-medium">Engineers assigned</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm transition-all">
-          <CardContent className="p-3.5">
-            <div className="flex items-center justify-between text-muted-foreground mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider">Pending Check-Ins</span>
-              <AlertCircle className="h-4 w-4 text-rose-500" />
-            </div>
-            <div className="text-xl font-bold text-rose-600">{permanentLabourPendingCheckIn.length}</div>
-            <p className="text-[10px] text-rose-600/80">Permanent staff</p>
-          </CardContent>
-        </Card>
+        <Link to="/attendance" className="block focus:outline-hidden">
+          <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm hover:border-rose-300 transition-all cursor-pointer h-full">
+            <CardContent className="p-3.5">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Pending Check-Ins</span>
+                <AlertCircle className="h-4 w-4 text-rose-500" />
+              </div>
+              <div className="text-xl font-bold text-rose-600">{permanentLabourPendingCheckIn.length}</div>
+              <p className="text-[10px] text-rose-600/80">Permanent staff</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm transition-all">
-          <CardContent className="p-3.5">
-            <div className="flex items-center justify-between text-muted-foreground mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider">Ongoing Works</span>
-              <Clock className="h-4 w-4 text-blue-500" />
-            </div>
-            <div className="text-xl font-bold text-blue-600">{projectsStartedCount}</div>
-            <p className="text-[10px] text-blue-600/80">Active on site</p>
-          </CardContent>
-        </Card>
+        <Link to="/projects" search={{ status: "Ongoing" }} className="block focus:outline-hidden">
+          <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm hover:border-blue-300 transition-all cursor-pointer h-full">
+            <CardContent className="p-3.5">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Ongoing Works</span>
+                <Clock className="h-4 w-4 text-blue-500" />
+              </div>
+              <div className="text-xl font-bold text-blue-600">{projectsStartedCount}</div>
+              <p className="text-[10px] text-blue-600/80">Active on site</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm transition-all">
-          <CardContent className="p-3.5">
-            <div className="flex items-center justify-between text-muted-foreground mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider">Completed Works</span>
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            </div>
-            <div className="text-xl font-bold text-emerald-600">{projectsCompletedCount}</div>
-            <p className="text-[10px] text-emerald-600/80">Signed off</p>
-          </CardContent>
-        </Card>
+        <Link to="/projects" search={{ status: "Completed" }} className="block focus:outline-hidden">
+          <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm hover:border-emerald-300 transition-all cursor-pointer h-full">
+            <CardContent className="p-3.5">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Completed Works</span>
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              </div>
+              <div className="text-xl font-bold text-emerald-600">{projectsCompletedCount}</div>
+              <p className="text-[10px] text-emerald-600/80">Signed off</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm transition-all">
-          <CardContent className="p-3.5">
-            <div className="flex items-center justify-between text-muted-foreground mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider">Permanent Staff</span>
-              <Users className="h-4 w-4 text-blue-600" />
-            </div>
-            <div className="text-xl font-bold text-blue-600">{permanentLabourWorkingCount} / {labours.filter(l=>l.isActive !== false && l.type==="Permanent").length}</div>
-            <p className="text-[10px] text-muted-foreground">Present today</p>
-          </CardContent>
-        </Card>
+        <Link to="/labours" search={{ type: "Permanent" }} className="block focus:outline-hidden">
+          <Card className="rounded-xl border border-border bg-white shadow-xs hover:shadow-sm hover:border-blue-300 transition-all cursor-pointer h-full">
+            <CardContent className="p-3.5">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Permanent Staff</span>
+                <Users className="h-4 w-4 text-blue-600" />
+              </div>
+              <div className="text-xl font-bold text-blue-600">{permanentLabourWorkingCount} / {labours.filter(l=>l.isActive !== false && l.type==="Permanent").length}</div>
+              <p className="text-[10px] text-muted-foreground">Present today</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="rounded-xl border border-slate-300/80 bg-slate-100/50 dark:bg-slate-900/40 shadow-xs hover:shadow-sm transition-all">
-          <CardContent className="p-3.5">
-            <div className="flex items-center justify-between text-slate-800 dark:text-slate-200 mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider">Contract Staff</span>
-              <HardHat className="h-4 w-4 text-slate-900 dark:text-slate-100" />
-            </div>
-            <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{contractLabourWorkingCount} / {labours.filter(l=>l.isActive !== false && l.type==="Contract").length}</div>
-            <p className="text-[10px] text-slate-700 dark:text-slate-300 font-medium">Present today</p>
-          </CardContent>
-        </Card>
+        <Link to="/labours" search={{ type: "Contract" }} className="block focus:outline-hidden">
+          <Card className="rounded-xl border border-slate-300/80 bg-slate-100/50 dark:bg-slate-900/40 shadow-xs hover:shadow-sm hover:border-blue-300 transition-all cursor-pointer h-full">
+            <CardContent className="p-3.5">
+              <div className="flex items-center justify-between text-slate-800 dark:text-slate-200 mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Contract Staff</span>
+                <HardHat className="h-4 w-4 text-slate-900 dark:text-slate-100" />
+              </div>
+              <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{contractLabourWorkingCount} / {labours.filter(l=>l.isActive !== false && l.type==="Contract").length}</div>
+              <p className="text-[10px] text-slate-700 dark:text-slate-300 font-medium">Present today</p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* ===========================================================================
@@ -2235,7 +2249,7 @@ function DashboardComponent() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Weekly Wage (₹)</Label>
+                  <Label className="text-xs font-semibold">Daily Wage (₹/day)</Label>
                   <Input
                     type="number"
                     value={labourWage}

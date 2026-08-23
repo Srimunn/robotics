@@ -5,6 +5,12 @@ import { addPayment } from "../src/server/payments";
 import { assignLaboursToProject, updateProjectStatus } from "../src/server/projects";
 import { issueMachineToProject, returnMachineFromProject } from "../src/server/machines";
 import { recordAttendance } from "../src/server/attendance";
+import {
+  generateProjectsReport,
+  generateAttendanceReport,
+  generateSingleProjectReport,
+  generatePayrollPdfReport,
+} from "../src/server/reports";
 
 /**
  * Helper to invoke TanStack Start server functions directly in Node CLI environment
@@ -19,7 +25,7 @@ async function callServerFn<T = any>(serverFn: any, payload: any): Promise<T> {
 
 async function runSmokeTest() {
   let passedCount = 0;
-  const totalChecks = 9;
+  const totalChecks = 10;
 
   let createdEnquiryId: string | null = null;
   let createdProjectId: string | null = null;
@@ -208,12 +214,21 @@ async function runSmokeTest() {
         assignments: [{ labourId: labour.id, weeklyWage: 6000 }],
       });
 
-      if (assignRes2.results[0]?.ok) {
-        throw new Error("Double-booking check failed: Labour assignment to second active project was erroneously accepted!");
+      if (!assignRes2.results[0]?.ok) {
+        throw new Error(`Failed to reassign labour to second project: ${assignRes2.results[0]?.reason}`);
+      }
+
+      // Verify prior assignment on first project was automatically deactivated
+      const priorAssignment = await db.projectLabourAssignment.findFirst({
+        where: { projectId: createdProjectId, labourId: labour.id },
+      });
+
+      if (priorAssignment?.isActive) {
+        throw new Error("Prior project assignment was not deactivated upon reallocation!");
       }
 
       passedCount++;
-      console.log(`  ✅ Check 4 Passed: Labour ${labour.id} assigned to ${createdProjectId}, and double-booking to ${secondProjectId} was correctly rejected.`);
+      console.log(`  ✅ Check 4 Passed: Labour ${labour.id} reallocated to ${secondProjectId}, and prior assignment on ${createdProjectId} was deactivated.`);
     } catch (err: any) {
       console.log(`  ❌ Check 4 Failed: ${err.message}`);
     }
@@ -382,9 +397,34 @@ async function runSmokeTest() {
     }
 
     // ----------------------------------------------------
-    // CHECK 9: Clean Up Test Records
+    // CHECK 9: PDF Reports Generation (Projects, Attendance, Detailed Project, Payroll)
     // ----------------------------------------------------
-    console.log("\n9. Testing Test Data Cleanup...");
+    console.log("\n9. Testing PDF Report Generators...");
+    try {
+      const projPdf = await callServerFn(generateProjectsReport, { status: "all" });
+      if (!projPdf?.base64 || projPdf.base64.length < 100) throw new Error("Projects Report PDF failed");
+
+      const attPdf = await callServerFn(generateAttendanceReport, { labourId: "ALL" });
+      if (!attPdf?.base64 || attPdf.base64.length < 100) throw new Error("Attendance Report PDF failed");
+
+      if (createdProjectId) {
+        const detailPdf = await callServerFn(generateSingleProjectReport, { projectId: createdProjectId });
+        if (!detailPdf?.base64 || detailPdf.base64.length < 100) throw new Error("Detailed Project PDF failed");
+      }
+
+      const payrollPdf = await callServerFn(generatePayrollPdfReport, {});
+      if (!payrollPdf?.base64 || payrollPdf.base64.length < 100) throw new Error("Payroll Report PDF failed");
+
+      passedCount++;
+      console.log(`  ✅ Check 9 Passed: All 4 PDF reports (Projects, Attendance, Detailed, Payroll) generated successfully with valid base64 buffers.`);
+    } catch (err: any) {
+      console.log(`  ❌ Check 9 Failed: ${err.message}`);
+    }
+
+    // ----------------------------------------------------
+    // CHECK 10: Clean Up Test Records
+    // ----------------------------------------------------
+    console.log("\n10. Testing Test Data Cleanup...");
     try {
       // 1. Unlink linked enquiries first
       await db.enquiry.updateMany({
@@ -429,9 +469,9 @@ async function runSmokeTest() {
       }
 
       passedCount++;
-      console.log(`  ✅ Check 9 Passed: Successfully cleaned up all test records matching "SMOKETEST-".`);
+      console.log(`  ✅ Check 10 Passed: Successfully cleaned up all test records matching "SMOKETEST-".`);
     } catch (err: any) {
-      console.log(`  ❌ Check 9 Failed: ${err.message}`);
+      console.log(`  ❌ Check 10 Failed: ${err.message}`);
     }
 
   } finally {

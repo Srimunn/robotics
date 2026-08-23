@@ -7,6 +7,7 @@ import { SmartComboBox } from "@/components/ui/SmartComboBox";
 import { DataPagination } from "@/components/ui/DataPagination";
 import { DeleteConfirm } from "@/components/delete-confirm";
 import { PhotoCapture } from "@/components/PhotoCapture";
+import { CreatedByBadge } from "@/components/created-by-badge";
 
 import {
   FolderKanban,
@@ -85,12 +86,14 @@ import { toast } from "sonner";
 
 interface ProjectsSearch {
   openId?: string;
+  status?: string;
 }
 
 export const Route = createFileRoute("/projects")({
   validateSearch: (search: Record<string, unknown>): ProjectsSearch => {
     return {
       openId: typeof search.openId === "string" ? search.openId : undefined,
+      status: typeof search.status === "string" ? search.status : undefined,
     };
   },
   component: ProjectsComponent,
@@ -98,11 +101,12 @@ export const Route = createFileRoute("/projects")({
 
 interface LabourAssignmentState {
   labourId: string;
+  dailyWage: number;
   weeklyWage: number;
 }
 
 function ProjectsComponent() {
-  const { openId } = Route.useSearch();
+  const { openId, status } = Route.useSearch();
   const {
     projects,
     labours,
@@ -136,10 +140,17 @@ function ProjectsComponent() {
   const navigate = useNavigate();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [statusFilter, setStatusFilter] = useState<string>(status || "ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (status) {
+      setStatusFilter(status);
+      setCurrentPage(1);
+    }
+  }, [status]);
 
   // Project Details Cockpit Modal state
   const [activeProject, setActiveProject] = useState<Project | null>(null);
@@ -262,7 +273,7 @@ function ProjectsComponent() {
   const [addLabourModalOpen, setAddLabourModalOpen] = useState(false);
   const [assignSearchQuery, setAssignSearchQuery] = useState("");
   const [selectedLabourIds, setSelectedLabourIds] = useState<string[]>([]);
-  const [customWeeklyWages, setCustomWeeklyWages] = useState<Record<string, number>>({});
+  const [customDailyWages, setCustomDailyWages] = useState<Record<string, number>>({});
   const [customAssignedDates, setCustomAssignedDates] = useState<Record<string, string>>({});
 
   const handleSaveNewAssignments = async (e: React.FormEvent) => {
@@ -276,9 +287,11 @@ function ProjectsComponent() {
     const assignmentsToSubmit = selectedLabourIds.map((id) => {
       const l = labours.find((x) => x.id === id);
       const date = customAssignedDates[id] || new Date().toISOString().slice(0, 10);
+      const dailyVal = customDailyWages[id] ?? l?.dailyWage ?? (l?.defaultWeeklyWage ? Math.round(l.defaultWeeklyWage / 6) : 233);
       return {
         labourId: id,
-        weeklyWage: customWeeklyWages[id] ?? 0,
+        dailyWage: dailyVal,
+        weeklyWage: dailyVal * 6,
         assignedDate: date,
       };
     });
@@ -296,6 +309,7 @@ function ProjectsComponent() {
         labourId: asgn.labourId,
         labourName: l?.name || asgn.labourId,
         labourType: l?.type || "Permanent",
+        dailyWage: asgn.dailyWage,
         weeklyWage: asgn.weeklyWage,
         assignedDate: date,
         isActive: true,
@@ -320,7 +334,7 @@ function ProjectsComponent() {
     toast.success(`Successfully assigned ${selectedLabourIds.length} labour staff`);
     setAddLabourModalOpen(false);
     setSelectedLabourIds([]);
-    setCustomWeeklyWages({});
+    setCustomDailyWages({});
     setCustomAssignedDates({});
     setAssignSearchQuery("");
   };
@@ -443,9 +457,11 @@ function ProjectsComponent() {
       .filter((l) => l.isActive !== false || (activeProject.assignedLabourIds || []).includes(l.id))
       .map((l) => {
         const existingAssignment = activeProject.labourAssignments?.find((a) => a.labourId === l.id);
+        const daily = existingAssignment?.dailyWage ?? (existingAssignment?.weeklyWage ? Math.round(existingAssignment.weeklyWage / 6) : (l.dailyWage ?? Math.round((l.defaultWeeklyWage || 1400) / 6)));
         return {
           labourId: l.id,
-          weeklyWage: existingAssignment ? existingAssignment.weeklyWage : (l.defaultWeeklyWage ?? 1400),
+          dailyWage: daily,
+          weeklyWage: daily * 6,
         };
       });
     setLabourAssignmentsState(initial);
@@ -464,7 +480,8 @@ function ProjectsComponent() {
       const existing = activeProject.labourAssignments?.find((a) => a.labourId === s.labourId);
       return {
         labourId: s.labourId,
-        weeklyWage: s.weeklyWage,
+        dailyWage: s.dailyWage,
+        weeklyWage: s.dailyWage * 6,
         assignedDate: existing?.assignedDate || new Date().toISOString().slice(0, 10),
       };
     });
@@ -479,7 +496,8 @@ function ProjectsComponent() {
         labourId: s.labourId,
         labourName: l?.name || s.labourId,
         labourType: l?.type || "Permanent",
-        weeklyWage: s.weeklyWage,
+        dailyWage: s.dailyWage,
+        weeklyWage: s.dailyWage * 6,
         assignedDate: existing?.assignedDate || new Date().toISOString().slice(0, 10),
         isActive: true,
       };
@@ -631,12 +649,15 @@ function ProjectsComponent() {
 
         <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
           <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Status:</span>
-          {["ALL", "Waiting", "Scheduled", "Ongoing", "Completed", "Closed"].map((st) => (
+          {["ALL", "Scheduled", "Ongoing", "Completed", "Closed"].map((st) => (
             <Button
               key={st}
               variant={statusFilter === st ? "default" : "outline"}
               size="sm"
-              onClick={() => setStatusFilter(st)}
+              onClick={() => {
+                setStatusFilter(st);
+                setCurrentPage(1);
+              }}
               className={`h-8 text-xs rounded-lg ${
                 statusFilter === st
                   ? st === "Ongoing"
@@ -719,7 +740,10 @@ function ProjectsComponent() {
                         className="hover:bg-accent/40 transition-colors cursor-pointer"
                       >
                         <td className="p-3 pl-4 font-bold text-blue-600 whitespace-nowrap">
-                          <div>{p.id}</div>
+                          <div className="flex items-center gap-1.5">
+                            <span>{p.id}</span>
+                            {p.createdByRole && <CreatedByBadge role={p.createdByRole} />}
+                          </div>
                           {p.enquiryId && (
                             <Badge variant="outline" className="text-[9px] bg-blue-50 text-blue-700 border-blue-200 mt-0.5">
                               Linked: {p.enquiryId}
@@ -785,7 +809,6 @@ function ProjectsComponent() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="rounded-xl">
-                            <SelectItem value="Waiting">Waiting</SelectItem>
                             <SelectItem value="Scheduled">Scheduled</SelectItem>
                             <SelectItem value="Ongoing">Ongoing</SelectItem>
                             <SelectItem value="Completed">Completed</SelectItem>
@@ -840,6 +863,7 @@ function ProjectsComponent() {
                 <div>
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <span className="text-xl font-black text-blue-700 font-mono tracking-wide">{activeProject.id}</span>
+                    {activeProject.createdByRole && <CreatedByBadge role={activeProject.createdByRole} />}
                     <Badge
                       className={`text-[10px] font-bold ${
                         activeProject.status === "Ongoing"
@@ -875,8 +899,8 @@ function ProjectsComponent() {
                   Progress
                 </span>
                 <div className="flex items-center justify-between mt-3 px-2 relative">
-                  {["Waiting", "Scheduled", "Ongoing", "Completed", "Closed"].map((st, idx) => {
-                    const stages = ["Waiting", "Scheduled", "Ongoing", "Completed", "Closed"];
+                  {["Scheduled", "Ongoing", "Completed", "Closed"].map((st, idx) => {
+                    const stages = ["Scheduled", "Ongoing", "Completed", "Closed"];
                     const currentIdx = stages.indexOf(activeProject.status);
                     const isPassed = idx <= currentIdx;
 
@@ -1190,7 +1214,7 @@ function ProjectsComponent() {
                         <tr>
                           <th className="p-2 pl-3">Labour Name</th>
                           <th className="p-2">Labour Type</th>
-                          <th className="p-2">Weekly Wage</th>
+                          <th className="p-2">Daily Wage (₹/day)</th>
                           <th className="p-2">Assigned Date</th>
                           <th className="p-2">Status</th>
                           <th className="p-2 text-right pr-3">Action</th>
@@ -1224,7 +1248,7 @@ function ProjectsComponent() {
                               ) : (
                                 activeAssignments.map((assignment) => {
                                   const lab = labours.find((x) => x.id === assignment.labourId);
-                                  const weeklyWage = assignment.weeklyWage ?? lab?.defaultWeeklyWage ?? 1400;
+                                  const dailyWageVal = assignment.dailyWage ?? (assignment.weeklyWage ? Math.round(assignment.weeklyWage / 6) : (lab?.dailyWage ?? Math.round((lab?.defaultWeeklyWage || 1400) / 6)));
 
                                   return (
                                     <tr key={assignment.labourId} className="hover:bg-accent/40 transition-colors">
@@ -1238,7 +1262,7 @@ function ProjectsComponent() {
                                         </Badge>
                                       </td>
                                       <td className="p-2.5 font-bold text-blue-700">
-                                        ₹{weeklyWage.toLocaleString("en-IN")}/week
+                                        ₹{dailyWageVal.toLocaleString("en-IN")}/day
                                       </td>
                                       <td className="p-2.5 text-muted-foreground">
                                         {assignment.assignedDate || "Active"}
@@ -1338,7 +1362,7 @@ function ProjectsComponent() {
                         <tr>
                           <th className="p-2 pl-3">Labour</th>
                           <th className="p-2">Type</th>
-                          <th className="p-2">Weekly Wage</th>
+                          <th className="p-2">Daily Wage (₹/day)</th>
                           <th className="p-2">In Time</th>
                           <th className="p-2">Out Time</th>
                           <th className="p-2">Attendance</th>
@@ -1359,7 +1383,7 @@ function ProjectsComponent() {
                           (activeProject.assignedLabourIds || []).map((lId) => {
                             const lab = labours.find((x) => x.id === lId);
                             const assignment = (activeProject.labourAssignments || []).find((a) => a.labourId === lId);
-                            const weeklyWage = assignment ? assignment.weeklyWage : (lab?.defaultWeeklyWage ?? 1400);
+                            const dailyWageVal = assignment?.dailyWage ?? (assignment?.weeklyWage ? Math.round(assignment.weeklyWage / 6) : (lab?.dailyWage ?? Math.round((lab?.defaultWeeklyWage || 1400) / 6)));
 
                             const existingLog = (activeProject.labourLogs || []).find((lg) => lg.labourId === lId);
                             const inTime = existingLog?.inTime || "";
@@ -1367,7 +1391,7 @@ function ProjectsComponent() {
                             const isPresent = Boolean(inTime && inTime.trim().length > 0);
                             const attendanceStatus = isPresent ? "Present" : "Absent";
                             const hours = isPresent ? calculateHoursFromTimes(inTime, outTime) : 0;
-                            const earnedWage = existingLog?.earnedMoney || calculateEarnedWage(weeklyWage, hours);
+                            const earnedWage = existingLog?.earnedMoney || calculateEarnedWage(dailyWageVal, attendanceStatus, hours);
                             const workDesc = existingLog?.workDescription || "Assigned on site";
 
                             return (
@@ -1380,7 +1404,7 @@ function ProjectsComponent() {
                                     {lab?.type || "Permanent"}
                                   </Badge>
                                 </td>
-                                <td className="p-2.5 font-bold text-purple-700">₹{weeklyWage}/wk</td>
+                                <td className="p-2.5 font-bold text-purple-700">₹{dailyWageVal}/day</td>
                                 <td className="p-2.5 font-mono text-blue-600 font-semibold">{inTime || "—"}</td>
                                 <td className="p-2.5 font-mono text-muted-foreground">{outTime || "—"}</td>
                                 <td className="p-2.5">
@@ -1406,7 +1430,8 @@ function ProjectsComponent() {
                                         labourId: lId,
                                         labourName: lab?.name || lId,
                                         labourType: lab?.type || "Permanent",
-                                        weeklyWage,
+                                        dailyWage: dailyWageVal,
+                                        weeklyWage: dailyWageVal * 6,
                                         date: new Date().toISOString().slice(0, 10),
                                         inTime: inTime || "09:00 AM",
                                         outTime: outTime || "06:00 PM",
@@ -2030,8 +2055,8 @@ function ProjectsComponent() {
             <form onSubmit={handleSaveLabourLog} className="space-y-4 text-xs">
               <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                 <p className="font-bold text-blue-950">{editingLogData.labourName}</p>
-                <p className="text-[11px] text-blue-800 mt-0.5">
-                  Weekly Wage for this project: <strong>₹{editingLogData.weeklyWage}/week</strong>
+                <p className="font-bold text-blue-950">
+                  Daily Wage for this project: <strong>₹{editingLogData.dailyWage ?? (editingLogData.weeklyWage ? Math.round(editingLogData.weeklyWage / 6) : 233)}/day</strong>
                 </p>
                 <p className="text-[11px] text-blue-800 mt-0.5">
                   Rule: Entering In Time automatically sets Attendance = <strong className="text-emerald-700">Present</strong>.
@@ -2104,20 +2129,20 @@ function ProjectsComponent() {
         </Dialog>
       )}
 
-      {/* MULTI-SELECT LABOUR ASSIGNMENT & EDITABLE WEEKLY WAGES DIALOG */}
+      {/* MULTI-SELECT LABOUR ASSIGNMENT & EDITABLE DAILY WAGES DIALOG */}
       <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
         <DialogContent className="max-w-xl rounded-xl border shadow-xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-base font-bold flex items-center gap-2">
-              <HardHat className="h-5 w-5 text-purple-600" /> Assign Workforce & Set Weekly Wages
+              <HardHat className="h-5 w-5 text-purple-600" /> Assign Workforce & Set Daily Wages
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-3 py-2 text-xs">
             <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
-              <p className="font-bold text-purple-950">Weekly Wages Policy</p>
+              <p className="font-bold text-purple-950">Daily Wages Configuration</p>
               <p className="text-[11px] text-purple-800 mt-0.5">
-                Configure project-specific weekly wages for each labour. (e.g., Ravi ₹1400/wk, Ganesh ₹1800/wk, Selvam ₹2200/wk).
+                Configure project-specific daily wages for each labour. (e.g., Ravi ₹300/day, Ganesh ₹350/day, Selvam ₹400/day).
               </p>
             </div>
 
@@ -2126,7 +2151,8 @@ function ProjectsComponent() {
                 .filter((l) => l.isActive !== false || (activeProject?.assignedLabourIds || []).includes(l.id))
                 .map((l) => {
                 const isAssigned = activeProject?.assignedLabourIds.includes(l.id);
-                const currentWageState = labourAssignmentsState.find((x) => x.labourId === l.id)?.weeklyWage ?? 0;
+                const defaultDaily = l.dailyWage ?? (l.defaultWeeklyWage ? Math.round(l.defaultWeeklyWage / 6) : 233);
+                const currentWageState = labourAssignmentsState.find((x) => x.labourId === l.id)?.dailyWage ?? defaultDaily;
 
                 return (
                   <div
@@ -2150,7 +2176,7 @@ function ProjectsComponent() {
                               if (!labourAssignmentsState.some((x) => x.labourId === l.id)) {
                                 setLabourAssignmentsState((prev) => [
                                   ...prev,
-                                  { labourId: l.id, weeklyWage: 0 },
+                                  { labourId: l.id, dailyWage: defaultDaily, weeklyWage: defaultDaily * 6 },
                                 ]);
                               }
                             } else {
@@ -2171,7 +2197,7 @@ function ProjectsComponent() {
                     {isAssigned && (
                       <div className="flex items-center gap-2 pl-7 pt-1 border-t border-purple-200/60">
                         <Label className="text-[11px] font-semibold text-purple-900 whitespace-nowrap">
-                          Weekly Wage (₹/week):
+                          Daily Wage (₹/day):
                         </Label>
                         <Input
                           type="number"
@@ -2179,7 +2205,7 @@ function ProjectsComponent() {
                           onChange={(e) => {
                             const val = Number(e.target.value);
                             setLabourAssignmentsState((prev) =>
-                              prev.map((item) => (item.labourId === l.id ? { ...item, weeklyWage: val } : item))
+                              prev.map((item) => (item.labourId === l.id ? { ...item, dailyWage: val, weeklyWage: val * 6 } : item))
                             );
                           }}
                           className="h-7 w-32 rounded-lg font-bold text-purple-700 bg-white"
@@ -2927,7 +2953,8 @@ function ProjectsComponent() {
 
                   return availableLabours.map((l) => {
                     const isSelected = selectedLabourIds.includes(l.id);
-                    const wageVal = customWeeklyWages[l.id] ?? 0;
+                    const defaultDaily = l.dailyWage ?? (l.defaultWeeklyWage ? Math.round(l.defaultWeeklyWage / 6) : 233);
+                    const wageVal = customDailyWages[l.id] ?? defaultDaily;
                     const dateVal = customAssignedDates[l.id] || new Date().toISOString().slice(0, 10);
 
                     return (
@@ -2944,10 +2971,10 @@ function ProjectsComponent() {
                               onCheckedChange={(checked) => {
                                 if (checked) {
                                   setSelectedLabourIds((prev) => [...prev, l.id]);
-                                  if (customWeeklyWages[l.id] === undefined) {
-                                    setCustomWeeklyWages((prev) => ({
+                                  if (customDailyWages[l.id] === undefined) {
+                                    setCustomDailyWages((prev) => ({
                                       ...prev,
-                                      [l.id]: 0,
+                                      [l.id]: defaultDaily,
                                     }));
                                   }
                                   if (!customAssignedDates[l.id]) {
@@ -2975,14 +3002,14 @@ function ProjectsComponent() {
                           <div className="grid grid-cols-2 gap-3 pl-7 pt-2 border-t border-blue-200/60 dark:border-blue-900/60">
                             <div className="space-y-1">
                               <Label className="text-[11px] font-semibold text-blue-900 dark:text-blue-300">
-                                Weekly Wage (₹/week):
+                                Daily Wage (₹/day):
                               </Label>
                               <Input
                                 type="number"
                                 value={wageVal}
                                 onChange={(e) => {
                                   const val = Number(e.target.value);
-                                  setCustomWeeklyWages((prev) => ({ ...prev, [l.id]: val }));
+                                  setCustomDailyWages((prev) => ({ ...prev, [l.id]: val }));
                                 }}
                                 className="h-8 rounded-lg font-bold text-blue-700 dark:text-blue-400 bg-background text-xs"
                               />

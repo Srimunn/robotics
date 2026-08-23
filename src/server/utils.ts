@@ -13,12 +13,45 @@ export function makeSeqId(prefix: string, existingCount: number): string {
 
 /** Robustly generate a unique sequential ID for any Prisma model delegate */
 export async function generateSafeId(
-  delegate: { count: () => Promise<number>; findUnique: (args: { where: { id: string } }) => Promise<any> },
+  delegate: {
+    count: (args?: any) => Promise<number>;
+    findUnique: (args: { where: { id: string } }) => Promise<any>;
+    findMany?: (args?: any) => Promise<any[]>;
+  },
   prefix: string,
   padding: number = 3
 ): Promise<string> {
-  const count = await delegate.count();
-  let num = count + 1;
+  let maxSeq = 0;
+  try {
+    if (typeof delegate.findMany === "function") {
+      const records = await delegate.findMany({
+        where: { id: { startsWith: prefix } },
+        select: { id: true },
+      });
+      for (const rec of records) {
+        if (rec && typeof rec.id === "string") {
+          const parts = rec.id.split("-");
+          const lastNum = parseInt(parts[parts.length - 1], 10);
+          if (!isNaN(lastNum) && lastNum > maxSeq) {
+            maxSeq = lastNum;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Error finding max sequential ID:", err);
+  }
+
+  if (maxSeq === 0) {
+    try {
+      const count = await delegate.count();
+      maxSeq = count;
+    } catch {
+      maxSeq = 0;
+    }
+  }
+
+  let num = maxSeq + 1;
   let id = `${prefix}-${String(num).padStart(padding, "0")}`;
   while (await delegate.findUnique({ where: { id } })) {
     num++;

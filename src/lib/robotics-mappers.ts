@@ -257,6 +257,7 @@ export function mapEnquiryFromDb(e: DbEnquiry): Enquiry {
     customerStatus: e.customerStatus ?? undefined,
     cancellationReason: e.cancellationReason ?? undefined,
     projectId: e.projectId ?? undefined,
+    createdByRole: (e as any).createdByRole ?? undefined,
     createdAt: isoDateTime(e.createdAt)!,
   };
 }
@@ -318,6 +319,7 @@ export function mapProjectFromDb(
       labourName: a.labourName,
       labourType: a.labourType as LabourType,
       weeklyWage: a.weeklyWage,
+      dailyWage: (a as any).dailyWage ?? (a.weeklyWage ? Math.round(a.weeklyWage / 6) : undefined),
       assignedDate: isoDate(a.assignedDate)!,
       isActive: (a as any).isActive ?? true,
     })),
@@ -330,6 +332,7 @@ export function mapProjectFromDb(
     afterWorkPhotoUrl: p.afterWorkPhotoUrl ?? undefined,
     internalNotes: p.internalNotes,
     followUpTag: ((p as any).followUpTag as "MD" | "Team" | null) ?? undefined,
+    createdByRole: (p as any).createdByRole ?? undefined,
     createdAt: isoDateTime(p.createdAt)!,
     statusHistory: (p.statusHistory ?? []).map((s) => ({
       status: s.status as ProjectStatus,
@@ -494,6 +497,7 @@ export function mapAttendanceFromDb(a: DbAttendanceRecord): AttendanceRecord {
     earnedMoney: a.earnedMoney ?? undefined,
     workDescription: a.workDescription ?? undefined,
     weeklyWage: a.weeklyWage ?? undefined,
+    dailyWage: (a as any).dailyWage ?? (a.weeklyWage ? Math.round(a.weeklyWage / 6) : undefined),
     remarks: a.remarks ?? undefined,
     inPhotoUrl: a.inPhotoUrl ?? undefined,
     outPhotoUrl: a.outPhotoUrl ?? undefined,

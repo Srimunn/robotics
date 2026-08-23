@@ -441,7 +441,7 @@ function AttendancePageComponent() {
                 <TableHead className="text-xs font-bold text-muted-foreground">TYPE</TableHead>
                 <TableHead className="text-xs font-bold text-muted-foreground text-center">PRESENT</TableHead>
                 <TableHead className="text-xs font-bold text-muted-foreground text-center">OVERTIME</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-right">BASE WAGE</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground text-right">DAILY WAGE</TableHead>
                 <TableHead className="text-xs font-bold text-muted-foreground text-right">WEEKLY WAGE</TableHead>
                 <TableHead className="text-xs font-bold text-muted-foreground text-right">MONTHLY WAGE</TableHead>
                 <TableHead className="text-xs font-bold text-muted-foreground text-right pr-4">ACTION</TableHead>
@@ -513,7 +513,7 @@ function AttendancePageComponent() {
                     </TableCell>
 
                     <TableCell className="text-right font-mono text-xs font-medium text-slate-600">
-                      ₹{(labour.defaultWeeklyWage || 1400).toLocaleString("en-IN")}
+                      ₹{(labour.dailyWage ?? Math.round((labour.defaultWeeklyWage || 1400) / 6)).toLocaleString("en-IN")}
                     </TableCell>
 
                     <TableCell className="text-right font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
@@ -586,7 +586,7 @@ function AttendancePageComponent() {
               <div className="p-3 bg-slate-50 dark:bg-slate-900/60 rounded-xl border flex items-center justify-between">
                 <div>
                   <div className="font-bold text-foreground">{activeLabourDetail.labour.name} ({activeLabourDetail.labour.id})</div>
-                  <div className="text-[11px] text-muted-foreground">{activeLabourDetail.labour.type} Staff • Base Wage: ₹{activeLabourDetail.labour.defaultWeeklyWage}/week</div>
+                  <div className="text-[11px] text-muted-foreground">{activeLabourDetail.labour.type} Staff • Daily Wage: ₹{activeLabourDetail.labour.dailyWage ?? Math.round((activeLabourDetail.labour.defaultWeeklyWage || 1400) / 6)}/day</div>
                 </div>
                 <div className="text-right">
                   <div className="text-xs font-bold text-emerald-600">Monthly Est: ₹{activeLabourDetail.calculatedMonthlyWage.toLocaleString("en-IN")}</div>
@@ -600,6 +600,7 @@ function AttendancePageComponent() {
                     <TableRow>
                       <TableHead className="text-[11px] font-bold">Date</TableHead>
                       <TableHead className="text-[11px] font-bold">Project</TableHead>
+                      <TableHead className="text-[11px] font-bold">Location</TableHead>
                       <TableHead className="text-[11px] font-bold text-center">In Time</TableHead>
                       <TableHead className="text-[11px] font-bold text-center">Out Time</TableHead>
                       <TableHead className="text-[11px] font-bold text-center">Status</TableHead>
@@ -609,16 +610,19 @@ function AttendancePageComponent() {
                   <TableBody>
                     {activeLabourDetail.logs.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-6 text-xs text-muted-foreground">
+                        <TableCell colSpan={7} className="text-center py-6 text-xs text-muted-foreground">
                           No daily logs recorded for this labour in selected period.
                         </TableCell>
                       </TableRow>
                     ) : (
                       activeLabourDetail.logs.map((log, idx) => {
+                        const proj = projects.find((p) => p.id === log.projectId);
+                        const siteLoc = log.projectLocation || proj?.location || "—";
                         return (
                           <TableRow key={idx} className="text-xs">
                             <TableCell className="font-mono text-muted-foreground">{log.date}</TableCell>
                             <TableCell className="font-bold text-purple-700">{log.projectId || "Project Site"}</TableCell>
+                            <TableCell className="text-muted-foreground whitespace-nowrap">{siteLoc}</TableCell>
                             <TableCell className="text-center font-mono text-blue-600 font-semibold">{log.inTime || "—"}</TableCell>
                             <TableCell className="text-center font-mono text-slate-500">{log.outTime || "—"}</TableCell>
                             <TableCell className="text-center">
@@ -667,7 +671,7 @@ function AttendancePageComponent() {
                 <SelectContent className="rounded-xl">
                   {labours.filter((l) => l.isActive !== false).map((l) => (
                     <SelectItem key={l.id} value={l.id}>
-                      {l.name} ({l.type} - ₹{(l.defaultWeeklyWage || 1400).toLocaleString("en-IN")}/wk)
+                      {l.name} ({l.type} - ₹{(l.dailyWage ?? Math.round((l.defaultWeeklyWage || 1400) / 6)).toLocaleString("en-IN")}/day)
                     </SelectItem>
                   ))}
                 </SelectContent>

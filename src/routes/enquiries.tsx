@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { uploadImage } from "~/server/upload";
 import { cn } from "@/lib/utils";
 import { useRobotics } from "@/lib/robotics-context";
@@ -7,6 +7,7 @@ import type { Enquiry, CustomerDecision, SiteVisitStatus } from "@/lib/robotics-
 import { SmartComboBox } from "@/components/ui/SmartComboBox";
 import { DataPagination } from "@/components/ui/DataPagination";
 import { DeleteConfirm } from "@/components/delete-confirm";
+import { CreatedByBadge } from "@/components/created-by-badge";
 import {
   PhoneCall,
   Plus,
@@ -53,7 +54,16 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 
+interface EnquiriesSearch {
+  filter?: string;
+}
+
 export const Route = createFileRoute("/enquiries")({
+  validateSearch: (search: Record<string, unknown>): EnquiriesSearch => {
+    return {
+      filter: typeof search.filter === "string" ? search.filter : undefined,
+    };
+  },
   component: EnquiriesComponent,
 });
 
@@ -70,9 +80,17 @@ function EnquiriesComponent() {
     checkEngineerAvailability,
   } = useRobotics();
   const navigate = useNavigate();
-
+  const { filter } = Route.useSearch();
+  const initialDecisionFilter = filter === "todayVisits" ? "Today's Visits" : "ALL";
   const [searchQuery, setSearchQuery] = useState("");
-  const [decisionFilter, setDecisionFilter] = useState<string>("ALL");
+  const [decisionFilter, setDecisionFilter] = useState<string>(initialDecisionFilter);
+
+  useEffect(() => {
+    if (filter === "todayVisits") {
+      setDecisionFilter("Today's Visits");
+      setCurrentPage(1);
+    }
+  }, [filter]);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -174,9 +192,12 @@ function EnquiriesComponent() {
       e.leakageType.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (e.assignedEngineerName && e.assignedEngineerName.toLowerCase().includes(searchQuery.toLowerCase()));
 
+    const todayStr = new Date().toISOString().slice(0, 10);
     const matchesDecision =
       decisionFilter === "ALL"
         ? true
+        : decisionFilter === "Today's Visits" || decisionFilter === "todayVisits"
+        ? e.siteVisitDate === todayStr || (e.siteVisitStatus !== "Completed" && Boolean(e.siteVisitDate))
         : decisionFilter === "Follow-up" || decisionFilter === "Follow Up"
         ? e.customerDecision === "Follow Up" || e.customerDecision === "Follow-up" || (e.customerDecision as string) === "FollowUp"
         : e.customerDecision === decisionFilter;
@@ -327,7 +348,7 @@ function EnquiriesComponent() {
 
         <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
           <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Filter:</span>
-          {["ALL", "Follow-up", "Approved", "Cancelled"].map((dec) => (
+          {["ALL", "Today's Visits", "Follow-up", "Approved", "Cancelled"].map((dec) => (
             <Button
               key={dec}
               variant={decisionFilter === dec ? "default" : "outline"}
@@ -342,6 +363,8 @@ function EnquiriesComponent() {
                     ? "bg-emerald-600 hover:bg-emerald-700 text-white"
                     : dec === "Cancelled"
                     ? "bg-rose-600 hover:bg-rose-700 text-white"
+                    : dec === "Today's Visits"
+                    ? "bg-amber-600 hover:bg-amber-700 text-white"
                     : "bg-blue-600 hover:bg-blue-700 text-white"
                   : ""
               }`}
@@ -367,6 +390,7 @@ function EnquiriesComponent() {
                   <th className="p-3 pl-4 whitespace-nowrap">ID</th>
                   <th className="p-3 whitespace-nowrap min-w-[160px]">CUSTOMER</th>
                   <th className="p-3 whitespace-nowrap min-w-[200px]">WORK TYPE</th>
+                  <th className="p-3 whitespace-nowrap">REFERRED BY</th>
                   <th className="p-3 whitespace-nowrap">ENGINEER</th>
                   <th className="p-3 whitespace-nowrap">AMOUNT</th>
                   <th className="p-3 whitespace-nowrap">START DATE</th>
@@ -378,7 +402,7 @@ function EnquiriesComponent() {
               <tbody className="divide-y">
                 {paginatedEnquiries.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-12 text-center">
+                    <td colSpan={10} className="p-12 text-center">
                       <div className="flex flex-col items-center justify-center space-y-3">
                         <div className="grid h-12 w-12 place-items-center rounded-full bg-blue-50 text-blue-600">
                           <PhoneCall className="h-6 w-6 stroke-[1.5]" />
@@ -422,7 +446,10 @@ function EnquiriesComponent() {
                         className="hover:bg-accent/40 transition-colors cursor-pointer"
                       >
                         <td className="p-3 pl-4 font-bold text-blue-600 whitespace-nowrap">
-                          <div>{enq.id}</div>
+                          <div className="flex items-center gap-1.5">
+                            <span>{enq.id}</span>
+                            {enq.createdByRole && <CreatedByBadge role={enq.createdByRole} />}
+                          </div>
                           {linkedProj && (
                             <Badge variant="outline" className="text-[9px] bg-purple-50 text-purple-700 border-purple-200 mt-0.5">
                               {linkedProj.id}
@@ -443,12 +470,16 @@ function EnquiriesComponent() {
                           </div>
                           <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 whitespace-nowrap mt-0.5">
                             <span>Source: <strong>{enq.leadSource}</strong></span>
-                            {enq.referredBy && (
-                              <Badge variant="outline" className="text-[9px] bg-purple-50 text-purple-700 border-purple-200 py-0">
-                                Ref: {enq.referredBy}
-                              </Badge>
-                            )}
                           </div>
+                        </td>
+                        <td className="p-3 whitespace-nowrap">
+                          {enq.referredBy ? (
+                            <span className="font-semibold text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100 whitespace-nowrap inline-block">
+                              {enq.referredBy}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
                         </td>
                         <td className="p-3 whitespace-nowrap">
                           {enq.assignedEngineerName ? (
@@ -565,6 +596,7 @@ function EnquiriesComponent() {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-xl font-extrabold text-blue-600">{activeEnquiry.id}</span>
+                    {activeEnquiry.createdByRole && <CreatedByBadge role={activeEnquiry.createdByRole} />}
                     <Badge
                       className={`text-xs ${
                         activeEnquiry.customerDecision === "Approved"

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRobotics } from "@/lib/robotics-context";
 import * as XLSX from "xlsx";
 import {
@@ -10,6 +10,7 @@ import {
   FileText,
   FolderKanban,
   Coins,
+  DollarSign,
   TrendingUp,
   Calendar,
   Wrench,
@@ -25,6 +26,7 @@ import {
   ExternalLink,
   Camera,
   Activity,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,8 +42,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { generateProjectsReport, generateAttendanceReport } from "~/server/reports";
-import { Loader2 } from "lucide-react";
+import {
+  generateProjectsReport,
+  generateAttendanceReport,
+  generatePayrollReport,
+  generatePayrollPdfReport,
+  type PayrollReportResult,
+} from "~/server/reports";
 
 export const Route = createFileRoute("/reports")({
   component: ReportsComponent,
@@ -51,10 +58,80 @@ function ReportsComponent() {
   const { enquiries, projects, payments, labours, attendance, customers, machines, machineIssues, currentUser } = useRobotics();
 
   const [activeReport, setActiveReport] = useState<
-    "REVENUE" | "PROJECTS" | "PENDING" | "ENQUIRIES" | "ATTENDANCE" | "NATURE" | "CUSTOMER" | "REFERRALS"
+    "REVENUE" | "PROJECTS" | "PENDING" | "ENQUIRIES" | "ATTENDANCE" | "PAYROLL" | "NATURE" | "CUSTOMER" | "REFERRALS"
   >("REVENUE");
 
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  // Payroll Report state
+  const sevenDaysAgoStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const [payrollStartDate, setPayrollStartDate] = useState(sevenDaysAgoStr);
+  const [payrollEndDate, setPayrollEndDate] = useState(new Date().toISOString().slice(0, 10));
+  const [payrollSearchQuery, setPayrollSearchQuery] = useState("");
+  const [payrollTypeFilter, setPayrollTypeFilter] = useState<"ALL" | "Permanent" | "Contract">("ALL");
+  const [payrollData, setPayrollData] = useState<PayrollReportResult | null>(null);
+  const [isLoadingPayroll, setIsLoadingPayroll] = useState(false);
+  const [isGeneratingPayrollPdf, setIsGeneratingPayrollPdf] = useState(false);
+
+  useEffect(() => {
+    if (activeReport === "PAYROLL") {
+      setIsLoadingPayroll(true);
+      generatePayrollReport({ data: { startDate: payrollStartDate, endDate: payrollEndDate } })
+        .then((res) => {
+          setPayrollData(res);
+        })
+        .catch((err) => {
+          console.error("Failed to load payroll report:", err);
+          toast.error("Failed to load payroll data");
+        })
+        .finally(() => {
+          setIsLoadingPayroll(false);
+        });
+    }
+  }, [activeReport, payrollStartDate, payrollEndDate]);
+
+  const handleDownloadPayrollPdf = async () => {
+    try {
+      setIsGeneratingPayrollPdf(true);
+      const res = await generatePayrollPdfReport({
+        data: { startDate: payrollStartDate, endDate: payrollEndDate },
+      });
+      downloadPdfBlob(res.base64, res.filename);
+      toast.success("Downloaded Payroll Report PDF");
+    } catch (err: any) {
+      console.error("Failed to generate payroll PDF:", err);
+      toast.error(err?.message || "Failed to generate payroll PDF");
+    } finally {
+      setIsGeneratingPayrollPdf(false);
+    }
+  };
+
+  const filteredPayrollItems = useMemo(() => {
+    if (!payrollData?.items) return [];
+    return payrollData.items.filter((item) => {
+      if (payrollTypeFilter !== "ALL" && item.labourType !== payrollTypeFilter) return false;
+      if (payrollSearchQuery.trim()) {
+        const q = payrollSearchQuery.toLowerCase().trim();
+        const matchName = item.labourName.toLowerCase().includes(q);
+        const matchId = item.labourId.toLowerCase().includes(q);
+        const matchProjects = item.distinctProjects.some((p) => p.toLowerCase().includes(q));
+        if (!matchName && !matchId && !matchProjects) return false;
+      }
+      return true;
+    });
+  }, [payrollData, payrollTypeFilter, payrollSearchQuery]);
+
+  const payrollFilteredTotals = useMemo(() => {
+    const totalPayable = filteredPayrollItems.reduce((acc, i) => acc + i.totalEarned, 0);
+    const totalDays = filteredPayrollItems.reduce((acc, i) => acc + i.daysPresent, 0);
+    const totalHours = filteredPayrollItems.reduce((acc, i) => acc + i.totalHours, 0);
+    return {
+      totalPayable,
+      totalDays,
+      totalHours: Number(totalHours.toFixed(1)),
+      count: filteredPayrollItems.length,
+    };
+  }, [filteredPayrollItems]);
 
   const downloadPdfBlob = (base64: string, filename: string) => {
     const byteCharacters = atob(base64);
@@ -479,6 +556,7 @@ function ReportsComponent() {
       ...log,
       projectId: p.id,
       customerName: p.customerName,
+      location: p.location,
       natureOfWork: p.natureOfWork,
     }))
   );
@@ -501,12 +579,16 @@ function ReportsComponent() {
 
       const presentDays = logs.filter((log) => log.attendance === "Present" || log.inTime).length;
       const totalHours = logs.reduce((acc, log) => acc + (log.hoursWorked || 0), 0);
-      const weeklyRate = l.defaultWeeklyWage || 1400;
+      const dailyWageRate = l.dailyWage ?? Math.round((l.defaultWeeklyWage || 1400) / 6);
       const earnedWages = logs.reduce(
         (acc, log) =>
           acc +
           (log.earnedMoney ||
-            (log.hoursWorked ? log.hoursWorked * (weeklyRate / 48) : weeklyRate / 6)),
+            (log.attendance === "Half Day"
+              ? Math.round(dailyWageRate / 2)
+              : log.attendance === "Absent" || log.attendance === "Leave"
+              ? 0
+              : dailyWageRate)),
         0
       );
 
@@ -514,7 +596,8 @@ function ReportsComponent() {
         labour: l,
         presentDays,
         totalHours,
-        weeklyRate,
+        dailyWageRate,
+        weeklyRate: l.defaultWeeklyWage || (dailyWageRate * 6),
         earnedWages,
         logs,
       };
@@ -722,6 +805,7 @@ function ReportsComponent() {
           { id: "PENDING", label: "Pending", icon: Coins },
           { id: "ENQUIRIES", label: "Enquiries", icon: FileText },
           { id: "ATTENDANCE", label: "Attendance", icon: Calendar },
+          { id: "PAYROLL", label: "Payroll", icon: DollarSign },
           { id: "NATURE", label: "My Activity", icon: Activity },
           { id: "CUSTOMER", label: "Ledger", icon: Users },
         ].map((tab) => (
@@ -1445,6 +1529,7 @@ function ReportsComponent() {
                         "Work Committed Date",
                         "Actual Work Started Date",
                         "Lead Source",
+                        "Referred By",
                         "Customer Decision",
                       ],
                       filteredEnquiriesReport.map((e) => [
@@ -1459,6 +1544,7 @@ function ReportsComponent() {
                         e.workCommittedDate || "Not Set",
                         e.actualWorkStartedDate || "Pending",
                         e.leadSource || "N/A",
+                        e.referredBy || "—",
                         e.customerDecision || "Follow Up",
                       ])
                     );
@@ -1487,6 +1573,7 @@ function ReportsComponent() {
                         "Start Date",
                         "Work Started",
                         "Lead Source",
+                        "Referred By",
                         "Decision",
                       ],
                       filteredEnquiriesReport.map((e) => [
@@ -1501,6 +1588,7 @@ function ReportsComponent() {
                         e.workCommittedDate || "Not Set",
                         e.actualWorkStartedDate || "Pending",
                         e.leadSource || "N/A",
+                        e.referredBy || "—",
                         e.customerDecision || "Follow Up",
                       ])
                     );
@@ -1625,13 +1713,14 @@ function ReportsComponent() {
                     <th className="p-3 whitespace-nowrap">Start Date</th>
                     <th className="p-3 whitespace-nowrap">Work Started</th>
                     <th className="p-3 whitespace-nowrap">Lead Source</th>
+                    <th className="p-3 whitespace-nowrap">Referred By</th>
                     <th className="p-3 text-right pr-4 whitespace-nowrap">Customer Decision</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {filteredEnquiriesReport.length === 0 ? (
                     <tr>
-                      <td colSpan={12} className="p-8 text-center text-muted-foreground font-medium">
+                      <td colSpan={13} className="p-8 text-center text-muted-foreground font-medium">
                         No enquiry records match the selected decision or date filters.
                       </td>
                     </tr>
@@ -1655,6 +1744,7 @@ function ReportsComponent() {
                           <td className="p-3 font-mono text-purple-700 whitespace-nowrap">{e.workCommittedDate || "Not Set"}</td>
                           <td className="p-3 font-mono text-emerald-700 whitespace-nowrap">{e.actualWorkStartedDate || "Pending"}</td>
                           <td className="p-3 text-muted-foreground whitespace-nowrap">{e.leadSource}</td>
+                          <td className="p-3 text-muted-foreground whitespace-nowrap">{e.referredBy || "—"}</td>
                           <td className="p-3 text-right pr-4 whitespace-nowrap">
                             <Badge
                               className={`text-[10px] ${
@@ -1714,12 +1804,13 @@ function ReportsComponent() {
 
                       handleExportCSV(
                         `Attendance_Timesheet_${memberLabel}${dateLabel}`,
-                        ["Date", "Labour ID", "Labour Name", "Project / Customer", "Work Description", "Check-in", "Check-out", "Hours Worked", "Earned Wage (INR)", "Attendance", "Verification"],
+                        ["Date", "Labour ID", "Labour Name", "Project / Customer", "Location", "Work Description", "Check-in", "Check-out", "Hours Worked", "Earned Wage (INR)", "Attendance", "Verification"],
                         logsToExport.map((log) => [
                           log.date,
                           log.labourId,
                           log.labourName,
                           log.customerName || "N/A",
+                          log.location || projects.find((p) => p.id === log.projectId)?.location || "—",
                           log.workDescription || "On-site servicing",
                           log.inTime || "N/A",
                           log.outTime || "N/A",
@@ -1732,12 +1823,12 @@ function ReportsComponent() {
                     } else {
                       handleExportCSV(
                         `Payroll_Summary_${memberLabel}${dateLabel}`,
-                        ["Labour ID", "Labour Name", "Labour Type", "Weekly Wage Rate (INR)", "Present Days", "Total Hours Worked", "Earned Payroll (INR)"],
+                        ["Labour ID", "Labour Name", "Labour Type", "Daily Wage (₹/day)", "Present Days", "Total Hours Worked", "Earned Payroll (INR)"],
                         filteredLaboursSummary.map((item) => [
                           item.labour.id,
                           item.labour.name,
                           item.labour.type,
-                          item.weeklyRate,
+                          item.dailyWageRate,
                           item.presentDays,
                           item.totalHours.toFixed(1),
                           Math.round(item.earnedWages),
@@ -1776,7 +1867,7 @@ function ReportsComponent() {
                   <option value="ALL">All Staff Members ({labours.filter((l) => l.isActive !== false).length})</option>
                   {labours.filter((l) => l.isActive !== false).map((l) => (
                     <option key={l.id} value={l.id}>
-                      {l.name} ({l.type} - ₹{l.defaultWeeklyWage || 1400}/wk)
+                      {l.name} ({l.type} - ₹{l.dailyWage ?? Math.round((l.defaultWeeklyWage || 1400) / 6)}/day)
                     </option>
                   ))}
                 </select>
@@ -1896,6 +1987,7 @@ function ReportsComponent() {
                             <tr>
                               <th className="p-3 pl-4">Shift Date</th>
                               <th className="p-3">Project / Customer</th>
+                              <th className="p-3">Location</th>
                               <th className="p-3">Work Description</th>
                               <th className="p-3">Check-in (IN)</th>
                               <th className="p-3">Check-out (OUT)</th>
@@ -1907,35 +1999,41 @@ function ReportsComponent() {
                           <tbody className="divide-y">
                             {memberLogs.length === 0 ? (
                               <tr>
-                                <td colSpan={8} className="p-6 text-center text-muted-foreground font-medium">
+                                <td colSpan={9} className="p-6 text-center text-muted-foreground font-medium">
                                   No shift logs found for this member in the selected date range.
                                 </td>
                               </tr>
                             ) : (
-                              memberLogs.map((log) => (
-                                <tr key={`${log.date}_${log.projectId}_${log.labourId}`} className="hover:bg-accent/40">
-                                  <td className="p-3 pl-4 font-bold text-foreground font-mono">{log.date}</td>
-                                  <td className="p-3 font-semibold text-blue-600">{log.customerName || "On-site Project"}</td>
-                                  <td className="p-3 text-muted-foreground">{log.workDescription || "On-site servicing"}</td>
-                                  <td className="p-3 font-mono text-slate-700">{log.inTime || "—"}</td>
-                                  <td className="p-3 font-mono text-slate-700">{log.outTime || "Active"}</td>
-                                  <td className="p-3 text-center font-bold text-foreground">{log.hoursWorked || 0} hrs</td>
-                                  <td className="p-3 text-right font-bold text-emerald-600">
-                                    ₹{Math.round(log.earnedMoney || 0).toLocaleString("en-IN")}
-                                  </td>
-                                  <td className="p-3 text-right pr-4">
-                                    <Badge
-                                      className={`text-[10px] ${
-                                        log.verificationStatus === "Verified"
-                                          ? "bg-emerald-100 text-emerald-800"
-                                          : "bg-amber-100 text-amber-800"
-                                      }`}
-                                    >
-                                      {log.verificationStatus || "Verified"}
-                                    </Badge>
-                                  </td>
-                                </tr>
-                              ))
+                              memberLogs.map((log) => {
+                                const proj = projects.find((p) => p.id === log.projectId);
+                                const siteLoc = log.location || proj?.location || "—";
+
+                                return (
+                                  <tr key={`${log.date}_${log.projectId}_${log.labourId}`} className="hover:bg-accent/40">
+                                    <td className="p-3 pl-4 font-bold text-foreground font-mono">{log.date}</td>
+                                    <td className="p-3 font-semibold text-blue-600">{log.customerName || log.projectId || "On-site Project"}</td>
+                                    <td className="p-3 text-muted-foreground whitespace-nowrap">{siteLoc}</td>
+                                    <td className="p-3 text-muted-foreground">{log.workDescription || "On-site servicing"}</td>
+                                    <td className="p-3 font-mono text-slate-700">{log.inTime || "—"}</td>
+                                    <td className="p-3 font-mono text-slate-700">{log.outTime || "Active"}</td>
+                                    <td className="p-3 text-center font-bold text-foreground">{log.hoursWorked || 0} hrs</td>
+                                    <td className="p-3 text-right font-bold text-emerald-600">
+                                      ₹{Math.round(log.earnedMoney || 0).toLocaleString("en-IN")}
+                                    </td>
+                                    <td className="p-3 text-right pr-4">
+                                      <Badge
+                                        className={`text-[10px] ${
+                                          log.verificationStatus === "Verified"
+                                            ? "bg-emerald-100 text-emerald-800"
+                                            : "bg-amber-100 text-amber-800"
+                                        }`}
+                                      >
+                                        {log.verificationStatus || "Verified"}
+                                      </Badge>
+                                    </td>
+                                  </tr>
+                                );
+                              })
                             )}
                           </tbody>
                         </table>
@@ -1952,7 +2050,7 @@ function ReportsComponent() {
                     <tr>
                       <th className="p-3 pl-4">Labour Staff Member</th>
                       <th className="p-3">Staff Type</th>
-                      <th className="p-3">Weekly Wage Rate</th>
+                      <th className="p-3">Daily Wage (₹/day)</th>
                       <th className="p-3 text-center">Present Days</th>
                       <th className="p-3 text-center">Total Hours Worked</th>
                       <th className="p-3 text-right">Earned Payroll</th>
@@ -1968,7 +2066,7 @@ function ReportsComponent() {
                             {item.labour.type}
                           </Badge>
                         </td>
-                        <td className="p-3 font-bold text-purple-700">₹{item.weeklyRate}/wk</td>
+                        <td className="p-3 font-bold text-purple-700">₹{item.dailyWageRate}/day</td>
                         <td className="p-3 text-center font-bold text-emerald-600">{item.presentDays} days</td>
                         <td className="p-3 text-center font-bold text-slate-700">{item.totalHours.toFixed(1)} hrs</td>
                         <td className="p-3 text-right font-extrabold text-blue-700 text-sm">
@@ -1987,6 +2085,296 @@ function ReportsComponent() {
                       </tr>
                     ))}
                   </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 5. PAYROLL REPORT WITH CUSTOM DATE-TO-DATE & DOWNLOADABLE PDF */}
+      {activeReport === "PAYROLL" && (
+        <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
+          <CardHeader className="p-4 border-b space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-emerald-600" />
+                  Weekly Workforce Payroll & Wage Settlement Summary
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Accrued wage calculation based on verified daily hours and project assignments for accounting & salary disbursement.
+                </CardDescription>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const dateLabel = `_${payrollStartDate}_to_${payrollEndDate}`;
+                    handleExportCSV(
+                      `Weekly_Payroll_Report${dateLabel}`,
+                      [
+                        "Labour ID",
+                        "Labour Name",
+                        "Employment Type",
+                        "Daily Wage (₹/day)",
+                        "Projects Worked",
+                        "Days Present",
+                        "Hours Worked",
+                        "Amount Payable (INR)",
+                      ],
+                      filteredPayrollItems.map((item) => [
+                        item.labourId,
+                        item.labourName,
+                        item.labourType,
+                        item.dailyWage,
+                        (item.distinctProjects || []).join("; ") || "General Duty",
+                        item.daysPresent,
+                        item.totalHours,
+                        item.totalEarned,
+                      ])
+                    );
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
+                >
+                  <Download className="h-3.5 w-3.5" /> Download Payroll Excel ({filteredPayrollItems.length})
+                </Button>
+
+                <Button
+                  size="sm"
+                  disabled={isGeneratingPayrollPdf}
+                  onClick={handleDownloadPayrollPdf}
+                  className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
+                >
+                  {isGeneratingPayrollPdf ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <FileText className="h-3.5 w-3.5" />
+                  )}
+                  Download Payroll Report (PDF)
+                </Button>
+              </div>
+            </div>
+
+            {/* Quick Type Filter Tabs */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              <span className="text-[11px] font-bold text-muted-foreground mr-1">Staff Type:</span>
+              {[
+                { id: "ALL", label: `All Workforce (${payrollData?.items?.length || 0})` },
+                {
+                  id: "Permanent",
+                  label: `Permanent (${payrollData?.items?.filter((i) => i.labourType === "Permanent").length || 0})`,
+                },
+                {
+                  id: "Contract",
+                  label: `Contract (${payrollData?.items?.filter((i) => i.labourType === "Contract").length || 0})`,
+                },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setPayrollTypeFilter(tab.id as any)}
+                  className={`text-[11px] font-bold px-2.5 py-1 rounded-full border transition-all duration-150 cursor-pointer ${
+                    payrollTypeFilter === tab.id
+                      ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                      : "bg-background text-foreground border-border hover:bg-accent"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Interactive Filters Panel: Date-to-Date & Search */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-2 bg-slate-50 dark:bg-muted/30 p-3 rounded-xl border border-slate-200 dark:border-border">
+              {/* Date From */}
+              <div className="sm:col-span-3 space-y-1">
+                <Label className="text-[11px] font-bold text-muted-foreground">Period From (Date)</Label>
+                <Input
+                  type="date"
+                  value={payrollStartDate}
+                  onChange={(e) => setPayrollStartDate(e.target.value)}
+                  className="h-8 text-xs rounded-lg border-border bg-white dark:bg-card font-mono"
+                />
+              </div>
+
+              {/* Date To */}
+              <div className="sm:col-span-3 space-y-1">
+                <Label className="text-[11px] font-bold text-muted-foreground">Period To (Date)</Label>
+                <Input
+                  type="date"
+                  value={payrollEndDate}
+                  onChange={(e) => setPayrollEndDate(e.target.value)}
+                  className="h-8 text-xs rounded-lg border-border bg-white dark:bg-card font-mono"
+                />
+              </div>
+
+              {/* Search input */}
+              <div className="sm:col-span-4 space-y-1">
+                <Label className="text-[11px] font-bold text-muted-foreground">Search Staff or Project</Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Worker Name, ID, Project..."
+                    value={payrollSearchQuery}
+                    onChange={(e) => setPayrollSearchQuery(e.target.value)}
+                    className="pl-8 h-8 text-xs rounded-lg border-border bg-white dark:bg-card"
+                  />
+                </div>
+              </div>
+
+              {/* Reset Button */}
+              <div className="sm:col-span-2 flex items-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setPayrollStartDate(sevenDaysAgoStr);
+                    setPayrollEndDate(new Date().toISOString().slice(0, 10));
+                    setPayrollTypeFilter("ALL");
+                    setPayrollSearchQuery("");
+                  }}
+                  className="w-full h-8 text-xs rounded-lg font-semibold gap-1 border-slate-200 text-slate-600 hover:bg-slate-100"
+                >
+                  <RotateCcw className="h-3 w-3" /> Reset
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="p-0">
+            {/* Live Financial Metrics Summary Bar */}
+            <div className="p-3.5 bg-emerald-50/60 dark:bg-emerald-950/20 border-b border-emerald-100 dark:border-emerald-900/30 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div className="space-y-0.5">
+                <span className="text-emerald-800 font-bold uppercase text-[10px]">Total Amount Payable</span>
+                <p className="font-extrabold text-emerald-700 text-base sm:text-lg">
+                  ₹{payrollFilteredTotals.totalPayable.toLocaleString("en-IN")}
+                </p>
+              </div>
+
+              <div className="space-y-0.5 border-l pl-3 border-emerald-200/60 dark:border-emerald-900/40">
+                <span className="text-muted-foreground font-semibold text-[10px]">Total Days Worked</span>
+                <p className="font-extrabold text-foreground text-sm sm:text-base">
+                  {payrollFilteredTotals.totalDays} days
+                </p>
+              </div>
+
+              <div className="space-y-0.5 border-l pl-3 border-emerald-200/60 dark:border-emerald-900/40">
+                <span className="text-muted-foreground font-semibold text-[10px]">Total Hours Logged</span>
+                <p className="font-extrabold text-foreground text-sm sm:text-base">
+                  {payrollFilteredTotals.totalHours} hrs
+                </p>
+              </div>
+
+              <div className="space-y-0.5 border-l pl-3 border-emerald-200/60 dark:border-emerald-900/40">
+                <span className="text-muted-foreground font-semibold text-[10px]">Workforce Size</span>
+                <p className="font-extrabold text-blue-700 text-sm sm:text-base">
+                  {payrollFilteredTotals.count} Labourers
+                </p>
+              </div>
+            </div>
+
+            {isLoadingPayroll ? (
+              <div className="p-12 text-center text-muted-foreground">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-blue-600" />
+                <p className="text-xs font-semibold">Calculating weekly payroll from logged attendance and verified hours...</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-muted/40 text-muted-foreground border-b font-medium">
+                    <tr>
+                      <th className="p-3 pl-4 whitespace-nowrap">Labour Staff</th>
+                      <th className="p-3 whitespace-nowrap">Type</th>
+                      <th className="p-3 whitespace-nowrap">Projects Worked</th>
+                      <th className="p-3 text-center whitespace-nowrap">Days Present</th>
+                      <th className="p-3 text-center whitespace-nowrap">Hours Worked</th>
+                      <th className="p-3 text-right whitespace-nowrap">Daily Wage (₹/day)</th>
+                      <th className="p-3 text-right pr-4 whitespace-nowrap">Amount Payable</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {filteredPayrollItems.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center text-muted-foreground font-medium">
+                          No payroll entries or attendance records match the selected date range and filters.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredPayrollItems.map((item) => (
+                        <tr key={item.labourId} className="hover:bg-accent/40 transition-colors">
+                          <td className="p-3 pl-4 font-bold text-foreground whitespace-nowrap">
+                            <div>{item.labourName}</div>
+                            <div className="text-[10px] text-muted-foreground font-mono font-normal">
+                              {item.labourId}
+                            </div>
+                          </td>
+                          <td className="p-3 whitespace-nowrap">
+                            <Badge
+                              className={`text-[10px] ${
+                                item.labourType === "Permanent"
+                                  ? "bg-blue-100 text-blue-800 border-blue-200"
+                                  : "bg-slate-800 text-white"
+                              }`}
+                            >
+                              {item.labourType}
+                            </Badge>
+                          </td>
+                          <td className="p-3">
+                            <div className="flex flex-wrap gap-1 max-w-[280px]">
+                              {(item.distinctProjects || []).length > 0 ? (
+                                (item.distinctProjects || []).map((p, idx) => (
+                                  <Badge
+                                    key={idx}
+                                    variant="outline"
+                                    className="text-[10px] bg-slate-50 text-slate-700 border-slate-200"
+                                  >
+                                    {p}
+                                  </Badge>
+                                ))
+                              ) : (
+                                <span className="text-muted-foreground text-xs italic">No site deployments</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-3 text-center font-bold text-foreground whitespace-nowrap">
+                            {item.daysPresent} days
+                          </td>
+                          <td className="p-3 text-center font-mono font-semibold text-slate-700 whitespace-nowrap">
+                            {item.totalHours} hrs
+                          </td>
+                          <td className="p-3 text-right font-medium text-muted-foreground whitespace-nowrap">
+                            ₹{item.dailyWage.toLocaleString("en-IN")}/day
+                          </td>
+                          <td className="p-3 text-right pr-4 font-extrabold text-emerald-700 text-sm whitespace-nowrap">
+                            ₹{item.totalEarned.toLocaleString("en-IN")}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  {filteredPayrollItems.length > 0 && (
+                    <tfoot className="bg-slate-100 dark:bg-slate-900 border-t-2 border-slate-300 dark:border-slate-700 font-bold text-xs">
+                      <tr>
+                        <td className="p-3 pl-4 uppercase font-extrabold text-foreground" colSpan={3}>
+                          Grand Total ({filteredPayrollItems.length} Labourers)
+                        </td>
+                        <td className="p-3 text-center font-extrabold text-foreground">
+                          {payrollFilteredTotals.totalDays} days
+                        </td>
+                        <td className="p-3 text-center font-extrabold text-foreground">
+                          {payrollFilteredTotals.totalHours} hrs
+                        </td>
+                        <td className="p-3 text-right text-muted-foreground font-normal">—</td>
+                        <td className="p-3 text-right pr-4 font-extrabold text-emerald-700 text-base">
+                          ₹{payrollFilteredTotals.totalPayable.toLocaleString("en-IN")}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
               </div>
             )}

@@ -8,7 +8,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Briefcase, Lock, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-type AppRole = "Admin" | "Manager" | "Labour";
+type AppRole = "Admin" | "RS" | "CS" | "BS" | "Labour";
+
+const ROLES: { id: AppRole; label: string; description: string }[] = [
+  { id: "Admin", label: "Admin", description: "CEO Executive Login" },
+  { id: "RS", label: "RS", description: "Robotics Service Login" },
+  { id: "CS", label: "CS", description: "Construction Solutions Login" },
+  { id: "BS", label: "BS", description: "Builder Supply Login" },
+  { id: "Labour", label: "Labour", description: "Field Crew Member Login" },
+];
 
 export function LoginPage() {
   const { labours, login } = useRobotics();
@@ -41,8 +49,12 @@ export function LoginPage() {
     let success = false;
     if (selectedRole === "Admin") {
       success = login("CEO", undefined, pin);
-    } else if (selectedRole === "Manager") {
-      success = login("Worker", undefined, pin);
+    } else if (selectedRole === "RS") {
+      success = login("RS", undefined, pin);
+    } else if (selectedRole === "CS") {
+      success = login("CS", undefined, pin);
+    } else if (selectedRole === "BS") {
+      success = login("BS", undefined, pin);
     } else if (selectedRole === "Labour") {
       if (!laborLoginId.trim()) {
         toast.error("Please select or enter your Name / Login ID");
@@ -78,20 +90,25 @@ export function LoginPage() {
         <form onSubmit={handleLoginSubmit} className="space-y-5">
           {/* Role Toggle Selector Pill Buttons */}
           <div className="space-y-2">
-            <Label className="text-xs font-semibold text-slate-700">Role</Label>
-            <div className="grid grid-cols-3 gap-2">
-              {(["Admin", "Manager", "Labour"] as AppRole[]).map((role) => (
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold text-slate-700">Role</Label>
+              <span className="text-[11px] font-medium text-blue-600">
+                {ROLES.find((r) => r.id === selectedRole)?.description}
+              </span>
+            </div>
+            <div className="grid grid-cols-5 gap-1.5">
+              {ROLES.map((role) => (
                 <button
-                  key={role}
+                  key={role.id}
                   type="button"
-                  onClick={() => handleRoleChange(role)}
-                  className={`h-9 rounded-xl text-xs font-bold transition-all duration-200 border cursor-pointer ${
-                    selectedRole === role
+                  onClick={() => handleRoleChange(role.id)}
+                  className={`h-9 rounded-xl text-xs font-bold transition-all duration-200 border cursor-pointer flex items-center justify-center ${
+                    selectedRole === role.id
                       ? "bg-blue-600 text-white border-blue-600 shadow-xs"
                       : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
                   }`}
                 >
-                  {role}
+                  {role.label}
                 </button>
               ))}
             </div>

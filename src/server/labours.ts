@@ -16,7 +16,7 @@ const labourInput = z.object({
   name: z.string().min(1),
   phone: z.string().min(1),
   type: z.enum(["Permanent", "Contract"]),
-  defaultWeeklyWage: z.number().int().min(0),
+  defaultWeeklyWage: z.number().int().min(0).optional().nullable(),
   dailyWage: z.number().int().min(0).optional().nullable(),
   skills: z.array(z.string()).default([]),
   loginId: z.string().optional(),
@@ -33,14 +33,17 @@ export const addLabour = createServerFn({ method: "POST" })
     const loginId = data.loginId?.trim() || cleanName.toLowerCase() || id.toLowerCase();
     const pin = data.pin?.trim() || String(Math.floor(1000 + Math.random() * 9000));
 
+    const dailyWage = data.dailyWage ?? (data.defaultWeeklyWage ? Math.round(data.defaultWeeklyWage / 6) : 0);
+    const defaultWeeklyWage = data.defaultWeeklyWage ?? (dailyWage * 6);
+
     return db.labour.create({
       data: {
         id,
         name: data.name,
         phone: cleanPhone(data.phone),
         type: data.type,
-        defaultWeeklyWage: data.defaultWeeklyWage,
-        dailyWage: data.dailyWage ?? undefined,
+        defaultWeeklyWage,
+        dailyWage,
         status: "Available",
         skills: data.skills,
         loginId,
@@ -55,12 +58,17 @@ export const updateLabour = createServerFn({ method: "POST" })
   .validator((input: { id: string; updates: Partial<z.infer<typeof labourInput>> }) => input)
   .handler(async ({ data }) => {
     const { id, updates } = data;
+    const updatesData: any = { ...updates };
+    if (updates.phone) updatesData.phone = cleanPhone(updates.phone);
+    if (updates.dailyWage !== undefined && updates.defaultWeeklyWage === undefined) {
+      updatesData.defaultWeeklyWage = (updates.dailyWage || 0) * 6;
+    } else if (updates.defaultWeeklyWage !== undefined && updates.dailyWage === undefined) {
+      updatesData.dailyWage = Math.round((updates.defaultWeeklyWage || 0) / 6);
+    }
+
     return db.labour.update({
       where: { id },
-      data: {
-        ...updates,
-        phone: updates.phone ? cleanPhone(updates.phone) : undefined,
-      } as any,
+      data: updatesData,
     });
   });
 

@@ -30,6 +30,7 @@ import {
   Copy,
   Wrench,
   KeyRound,
+  Edit,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -110,7 +111,16 @@ class LabourErrorBoundary extends React.Component<{ children: React.ReactNode },
   }
 }
 
+interface LaboursSearch {
+  type?: string;
+}
+
 export const Route = createFileRoute("/labours")({
+  validateSearch: (search: Record<string, unknown>): LaboursSearch => {
+    return {
+      type: typeof search.type === "string" ? search.type : undefined,
+    };
+  },
   component: () => (
     <LabourErrorBoundary>
       <LaboursComponent />
@@ -125,15 +135,84 @@ function LaboursComponent() {
   const projects = robotics?.projects || [];
   const { addLabour, updateLabour, deleteLabour, deactivateLabour, reactivateLabour, deleteLabourPermanently, checkLabourAvailability, addMasterDataItem, updateProjectLabourLog, verifyAttendanceRecord, currentUser } = robotics;
 
+  const { type } = Route.useSearch();
+  const initialTypeFilter =
+    type?.toUpperCase() === "PERMANENT" ? "PERMANENT" : type?.toUpperCase() === "CONTRACT" ? "CONTRACT" : "ALL";
+
   const [activeTab, setActiveTab] = useState<"PROFILE" | "ATTENDANCE" | "MASTER">("PROFILE");
-  const [labourTypeFilter, setLabourTypeFilter] = useState<"PERMANENT" | "CONTRACT" | "ALL">("ALL");
+  const [labourTypeFilter, setLabourTypeFilter] = useState<"PERMANENT" | "CONTRACT" | "ALL">(initialTypeFilter);
   const [showInactive, setShowInactive] = useState(false);
+
+  React.useEffect(() => {
+    if (type) {
+      const nextFilter = type.toUpperCase() === "PERMANENT" ? "PERMANENT" : type.toUpperCase() === "CONTRACT" ? "CONTRACT" : "ALL";
+      setLabourTypeFilter(nextFilter);
+    }
+  }, [type]);
 
   const [deactivateConfirmTarget, setDeactivateConfirmTarget] = useState<Labour | null>(null);
   const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<Labour | null>(null);
   const [reactivateConfirmTarget, setReactivateConfirmTarget] = useState<Labour | null>(null);
 
   const isManagerOrCeo = currentUser?.role === "CEO" || currentUser?.role === "Worker";
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTargetLabour, setEditTargetLabour] = useState<Labour | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    phone: "",
+    loginId: "",
+    pin: "",
+    type: "Permanent" as LabourType,
+    dailyWage: 233,
+    defaultWeeklyWage: 1400,
+    skills: "",
+  });
+
+  const handleOpenEdit = (labour: Labour) => {
+    setEditTargetLabour(labour);
+    const dailyWageVal = labour.dailyWage ?? (labour.defaultWeeklyWage ? Math.round(labour.defaultWeeklyWage / 6) : 233);
+    setEditFormData({
+      name: labour.name,
+      phone: labour.phone,
+      loginId: labour.loginId || labour.name.split(" ")[0],
+      pin: labour.pin || "",
+      type: labour.type,
+      dailyWage: dailyWageVal,
+      defaultWeeklyWage: labour.defaultWeeklyWage || (dailyWageVal * 6),
+      skills: (labour.skills || []).join(", "),
+    });
+    setEditOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editTargetLabour) return;
+    try {
+      const skillsArray = editFormData.skills
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      const dailyWageVal = Number(editFormData.dailyWage) || 233;
+      await updateLabour(editTargetLabour.id, {
+        name: editFormData.name.trim(),
+        phone: editFormData.phone.trim(),
+        loginId: editFormData.loginId.trim() || undefined,
+        pin: editFormData.pin.trim() || undefined,
+        type: editFormData.type,
+        dailyWage: dailyWageVal,
+        defaultWeeklyWage: dailyWageVal * 6,
+        skills: skillsArray,
+      });
+
+      toast.success(`Updated profile for ${editFormData.name}`);
+      setEditOpen(false);
+      setEditTargetLabour(null);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update labour profile");
+    }
+  };
 
   const handleResetPin = async (labourId: string) => {
     const newPin = String(Math.floor(1000 + Math.random() * 9000));
@@ -211,6 +290,7 @@ function LaboursComponent() {
     loginId: "",
     pin: "",
     type: "Permanent" as LabourType,
+    dailyWage: 233,
     defaultWeeklyWage: 1400,
     status: "Available" as any,
   });
@@ -222,13 +302,15 @@ function LaboursComponent() {
       return;
     }
 
+    const dailyWageVal = Number(labourFormData.dailyWage) || 233;
     const newL = await addLabour({
       name: labourFormData.name,
       phone: labourFormData.phone,
       loginId: labourFormData.loginId.trim() || "",
       pin: labourFormData.pin.trim() || "0000",
       type: labourFormData.type,
-      defaultWeeklyWage: labourFormData.defaultWeeklyWage,
+      dailyWage: dailyWageVal,
+      defaultWeeklyWage: dailyWageVal * 6,
       status: labourFormData.status,
       skills: [],
       wageHistory: [],
@@ -241,6 +323,7 @@ function LaboursComponent() {
       loginId: "",
       pin: "",
       type: "Permanent",
+      dailyWage: 233,
       defaultWeeklyWage: 1400,
       status: "Available",
     });
@@ -639,6 +722,17 @@ function LaboursComponent() {
 
                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                         <div className="flex items-center gap-2">
+                          {isManagerOrCeo && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenEdit(activeLabour)}
+                              className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300 text-xs font-bold rounded-lg gap-1 shadow-2xs"
+                            >
+                              <Edit className="h-3.5 w-3.5" /> Edit Profile
+                            </Button>
+                          )}
+
                           {activeLabour.isActive === false ? (
                             <Button
                               size="sm"
@@ -672,8 +766,8 @@ function LaboursComponent() {
                         </div>
 
                         <div className="text-left sm:text-right bg-emerald-50 p-3 rounded-xl border border-emerald-100">
-                          <span className="text-[10px] uppercase font-bold text-emerald-900">Default Weekly Wage</span>
-                          <p className="text-xl font-extrabold text-emerald-700">₹{(activeLabour.defaultWeeklyWage || 1400).toLocaleString("en-IN")} / week</p>
+                          <span className="text-[10px] uppercase font-bold text-emerald-900">Daily Wage (₹/day)</span>
+                          <p className="text-xl font-extrabold text-emerald-700">₹{(activeLabour.dailyWage ?? Math.round((activeLabour.defaultWeeklyWage || 1400) / 6)).toLocaleString("en-IN")} / day</p>
                         </div>
                       </div>
 
@@ -870,7 +964,7 @@ function LaboursComponent() {
                                 <tr>
                                   <th className="p-2.5 pl-3">Project ID & Customer</th>
                                   <th className="p-2.5">Nature of Work & Location</th>
-                                  <th className="p-2.5">Weekly Wage</th>
+                                  <th className="p-2.5">Daily Wage (₹/day)</th>
                                   <th className="p-2.5">Assigned Date</th>
                                   <th className="p-2.5 text-right pr-3">Status</th>
                                 </tr>
@@ -885,7 +979,7 @@ function LaboursComponent() {
                                 ) : (
                                   recentProjectsList.map((p) => {
                                     const assignment = p.labourAssignments?.find((a) => a.labourId === activeLabour.id);
-                                    const projWage = assignment ? assignment.weeklyWage : (activeLabour.defaultWeeklyWage ?? 1400);
+                                    const projWage = assignment?.dailyWage ?? (assignment?.weeklyWage ? Math.round(assignment.weeklyWage / 6) : (activeLabour.dailyWage ?? Math.round((activeLabour.defaultWeeklyWage || 1400) / 6)));
 
                                     return (
                                       <tr key={p.id} className="hover:bg-accent/40 transition-colors">
@@ -897,7 +991,7 @@ function LaboursComponent() {
                                           <div className="font-medium text-foreground">{p.natureOfWork}</div>
                                           <div className="text-[10px] text-muted-foreground">{p.location}</div>
                                         </td>
-                                        <td className="p-2.5 font-bold text-emerald-700">₹{projWage.toLocaleString("en-IN")}/wk</td>
+                                        <td className="p-2.5 font-bold text-emerald-700">₹{projWage.toLocaleString("en-IN")}/day</td>
                                         <td className="p-2.5 text-muted-foreground">{assignment?.assignedDate || p.scheduledDate}</td>
                                         <td className="p-2.5 text-right pr-3">
                                           <Badge
@@ -1089,7 +1183,7 @@ function LaboursComponent() {
                     <th className="p-3 pl-4">Date</th>
                     <th className="p-3">Labour Name</th>
                     <th className="p-3">Project / Site Name</th>
-                    <th className="p-3">Weekly Wage</th>
+                    <th className="p-3">Daily Wage (₹/day)</th>
                     <th className="p-3">In Time</th>
                     <th className="p-3">Out Time</th>
                     <th className="p-3">Hours Worked</th>
@@ -1100,7 +1194,7 @@ function LaboursComponent() {
                 <tbody className="divide-y">
                   {globalAttendanceList.map((rec) => {
                     const lab = labours.find((l) => l.id === rec.labourId);
-                    const wage = rec.weeklyWage ?? lab?.defaultWeeklyWage ?? 1400;
+                    const wage = rec.dailyWage ?? (rec.weeklyWage ? Math.round(rec.weeklyWage / 6) : (lab?.dailyWage ?? Math.round((lab?.defaultWeeklyWage || 1400) / 6)));
 
                     return (
                       <tr key={rec.id} className="hover:bg-accent/40 transition-colors">
@@ -1112,7 +1206,7 @@ function LaboursComponent() {
                         <td className="p-3 font-bold text-blue-600">
                           {rec.projectId ? `${rec.projectId} (${rec.projectName || "Site"})` : "General Site Duty"}
                         </td>
-                        <td className="p-3 font-bold text-emerald-700">₹{wage}/wk</td>
+                        <td className="p-3 font-bold text-emerald-700">₹{wage}/day</td>
                         <td className="p-3 font-mono text-blue-600 font-semibold">{rec.inTime || "—"}</td>
                         <td className="p-3 font-mono text-muted-foreground">{rec.outTime || "—"}</td>
                         <td className="p-3 font-bold text-foreground">
@@ -1189,7 +1283,7 @@ function LaboursComponent() {
                     <th className="p-3">Full Name</th>
                     <th className="p-3">Phone</th>
                     <th className="p-3">Labour Type</th>
-                    <th className="p-3">Default Weekly Wage</th>
+                    <th className="p-3">Daily Wage (₹/day)</th>
                     <th className="p-3">Status</th>
                     <th className="p-3 text-right pr-4">Actions</th>
                   </tr>
@@ -1210,21 +1304,31 @@ function LaboursComponent() {
                       <td className="p-3">
                         <Badge variant="outline" className="text-[10px]">{l.type}</Badge>
                       </td>
-                      <td className="p-3 font-bold text-emerald-700">₹{(l.defaultWeeklyWage || 1400).toLocaleString("en-IN")}/wk</td>
+                      <td className="p-3 font-bold text-emerald-700">₹{(l.dailyWage ?? Math.round((l.defaultWeeklyWage || 1400) / 6)).toLocaleString("en-IN")}/day</td>
                       <td className="p-3">
                         <Badge className="bg-emerald-100 text-emerald-800 text-[10px]">{l.status}</Badge>
                       </td>
                       <td className="p-3 text-right pr-4">
                         <div className="flex items-center justify-end gap-1.5">
                           {isManagerOrCeo && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleResetPin(l.id)}
-                              className="h-7 text-[11px] font-bold text-purple-700 border-purple-300 hover:bg-purple-50 rounded-lg gap-1"
-                            >
-                              <KeyRound className="h-3 w-3" /> Reset PIN
-                            </Button>
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleOpenEdit(l)}
+                                className="h-7 text-[11px] font-bold text-blue-700 border-blue-300 hover:bg-blue-50 rounded-lg gap-1"
+                              >
+                                <Edit className="h-3 w-3" /> Edit
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleResetPin(l.id)}
+                                className="h-7 text-[11px] font-bold text-purple-700 border-purple-300 hover:bg-purple-50 rounded-lg gap-1"
+                              >
+                                <KeyRound className="h-3 w-3" /> Reset PIN
+                              </Button>
+                            </>
                           )}
                           {l.isActive === false ? (
                             <Button
@@ -1354,13 +1458,13 @@ function LaboursComponent() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Weekly Wage (₹) *</Label>
+                  <Label className="text-xs font-semibold">Daily Wage (₹/day) *</Label>
                   <Input
                     type="number"
                     required
-                    value={labourFormData.defaultWeeklyWage}
+                    value={labourFormData.dailyWage}
                     onChange={(e) =>
-                      setLabourFormData({ ...labourFormData, defaultWeeklyWage: Number(e.target.value) })
+                      setLabourFormData({ ...labourFormData, dailyWage: Number(e.target.value), defaultWeeklyWage: Number(e.target.value) * 6 })
                     }
                     className="h-9 text-xs rounded-xl font-bold text-purple-700 dark:text-purple-400 bg-background"
                   />
@@ -1373,6 +1477,125 @@ function LaboursComponent() {
                 Add Labour Profile
               </Button>
               <Button type="button" variant="outline" onClick={() => setAddOpen(false)} className="rounded-xl text-xs w-full sm:w-auto">
+                Cancel
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* EDIT LABOUR PROFILE DIALOG */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-md rounded-2xl p-6 bg-white dark:bg-card border shadow-2xl">
+          <DialogHeader className="border-b pb-3">
+            <DialogTitle className="text-base font-bold text-foreground flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Edit className="h-5 w-5 text-blue-600" /> Edit Labour Profile
+              </div>
+              <span className="font-mono text-xs text-muted-foreground font-normal">
+                {editTargetLabour?.id}
+              </span>
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Update worker details and default weekly wage. Existing assigned projects and past logged wages remain preserved.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleEditSubmit} className="space-y-4 text-xs pt-2">
+            {/* CONTACT */}
+            <div className="p-4 rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/20 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
+                <User className="h-4 w-4 text-blue-600" /> Contact Details
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Name *</Label>
+                  <Input
+                    required
+                    value={editFormData.name}
+                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                    className="h-9 text-xs rounded-xl bg-background"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Phone *</Label>
+                  <Input
+                    required
+                    value={editFormData.phone}
+                    onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                    className="h-9 text-xs rounded-xl bg-background"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Login ID</Label>
+                  <Input
+                    value={editFormData.loginId}
+                    onChange={(e) => setEditFormData({ ...editFormData, loginId: e.target.value })}
+                    className="h-9 text-xs rounded-xl bg-background"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">4-Digit PIN</Label>
+                  <Input
+                    maxLength={4}
+                    value={editFormData.pin}
+                    onChange={(e) => setEditFormData({ ...editFormData, pin: e.target.value.replace(/\D/g, "") })}
+                    className="h-9 text-xs rounded-xl bg-background font-mono font-bold"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* EMPLOYMENT & DEFAULT WAGE */}
+            <div className="p-4 rounded-xl border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-950/20 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                <DollarSign className="h-4 w-4 text-emerald-600" /> Employment & Wage Configuration
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Type *</Label>
+                  <SmartComboBox
+                    category="Labour Types"
+                    value={editFormData.type}
+                    onChange={(val) => setEditFormData({ ...editFormData, type: val as LabourType })}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Daily Wage (₹/day) *</Label>
+                  <Input
+                    type="number"
+                    required
+                    value={editFormData.dailyWage}
+                    onChange={(e) =>
+                      setEditFormData({ ...editFormData, dailyWage: Number(e.target.value), defaultWeeklyWage: Number(e.target.value) * 6 })
+                    }
+                    className="h-9 text-xs rounded-xl font-bold text-emerald-700 dark:text-emerald-400 bg-background"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1 pt-1">
+                <Label className="text-xs font-semibold">Skills / Specializations (comma separated)</Label>
+                <Input
+                  placeholder="e.g. Masonry, Waterproofing, Plastering"
+                  value={editFormData.skills}
+                  onChange={(e) => setEditFormData({ ...editFormData, skills: e.target.value })}
+                  className="h-9 text-xs rounded-xl bg-background"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="pt-3 border-t flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-10 text-xs font-bold shadow-md px-5 w-full sm:w-auto">
+                Save Changes
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setEditOpen(false)} className="rounded-xl text-xs w-full sm:w-auto">
                 Cancel
               </Button>
             </DialogFooter>

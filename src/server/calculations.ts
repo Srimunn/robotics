@@ -28,10 +28,36 @@ export function calculateHoursFromTimes(inTime?: string | null, outTime?: string
   return diff > 0 ? Math.round(diff * 10) / 10 : 8;
 }
 
-export function calculateEarnedWage(weeklyWage: number, hoursWorked: number): number {
-  if (!hoursWorked || hoursWorked <= 0) return 0;
-  const hourlyRate = (weeklyWage ?? 1400) / 48;
-  return Math.round(hoursWorked * hourlyRate);
+export function calculateEarnedWage(
+  dailyWage: number,
+  status: string | number = "Present",
+  hoursWorked?: number
+): number {
+  const wage = Number(dailyWage) || 0;
+  if (wage <= 0) return 0;
+
+  // Backward compatibility: If 2nd argument was hoursWorked as number
+  if (typeof status === "number") {
+    if (status <= 0) return 0;
+    return Math.round(wage);
+  }
+
+  const s = String(status || "").toLowerCase().replace(/[\s_-]/g, "");
+  if (s === "present" || s === "overtime") {
+    return Math.round(wage);
+  }
+  if (s === "halfday" || s === "half") {
+    return Math.round(wage / 2);
+  }
+  if (s === "absent" || s === "leave") {
+    return 0;
+  }
+
+  // Fallback: If status is unknown but hours are given
+  if (hoursWorked !== undefined && hoursWorked <= 0) {
+    return 0;
+  }
+  return Math.round(wage);
 }
 
 /** Compute PaymentStatus from project total + received + stages */

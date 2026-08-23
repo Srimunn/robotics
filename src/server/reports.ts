@@ -182,7 +182,7 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
     const { status, startDate, endDate } = data;
 
     const where: any = {};
-    if (status && status !== "ALL") {
+    if (status && status.toUpperCase() !== "ALL") {
       where.status = status;
     }
 
@@ -388,12 +388,17 @@ export const generateAttendanceReport = createServerFn({ method: "POST" })
 
     const [attendanceRecords, projects] = await Promise.all([
       db.attendanceRecord.findMany({ orderBy: { date: "desc" } }),
-      db.project.findMany({ select: { id: true, customerName: true, labourLogs: true } }),
+      db.project.findMany({ select: { id: true, customerName: true, location: true, labourLogs: true } }),
     ]);
+
+    const projMap = new Map(projects.map((p) => [p.id, p]));
 
     interface LogItem {
       labourId: string;
       labourName: string;
+      projectId?: string;
+      projectName?: string;
+      location?: string;
       date: string;
       inTime?: string;
       outTime?: string;
@@ -408,9 +413,13 @@ export const generateAttendanceReport = createServerFn({ method: "POST" })
     for (const ar of attendanceRecords) {
       const dateStr = ar.date instanceof Date ? ar.date.toISOString().slice(0, 10) : String(ar.date).slice(0, 10);
       const key = `${ar.labourId}_${dateStr}`;
+      const proj = ar.projectId ? projMap.get(ar.projectId) : undefined;
       logMap.set(key, {
         labourId: ar.labourId,
         labourName: ar.labourName || ar.labourId,
+        projectId: ar.projectId || undefined,
+        projectName: ar.projectName || proj?.customerName || undefined,
+        location: proj?.location || undefined,
         date: dateStr,
         inTime: ar.inTime || undefined,
         outTime: ar.outTime || undefined,
@@ -429,6 +438,9 @@ export const generateAttendanceReport = createServerFn({ method: "POST" })
           logMap.set(key, {
             labourId: lg.labourId,
             labourName: lg.labourName || lg.labourId,
+            projectId: p.id,
+            projectName: p.customerName,
+            location: p.location,
             date: lgDateStr,
             inTime: lg.inTime || undefined,
             outTime: lg.outTime || undefined,
@@ -500,10 +512,13 @@ export const generateAttendanceReport = createServerFn({ method: "POST" })
           doc.rect(30, startY, 535, 52).fillAndStroke("#f8fafc", "#e2e8f0");
 
           doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#0f172a").text(`Date: ${formatPdfDate(log.date)}`, 40, startY + 8);
+          const siteLocationText = log.location
+            ? `${log.projectId ? log.projectId + " — " : ""}${log.location}`
+            : (log.projectName || log.projectId || "General Site");
           doc
             .font("Helvetica")
             .fillColor("#475569")
-            .text(`In: ${log.inTime || "—"} | Out: ${log.outTime || "—"} | Worked: ${log.hoursWorked || 0} hrs | Status: ${log.status}`);
+            .text(`Site: ${siteLocationText} | In: ${log.inTime || "—"} | Out: ${log.outTime || "—"} | Worked: ${log.hoursWorked || 0} hrs | Status: ${log.status}`, 40, startY + 22);
 
           // In & Out thumbnails (40x40px)
           const inX = 420;
@@ -772,3 +787,304 @@ export const generateSingleProjectReport = createServerFn({ method: "POST" })
       filename: `project-report-${project.id}.pdf`,
     };
   });
+
+export interface PayrollProjectItem {
+  projectId: string;
+  projectName: string;
+  projectLocation?: string;
+  projectDisplay: string;
+  daysWorked: number;
+  hoursWorked: number;
+  earnedAmount: number;
+}
+
+export interface PayrollLabourSummary {
+  labourId: string;
+  labourName: string;
+  labourType: string;
+  dailyWage: number;
+  defaultWeeklyWage: number;
+  distinctProjects: string[];
+  daysPresent: number;
+  totalHours: number;
+  totalEarned: number;
+  projectBreakdowns: PayrollProjectItem[];
+}
+
+export interface PayrollReportResult {
+  items: PayrollLabourSummary[];
+  grandTotal: {
+    totalPayable: number;
+    totalDaysPresent: number;
+    totalHoursWorked: number;
+    totalLabourers: number;
+  };
+  startDate: string;
+  endDate: string;
+}
+
+async function fetchPayrollData(startDate?: string, endDate?: string): Promise<PayrollReportResult> {
+  const [labours, attendanceRecords, projects] = await Promise.all([
+    db.labour.findMany({ orderBy: { name: "asc" } }),
+    db.attendanceRecord.findMany({ orderBy: { date: "asc" } }),
+    db.project.findMany({
+      select: {
+        id: true,
+        customerName: true,
+        location: true,
+        labourLogs: true,
+        labourAssignments: true,
+      },
+    }),
+  ]);
+
+  const projMap = new Map(projects.map((p) => [p.id, p]));
+
+  const defaultStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const defaultEnd = new Date().toISOString().slice(0, 10);
+  const effectiveStart = startDate || defaultStart;
+  const effectiveEnd = endDate || defaultEnd;
+
+  interface DailyLog {
+    labourId: string;
+    labourName: string;
+    date: string;
+    projectId?: string;
+    projectName?: string;
+    projectLocation?: string;
+    status: string;
+    hoursWorked: number;
+    earnedMoney: number;
+  }
+
+  const entryMap = new Map<string, DailyLog>();
+
+  for (const ar of attendanceRecords) {
+    const dateStr = ar.date instanceof Date ? ar.date.toISOString().slice(0, 10) : String(ar.date).slice(0, 10);
+    if (effectiveStart && dateStr < effectiveStart) continue;
+    if (effectiveEnd && dateStr > effectiveEnd) continue;
+
+    const pId = ar.projectId || "GENERAL";
+    const key = `${ar.labourId}_${dateStr}_${pId}`;
+    const proj = ar.projectId ? projMap.get(ar.projectId) : undefined;
+    entryMap.set(key, {
+      labourId: ar.labourId,
+      labourName: ar.labourName || ar.labourId,
+      date: dateStr,
+      projectId: ar.projectId || undefined,
+      projectName: ar.projectName || proj?.customerName || undefined,
+      projectLocation: proj?.location || undefined,
+      status: ar.status,
+      hoursWorked: toNumber(ar.hoursWorked) || 0,
+      earnedMoney: toNumber(ar.earnedMoney) || 0,
+    });
+  }
+
+  for (const p of projects) {
+    for (const lg of p.labourLogs || []) {
+      const lgDateStr = lg.date instanceof Date ? lg.date.toISOString().slice(0, 10) : String(lg.date).slice(0, 10);
+      if (effectiveStart && lgDateStr < effectiveStart) continue;
+      if (effectiveEnd && lgDateStr > effectiveEnd) continue;
+
+      const key = `${lg.labourId}_${lgDateStr}_${p.id}`;
+      if (!entryMap.has(key)) {
+        entryMap.set(key, {
+          labourId: lg.labourId,
+          labourName: lg.labourName || lg.labourId,
+          date: lgDateStr,
+          projectId: p.id,
+          projectName: p.customerName,
+          projectLocation: p.location,
+          status: lg.attendance || "Present",
+          hoursWorked: toNumber(lg.hoursWorked) || 0,
+          earnedMoney: toNumber(lg.earnedMoney || lg.dailyWage) || 0,
+        });
+      }
+    }
+  }
+
+  const allEntries = Array.from(entryMap.values());
+
+  const items: PayrollLabourSummary[] = [];
+  let totalGrandPayable = 0;
+  let totalGrandDays = 0;
+  let totalGrandHours = 0;
+
+  for (const lab of labours) {
+    const labEntries = allEntries.filter((e) => e.labourId === lab.id);
+
+    if (labEntries.length === 0 && lab.isActive === false) {
+      continue;
+    }
+
+    const distinctProjectMap = new Map<string, PayrollProjectItem>();
+    const presentDates = new Set<string>();
+    let labTotalHours = 0;
+    let labTotalEarned = 0;
+
+    for (const entry of labEntries) {
+      const isPresent = entry.status === "Present" || entry.status === "HalfDay" || entry.status === "Overtime" || entry.hoursWorked > 0;
+      if (isPresent) {
+        presentDates.add(entry.date);
+      }
+
+      labTotalHours += entry.hoursWorked;
+      labTotalEarned += entry.earnedMoney;
+
+      const pKey = entry.projectId || "General Duty";
+      const pName = entry.projectName || (entry.projectId ? `Project ${entry.projectId}` : "General Site Duty");
+      const pLocation = entry.projectLocation;
+      const pDisplay = entry.projectId
+        ? `${entry.projectId}${pLocation ? ` — ${pLocation}` : ""}`
+        : "General Site Duty";
+
+      if (!distinctProjectMap.has(pKey)) {
+        distinctProjectMap.set(pKey, {
+          projectId: entry.projectId || "General Duty",
+          projectName: pName,
+          projectLocation: pLocation,
+          projectDisplay: pDisplay,
+          daysWorked: 0,
+          hoursWorked: 0,
+          earnedAmount: 0,
+        });
+      }
+
+      const pItem = distinctProjectMap.get(pKey)!;
+      if (isPresent) pItem.daysWorked += 1;
+      pItem.hoursWorked += entry.hoursWorked;
+      pItem.earnedAmount += entry.earnedMoney;
+    }
+
+    const distinctProjects = Array.from(distinctProjectMap.values()).map((p) => p.projectDisplay);
+    const daysPresent = presentDates.size;
+    const labDailyWage = lab.dailyWage ?? (lab.defaultWeeklyWage ? Math.round(lab.defaultWeeklyWage / 6) : 0);
+
+    totalGrandPayable += labTotalEarned;
+    totalGrandDays += daysPresent;
+    totalGrandHours += labTotalHours;
+
+    items.push({
+      labourId: lab.id,
+      labourName: lab.name,
+      labourType: lab.type,
+      dailyWage: labDailyWage,
+      defaultWeeklyWage: lab.defaultWeeklyWage || (labDailyWage * 6),
+      distinctProjects,
+      daysPresent,
+      totalHours: Number(labTotalHours.toFixed(1)),
+      totalEarned: Math.round(labTotalEarned),
+      projectBreakdowns: Array.from(distinctProjectMap.values()),
+    });
+  }
+
+  return {
+    items,
+    grandTotal: {
+      totalPayable: Math.round(totalGrandPayable),
+      totalDaysPresent: totalGrandDays,
+      totalHoursWorked: Number(totalGrandHours.toFixed(1)),
+      totalLabourers: items.length,
+    },
+    startDate: effectiveStart,
+    endDate: effectiveEnd,
+  };
+}
+
+export const generatePayrollReport = createServerFn({ method: "POST" })
+  .validator((input: { startDate?: string; endDate?: string }) => input)
+  .handler(async ({ data }) => {
+    return fetchPayrollData(data.startDate, data.endDate);
+  });
+
+export const generatePayrollPdfReport = createServerFn({ method: "POST" })
+  .validator((input: { startDate?: string; endDate?: string }) => input)
+  .handler(async ({ data }) => {
+    const payrollData = await fetchPayrollData(data.startDate, data.endDate);
+    const { items, grandTotal, startDate, endDate } = payrollData;
+
+    const dateRangeStr = `${formatPdfDate(startDate)} to ${formatPdfDate(endDate)}`;
+    const nowStr = formatPdfDate(new Date());
+
+    const pdfBuffer = await renderPdf(async (doc) => {
+      // Header
+      doc
+        .fontSize(16)
+        .font("Helvetica-Bold")
+        .fillColor("#0f172a")
+        .text("Robotics Bricks & Blocks — Weekly Payroll Summary", { align: "center" })
+        .moveDown(0.3);
+
+      doc
+        .fontSize(9)
+        .font("Helvetica")
+        .fillColor("#475569")
+        .text(`Period: ${dateRangeStr} | Generated on: ${nowStr} | Total Staff: ${items.length}`, { align: "center" })
+        .moveDown(0.8);
+
+      doc.moveTo(30, doc.y).lineTo(565, doc.y).strokeColor("#cbd5e1").stroke().moveDown(0.8);
+
+      // Top Grand Total Summary KPI Card
+      const summaryY = doc.y;
+      doc.rect(30, summaryY, 535, 48).fillAndStroke("#f0fdf4", "#bbf7d0");
+      doc.fontSize(11).font("Helvetica-Bold").fillColor("#14532d");
+      doc.text(`Total Amount Payable: INR ${grandTotal.totalPayable.toLocaleString("en-IN")}`, 40, summaryY + 10);
+      doc.fontSize(8.5).font("Helvetica").fillColor("#166534");
+      doc.text(`Total Days Worked: ${grandTotal.totalDaysPresent} days | Total Hours: ${grandTotal.totalHoursWorked} hrs | Active Staff: ${items.length}`, 40, summaryY + 28);
+
+      doc.y = summaryY + 58;
+      doc.moveDown(0.4);
+
+      if (items.length === 0) {
+        doc.fontSize(10).fillColor("#64748b").text("No labour activity logged for the selected date range.", { align: "center" });
+        return;
+      }
+
+      // Labour Breakdown Sections
+      doc.fontSize(11).font("Helvetica-Bold").fillColor("#1e293b").text("Workforce Wage & Project Breakdown", 30, doc.y);
+      doc.moveDown(0.4);
+
+      for (const item of items) {
+        if (doc.y > 680) doc.addPage();
+
+        const cardY = doc.y;
+        const breakdownHeight = Math.max(45, 30 + (item.projectBreakdowns.length * 14));
+        doc.rect(30, cardY, 535, breakdownHeight).fillAndStroke("#f8fafc", "#e2e8f0");
+
+        doc.fontSize(9.5).font("Helvetica-Bold").fillColor("#0f172a");
+        doc.text(`${item.labourName} (${item.labourId}) — ${item.labourType} Labour`, 40, cardY + 8);
+        doc.fontSize(9.5).font("Helvetica-Bold").fillColor("#059669").text(`Payable: INR ${item.totalEarned.toLocaleString("en-IN")}`, 410, cardY + 8, { align: "right", width: 145 });
+
+        doc.fontSize(8).font("Helvetica").fillColor("#475569");
+        doc.text(`Days Present: ${item.daysPresent} | Total Hours: ${item.totalHours} hrs | Daily Wage: INR ${item.dailyWage}/day`, 40, cardY + 22);
+
+        let projY = cardY + 36;
+        for (const pb of item.projectBreakdowns) {
+          doc.fontSize(7.5).font("Helvetica").fillColor("#334155");
+          doc.text(`• ${pb.projectDisplay} (${pb.projectName}): ${pb.daysWorked} days, ${pb.hoursWorked} hrs -> INR ${Math.round(pb.earnedAmount).toLocaleString("en-IN")}`, 50, projY);
+          projY += 13;
+        }
+
+        doc.y = cardY + breakdownHeight + 6;
+      }
+
+      // Accounts Signoff Section
+      if (doc.y > 660) doc.addPage();
+      doc.moveDown(1);
+      const signY = doc.y;
+      doc.moveTo(30, signY).lineTo(565, signY).strokeColor("#cbd5e1").stroke().moveDown(0.8);
+
+      const boxY = doc.y;
+      doc.fontSize(8.5).font("Helvetica").fillColor("#64748b");
+      doc.text("Prepared By: ___________________ (Site Supervisor)", 40, boxY + 10);
+      doc.text("Verified & Approved: ___________________ (Accounts / CEO)", 300, boxY + 10);
+      doc.y = boxY + 30;
+    });
+
+    const fileDateStr = `${formatPdfDate(startDate)}-to-${formatPdfDate(endDate)}`;
+    return {
+      base64: pdfBuffer.toString("base64"),
+      filename: `weekly-payroll-report-${fileDateStr}.pdf`,
+    };
+  });
+

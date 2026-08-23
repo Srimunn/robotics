@@ -49,6 +49,7 @@ const enquiryCreate = z.object({
   workCommittedDate: z.preprocess(preprocessDate, z.coerce.date().optional().nullable()),
   actualWorkStartedDate: z.preprocess(preprocessDate, z.coerce.date().optional().nullable()),
   customerStatus: z.string().optional().nullable(),
+  createdByRole: z.string().optional().nullable(),
 });
 
 export const addEnquiry = createServerFn({ method: "POST" })
@@ -86,7 +87,8 @@ export const addEnquiry = createServerFn({ method: "POST" })
         actualWorkStartedDate: data.actualWorkStartedDate ?? undefined,
         customerDecision: "FollowUp",
         customerStatus: data.customerStatus ?? "Prospective",
-      },
+        createdByRole: data.createdByRole ?? undefined,
+      } as any,
     });
     return formatEnquiry(created);
   });
@@ -244,7 +246,8 @@ export const approveAndConvertEnquiryToProject = createServerFn({ method: "POST"
           balanceAmount: costValue,
           paymentStatus: "Pending",
           internalNotes: `Auto-inherited from Approved Enquiry ${enq.id}.`,
-        },
+          createdByRole: (enq as any).createdByRole ?? undefined,
+        } as any,
       });
 
       // Seed initial activity log

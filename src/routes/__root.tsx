@@ -257,7 +257,7 @@ function MainHeader() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="gap-2 rounded-lg px-2 text-xs">
                 <div className="h-6 w-6 rounded-full bg-blue-100 text-blue-700 font-bold grid place-items-center text-[10px]">
-                  {currentUser?.role === "CEO" ? "CEO" : "SP"}
+                  {currentUser?.role === "CEO" ? "CEO" : (currentUser?.subRole || "SP")}
                 </div>
                 <span className="hidden md:inline font-medium text-foreground">{currentUser?.name || "Admin User"}</span>
               </Button>
@@ -266,7 +266,7 @@ function MainHeader() {
               <DropdownMenuLabel>
                 <p className="text-xs font-semibold">{currentUser?.name || "Service Admin"}</p>
                 <p className="text-[10px] text-muted-foreground font-normal">
-                  {currentUser?.role === "CEO" ? "CEO / Super Admin" : "Supervisor / Staff"}
+                  {currentUser?.role === "CEO" ? "CEO / Super Admin" : `${currentUser?.subRole || "Supervisor"} / Staff`}
                 </p>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />

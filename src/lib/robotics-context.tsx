@@ -193,7 +193,7 @@ const defaultSettings: SystemSettings = {
 
 type RoboticsContextType = {
   currentUser: CurrentUser | null;
-  login: (role: "CEO" | "Worker" | "Labor", loginIdOrId?: string, pin?: string) => boolean;
+  login: (role: "CEO" | "Worker" | "Labor" | "RS" | "CS" | "BS", loginIdOrId?: string, pin?: string) => boolean;
   logout: (isAutoTimeout?: boolean) => void;
   isLoading: boolean;
 
@@ -557,7 +557,7 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   };
 
   // ---------- Login / Logout ----------
-  const login = (role: "CEO" | "Worker" | "Labor", loginIdOrId?: string, pin?: string): boolean => {
+  const login = (role: "CEO" | "Worker" | "Labor" | "RS" | "CS" | "BS", loginIdOrId?: string, pin?: string): boolean => {
     if (!pin || !pin.trim()) { toast.error("Security PIN is required"); return false; }
     const trimmedPin = pin.trim();
     if (role === "CEO") {
@@ -566,10 +566,22 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
       toast.success("Welcome back, CEO!");
       return true;
     }
-    if (role === "Worker") {
-      if (trimmedPin !== "5678") { toast.error("Incorrect Supervisor PIN"); return false; }
-      setCurrentUser({ role: "Worker", name: "Operations Supervisor" });
-      toast.success("Supervisor session initiated");
+    if (role === "RS" || (role === "Worker" && !loginIdOrId)) {
+      if (trimmedPin !== "5678") { toast.error("Incorrect Robotics Service PIN"); return false; }
+      setCurrentUser({ role: "Worker", subRole: "RS", name: "Robotics Service" });
+      toast.success("Robotics Service session initiated");
+      return true;
+    }
+    if (role === "CS") {
+      if (trimmedPin !== "2468") { toast.error("Incorrect Construction Solutions PIN"); return false; }
+      setCurrentUser({ role: "Worker", subRole: "CS", name: "Construction Solutions" });
+      toast.success("Construction Solutions session initiated");
+      return true;
+    }
+    if (role === "BS") {
+      if (trimmedPin !== "8642") { toast.error("Incorrect Builder Supply PIN"); return false; }
+      setCurrentUser({ role: "Worker", subRole: "BS", name: "Builder Supply" });
+      toast.success("Builder Supply session initiated");
       return true;
     }
     if (role === "Labor") {
@@ -662,7 +674,12 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   // Enquiries
   const addEnquiryM = useMutation({
     mutationFn: async (input: Omit<Enquiry, "id" | "createdAt" | "customerDecision" | "siteVisitStatus">) => {
-      const created = await addEnquiryFn({ data: input as any });
+      const creatorRole = currentUser?.role === "CEO" ? "CEO" : (currentUser?.subRole || (currentUser?.role === "Worker" ? "RS" : undefined));
+      const payload = {
+        ...input,
+        createdByRole: input.createdByRole || creatorRole,
+      };
+      const created = await addEnquiryFn({ data: payload as any });
       return mapEnquiryFromDb(created as any);
     },
     onSuccess: (created) => { invalidate("enquiries", "customers", "masterData"); toast.success(`Enquiry ${created.id} created for ${created.customerName}`); },

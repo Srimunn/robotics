@@ -117,14 +117,14 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-slate-200 p-3 bg-white space-y-2">
         <div className="flex items-center gap-2.5 p-1 text-left">
           <div className="h-7 w-7 rounded-lg bg-slate-100 text-slate-800 font-bold grid place-items-center text-[10px] border border-slate-200 shrink-0">
-            {currentUser?.role === "CEO" ? "CEO" : "WK"}
+            {currentUser?.role === "CEO" ? "CEO" : (currentUser?.subRole || "WK")}
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-xs font-bold text-slate-900 truncate leading-tight">
               {currentUser?.name || "User"}
             </p>
             <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">
-              {currentUser?.role === "CEO" ? "Admin" : currentUser?.role === "Worker" ? "Worker" : "Manager"}
+              {currentUser?.role === "CEO" ? "Admin" : (currentUser?.subRole ? `${currentUser.subRole} Manager` : "Worker")}
             </p>
           </div>
         </div>
