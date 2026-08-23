@@ -339,6 +339,7 @@ model ProjectLabourAssignment {
   labourName   String
   labourType   LabourType
   weeklyWage   Int
+  dailyWage    Int?
   assignedDate DateTime
   isActive     Boolean    @default(true)
 
@@ -468,6 +469,7 @@ model AttendanceRecord {
   earnedMoney           Int?
   workDescription       String?
   weeklyWage            Int?
+  dailyWage             Int?
   remarks               String?
   inPhotoUrl            String?
   outPhotoUrl           String?

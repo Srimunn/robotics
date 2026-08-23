@@ -10,6 +10,7 @@ import {
   generateAttendanceReport,
   generateSingleProjectReport,
   generatePayrollPdfReport,
+  generatePayrollReport,
 } from "../src/server/reports";
 
 /**
@@ -412,11 +413,15 @@ async function runSmokeTest() {
         if (!detailPdf?.base64 || detailPdf.base64.length < 100) throw new Error("Detailed Project PDF failed");
       }
 
+      const payrollData = await callServerFn(generatePayrollReport, {});
+      if (!payrollData?.items || payrollData.items.length === 0) throw new Error("Payroll data returned empty");
+      console.log(`     ↳ Payroll Data: ${payrollData.items.length} labourers (all Permanent: ${payrollData.items.filter((i: any) => i.labourType === 'Permanent').length}, Contract: ${payrollData.items.filter((i: any) => i.labourType === 'Contract').length}), Total: ₹${payrollData.grandTotal.totalPayable.toLocaleString('en-IN')}`);
+
       const payrollPdf = await callServerFn(generatePayrollPdfReport, {});
       if (!payrollPdf?.base64 || payrollPdf.base64.length < 100) throw new Error("Payroll Report PDF failed");
 
       passedCount++;
-      console.log(`  ✅ Check 9 Passed: All 4 PDF reports (Projects, Attendance, Detailed, Payroll) generated successfully with valid base64 buffers.`);
+      console.log(`  ✅ Check 9 Passed: All 4 PDF reports and Payroll Summary dataset verified.`);
     } catch (err: any) {
       console.log(`  ❌ Check 9 Failed: ${err.message}`);
     }

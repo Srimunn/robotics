@@ -7,6 +7,7 @@ import { cleanPhone, generateSafeId } from "./utils";
 
 export const listLabours = createServerFn({ method: "GET" }).handler(async () => {
   return db.labour.findMany({
+    where: { isActive: true },
     orderBy: { name: "asc" },
     include: { wageHistory: { orderBy: { assignedDate: "desc" } } },
   });

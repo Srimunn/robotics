@@ -31,6 +31,7 @@ import { createServerFn } from "@tanstack/react-start";
 import PDFDocument from "pdfkit/js/pdfkit.standalone.js";
 import { db } from "~/lib/db";
 import { toNumber } from "./utils";
+import { calculateEarnedWage } from "./calculations";
 
 /** Helper to validate if an ArrayBuffer has JPEG or PNG magic byte headers for PDFKit image parser */
 function isValidPdfImageBuffer(buf: ArrayBuffer | Buffer | null): boolean {
@@ -386,11 +387,13 @@ export const generateAttendanceReport = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { startDate, endDate, labourId } = data;
 
-    const [attendanceRecords, projects] = await Promise.all([
+    const [attendanceRecords, projects, activeLabours] = await Promise.all([
       db.attendanceRecord.findMany({ orderBy: { date: "desc" } }),
       db.project.findMany({ select: { id: true, customerName: true, location: true, labourLogs: true } }),
+      db.labour.findMany({ where: { isActive: true }, select: { id: true, name: true } }),
     ]);
 
+    const activeLabSet = new Set(activeLabours.map((l) => l.id));
     const projMap = new Map(projects.map((p) => [p.id, p]));
 
     interface LogItem {
@@ -411,6 +414,7 @@ export const generateAttendanceReport = createServerFn({ method: "POST" })
     const logMap = new Map<string, LogItem>();
 
     for (const ar of attendanceRecords) {
+      if (!activeLabSet.has(ar.labourId)) continue;
       const dateStr = ar.date instanceof Date ? ar.date.toISOString().slice(0, 10) : String(ar.date).slice(0, 10);
       const key = `${ar.labourId}_${dateStr}`;
       const proj = ar.projectId ? projMap.get(ar.projectId) : undefined;
@@ -432,6 +436,7 @@ export const generateAttendanceReport = createServerFn({ method: "POST" })
 
     for (const p of projects) {
       for (const lg of p.labourLogs || []) {
+        if (!activeLabSet.has(lg.labourId)) continue;
         const lgDateStr = lg.date instanceof Date ? lg.date.toISOString().slice(0, 10) : String(lg.date).slice(0, 10);
         const key = `${lg.labourId}_${lgDateStr}`;
         if (!logMap.has(key)) {
@@ -825,7 +830,7 @@ export interface PayrollReportResult {
 
 async function fetchPayrollData(startDate?: string, endDate?: string): Promise<PayrollReportResult> {
   const [labours, attendanceRecords, projects] = await Promise.all([
-    db.labour.findMany({ orderBy: { name: "asc" } }),
+    db.labour.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
     db.attendanceRecord.findMany({ orderBy: { date: "asc" } }),
     db.project.findMany({
       select: {
@@ -838,6 +843,7 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
     }),
   ]);
 
+  const activeLabMap = new Map(labours.map((l) => [l.id, l]));
   const projMap = new Map(projects.map((p) => [p.id, p]));
 
   const defaultStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -860,44 +866,54 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
   const entryMap = new Map<string, DailyLog>();
 
   for (const ar of attendanceRecords) {
+    if (!activeLabMap.has(ar.labourId)) continue;
     const dateStr = ar.date instanceof Date ? ar.date.toISOString().slice(0, 10) : String(ar.date).slice(0, 10);
     if (effectiveStart && dateStr < effectiveStart) continue;
     if (effectiveEnd && dateStr > effectiveEnd) continue;
+
+    const lab = activeLabMap.get(ar.labourId)!;
+    const labDailyWage = lab.dailyWage ?? (lab.defaultWeeklyWage ? Math.round(lab.defaultWeeklyWage / 6) : 0);
+    const earned = calculateEarnedWage(labDailyWage, ar.status, ar.hoursWorked ? Number(ar.hoursWorked) : 8);
 
     const pId = ar.projectId || "GENERAL";
     const key = `${ar.labourId}_${dateStr}_${pId}`;
     const proj = ar.projectId ? projMap.get(ar.projectId) : undefined;
     entryMap.set(key, {
       labourId: ar.labourId,
-      labourName: ar.labourName || ar.labourId,
+      labourName: ar.labourName || lab.name,
       date: dateStr,
       projectId: ar.projectId || undefined,
       projectName: ar.projectName || proj?.customerName || undefined,
       projectLocation: proj?.location || undefined,
       status: ar.status,
       hoursWorked: toNumber(ar.hoursWorked) || 0,
-      earnedMoney: toNumber(ar.earnedMoney) || 0,
+      earnedMoney: earned,
     });
   }
 
   for (const p of projects) {
     for (const lg of p.labourLogs || []) {
+      if (!activeLabMap.has(lg.labourId)) continue;
       const lgDateStr = lg.date instanceof Date ? lg.date.toISOString().slice(0, 10) : String(lg.date).slice(0, 10);
       if (effectiveStart && lgDateStr < effectiveStart) continue;
       if (effectiveEnd && lgDateStr > effectiveEnd) continue;
+
+      const lab = activeLabMap.get(lg.labourId)!;
+      const labDailyWage = lab.dailyWage ?? (lab.defaultWeeklyWage ? Math.round(lab.defaultWeeklyWage / 6) : 0);
+      const earned = calculateEarnedWage(labDailyWage, lg.attendance, lg.hoursWorked ? Number(lg.hoursWorked) : 8);
 
       const key = `${lg.labourId}_${lgDateStr}_${p.id}`;
       if (!entryMap.has(key)) {
         entryMap.set(key, {
           labourId: lg.labourId,
-          labourName: lg.labourName || lg.labourId,
+          labourName: lg.labourName || lab.name,
           date: lgDateStr,
           projectId: p.id,
           projectName: p.customerName,
           projectLocation: p.location,
           status: lg.attendance || "Present",
           hoursWorked: toNumber(lg.hoursWorked) || 0,
-          earnedMoney: toNumber(lg.earnedMoney || lg.dailyWage) || 0,
+          earnedMoney: earned,
         });
       }
     }
