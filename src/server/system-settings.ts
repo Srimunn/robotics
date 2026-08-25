@@ -3,6 +3,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "~/lib/db";
+import { assertCanEdit } from "./permissions";
 
 export const getSettings = createServerFn({ method: "GET" }).handler(async () => {
   const s = await db.systemSettings.findUnique({ where: { id: "singleton" } });
@@ -23,13 +24,18 @@ const updateSettingsSchema = z.object({
   defaultWeeklyWageContract: z.number().int().optional(),
   defaultDailyWagePermanent: z.number().int().nullable().optional(),
   defaultDailyWageContract: z.number().int().nullable().optional(),
+  requestedByRole: z.string().optional().nullable(),
+  requestedBySubRole: z.string().optional().nullable(),
 });
 
 export const updateSettings = createServerFn({ method: "POST" })
   .validator((input: unknown) => updateSettingsSchema.parse(input))
   .handler(async ({ data }) => {
+    assertCanEdit(data);
+    const { requestedByRole, requestedBySubRole, ...settingsData } = data;
     return db.systemSettings.update({
       where: { id: "singleton" },
-      data,
+      data: settingsData,
     });
   });
+

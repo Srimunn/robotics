@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useRobotics } from "@/lib/robotics-context";
+import { canEdit } from "@/lib/permissions";
 import type { PaymentMode, PaymentStatus, Project } from "@/lib/robotics-types";
 import { DataPagination } from "@/components/ui/DataPagination";
 import { DeleteConfirm } from "@/components/delete-confirm";
@@ -83,7 +84,9 @@ function getDaysOverdue(dueDate: string, balance: number) {
 }
 
 function PaymentsComponent() {
-  const { payments, projects, customers, addPayment, deletePayment, updateFollowUpTag } = useRobotics();
+  const { payments, projects, customers, addPayment, deletePayment, updateFollowUpTag, currentUser } = useRobotics();
+
+  const canFullEdit = canEdit(currentUser);
 
   const [activeTab, setActiveTab] = useState<"RECEIVABLES" | "HISTORY" | "CUSTOMER">("RECEIVABLES");
   const [searchQuery, setSearchQuery] = useState("");
@@ -254,13 +257,15 @@ function PaymentsComponent() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            onClick={() => handleOpenReceivePayment()}
-            className="text-xs font-semibold h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-sm"
-          >
-            <Plus className="h-4 w-4" />
-            Receive Payment
-          </Button>
+          {canFullEdit && (
+            <Button
+              onClick={() => handleOpenReceivePayment()}
+              className="text-xs font-semibold h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-sm"
+            >
+              <Plus className="h-4 w-4" />
+              Receive Payment
+            </Button>
+          )}
         </div>
       </div>
 
@@ -471,13 +476,15 @@ function PaymentsComponent() {
                           <p className="text-base font-semibold text-foreground">No payments recorded.</p>
                           <p className="text-xs text-muted-foreground">Record project advance or milestone stage payments to populate receivables ledger.</p>
                         </div>
-                        <Button
-                          size="sm"
-                          onClick={() => setReceiveOpen(true)}
-                          className="mt-2 bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 rounded-lg shadow-xs"
-                        >
-                          <Plus className="h-4 w-4" /> Receive Payment
-                        </Button>
+                        {canFullEdit && (
+                          <Button
+                            size="sm"
+                            onClick={() => setReceiveOpen(true)}
+                            className="mt-2 bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 rounded-lg shadow-xs"
+                          >
+                            <Plus className="h-4 w-4" /> Receive Payment
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -493,28 +500,34 @@ function PaymentsComponent() {
                             <div className="font-bold text-xs text-foreground flex items-center gap-1">
                               <User className="h-3 w-3 text-muted-foreground shrink-0" /> {proj.customerName}
                             </div>
-                            <Select
-                              value={proj.followUpTag || "NONE"}
-                              onValueChange={async (val) => {
-                                const newTag = val === "NONE" ? null : (val as "MD" | "Team");
-                                await updateFollowUpTag(proj.id, newTag);
-                              }}
-                            >
-                              <SelectTrigger className="h-5 text-[10px] px-1.5 py-0 font-bold rounded border-0 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 shadow-none w-auto gap-0.5">
-                                {proj.followUpTag === "MD" ? (
-                                  <Badge className="bg-blue-100 text-blue-800 border-blue-200 font-extrabold text-[10px] px-1.5 py-0">MD</Badge>
-                                ) : proj.followUpTag === "Team" ? (
-                                  <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-extrabold text-[10px] px-1.5 py-0">Team</Badge>
-                                ) : (
-                                  <span className="text-slate-400 font-medium text-[10px] hover:underline">+ Tag</span>
-                                )}
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="NONE" className="text-xs font-medium">No Tag</SelectItem>
-                                <SelectItem value="MD" className="text-xs font-bold text-blue-700">MD</SelectItem>
-                                <SelectItem value="Team" className="text-xs font-bold text-slate-700">Team</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            {canFullEdit ? (
+                              <Select
+                                value={proj.followUpTag || "NONE"}
+                                onValueChange={async (val) => {
+                                  const newTag = val === "NONE" ? null : (val as "MD" | "Team");
+                                  await updateFollowUpTag(proj.id, newTag);
+                                }}
+                              >
+                                <SelectTrigger className="h-5 text-[10px] px-1.5 py-0 font-bold rounded border-0 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 shadow-none w-auto gap-0.5">
+                                  {proj.followUpTag === "MD" ? (
+                                    <Badge className="bg-blue-100 text-blue-800 border-blue-200 font-extrabold text-[10px] px-1.5 py-0">MD</Badge>
+                                  ) : proj.followUpTag === "Team" ? (
+                                    <Badge className="bg-slate-100 text-slate-700 border-slate-200 font-extrabold text-[10px] px-1.5 py-0">Team</Badge>
+                                  ) : (
+                                    <span className="text-slate-400 font-medium text-[10px] hover:underline">+ Tag</span>
+                                  )}
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="NONE" className="text-xs font-medium">No Tag</SelectItem>
+                                  <SelectItem value="MD" className="text-xs font-bold text-blue-700">MD</SelectItem>
+                                  <SelectItem value="Team" className="text-xs font-bold text-slate-700">Team</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : proj.followUpTag ? (
+                              <Badge className={proj.followUpTag === "MD" ? "bg-blue-100 text-blue-800 border-blue-200 font-extrabold text-[10px] px-1.5 py-0" : "bg-slate-100 text-slate-700 border-slate-200 font-extrabold text-[10px] px-1.5 py-0"}>
+                                {proj.followUpTag}
+                              </Badge>
+                            ) : null}
                           </div>
                           <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
                             <span>{proj.phone}</span>
@@ -584,7 +597,7 @@ function PaymentsComponent() {
                         </TableCell>
 
                         <TableCell className="text-right pr-4 whitespace-nowrap">
-                          {proj.balanceAmount > 0 && (
+                          {canFullEdit && proj.balanceAmount > 0 && (
                             <Button
                               size="sm"
                               onClick={() => handleOpenReceivePayment(proj.id, proj.balanceAmount)}
@@ -692,15 +705,17 @@ function PaymentsComponent() {
                         </TableCell>
 
                         <TableCell className="text-right pr-4">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => setDeletePaymentTargetId(pay.id)}
-                            title="Delete Payment Record"
-                            className="h-7 w-7 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          {canFullEdit && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setDeletePaymentTargetId(pay.id)}
+                              title="Delete Payment Record"
+                              className="h-7 w-7 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     );

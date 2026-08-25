@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useRobotics, calculateEarnedWage, calculateHoursFromTimes } from "@/lib/robotics-context";
+import { canEdit } from "@/lib/permissions";
 import type { Labour, LabourType } from "@/lib/robotics-types";
 import { SmartComboBox } from "@/components/ui/SmartComboBox";
 import { DataPagination } from "@/components/ui/DataPagination";
@@ -154,7 +155,7 @@ function LaboursComponent() {
   const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<Labour | null>(null);
   const [reactivateConfirmTarget, setReactivateConfirmTarget] = useState<Labour | null>(null);
 
-  const isManagerOrCeo = currentUser?.role === "CEO" || currentUser?.role === "Worker";
+  const canFullEdit = canEdit(currentUser);
 
   const [editOpen, setEditOpen] = useState(false);
   const [editTargetLabour, setEditTargetLabour] = useState<Labour | null>(null);
@@ -465,25 +466,27 @@ function LaboursComponent() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Labours</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={() => {
-              const activeList = labours.filter((l) => l.isActive !== false);
-              if (activeList.length > 0) setAttLabourId(activeList[0].id);
-              if (projects.length > 0) setAttProjectId(projects[0].id);
-              setMarkAttendanceOpen(true);
-            }}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold gap-1.5 shadow-xs"
-          >
-            <CalendarCheck className="h-4 w-4" /> Mark Attendance
-          </Button>
-          <Button
-            onClick={() => setAddOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1.5 shadow-xs"
-          >
-            <Plus className="h-4 w-4" /> Add Labour
-          </Button>
-        </div>
+        {canFullEdit && (
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => {
+                const activeList = labours.filter((l) => l.isActive !== false);
+                if (activeList.length > 0) setAttLabourId(activeList[0].id);
+                if (projects.length > 0) setAttProjectId(projects[0].id);
+                setMarkAttendanceOpen(true);
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold gap-1.5 shadow-xs"
+            >
+              <CalendarCheck className="h-4 w-4" /> Mark Attendance
+            </Button>
+            <Button
+              onClick={() => setAddOpen(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1.5 shadow-xs"
+            >
+              <Plus className="h-4 w-4" /> Add Labour
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Navigation Tabs */}
@@ -609,9 +612,11 @@ function LaboursComponent() {
                   <HardHat className="h-8 w-8 text-muted-foreground mx-auto mb-2 opacity-50 stroke-[1.5]" />
                   <p className="text-sm font-semibold text-foreground">No labour workforce registered.</p>
                   <p className="text-xs text-muted-foreground mt-1">Add workers to assign to site projects.</p>
-                  <Button size="sm" onClick={() => setAddOpen(true)} className="mt-3 bg-blue-600 hover:bg-blue-700 text-white gap-1 rounded-lg">
-                    <Plus className="h-3.5 w-3.5" /> Add Labour
-                  </Button>
+                  {canFullEdit && (
+                    <Button size="sm" onClick={() => setAddOpen(true)} className="mt-3 bg-blue-600 hover:bg-blue-700 text-white gap-1 rounded-lg">
+                      <Plus className="h-3.5 w-3.5" /> Add Labour
+                    </Button>
+                  )}
                 </div>
               ) : (
                 filteredLabours.map((l) => {
@@ -721,8 +726,8 @@ function LaboursComponent() {
                       </div>
 
                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          {isManagerOrCeo && (
+                        {canFullEdit && (
+                          <div className="flex items-center gap-2">
                             <Button
                               size="sm"
                               variant="outline"
@@ -731,39 +736,39 @@ function LaboursComponent() {
                             >
                               <Edit className="h-3.5 w-3.5" /> Edit Profile
                             </Button>
-                          )}
 
-                          {activeLabour.isActive === false ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setReactivateConfirmTarget(activeLabour)}
-                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300 text-xs font-bold rounded-lg gap-1 shadow-2xs"
-                            >
-                              <UserCheck className="h-3.5 w-3.5" /> Reactivate
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setDeactivateConfirmTarget(activeLabour)}
-                              className="bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300 text-xs font-bold rounded-lg gap-1 shadow-2xs"
-                            >
-                              <AlertTriangle className="h-3.5 w-3.5 text-amber-600" /> Deactivate
-                            </Button>
-                          )}
+                            {activeLabour.isActive === false ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setReactivateConfirmTarget(activeLabour)}
+                                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300 text-xs font-bold rounded-lg gap-1 shadow-2xs"
+                              >
+                                <UserCheck className="h-3.5 w-3.5" /> Reactivate
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setDeactivateConfirmTarget(activeLabour)}
+                                className="bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300 text-xs font-bold rounded-lg gap-1 shadow-2xs"
+                              >
+                                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" /> Deactivate
+                              </Button>
+                            )}
 
-                          {!hasLabourHistory(activeLabour.id) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setDeleteConfirmTarget(activeLabour)}
-                              className="bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-300 text-xs font-bold rounded-lg gap-1 shadow-2xs"
-                            >
-                              <Trash2 className="h-3.5 w-3.5 text-rose-600" /> Delete Permanently
-                            </Button>
-                          )}
-                        </div>
+                            {!hasLabourHistory(activeLabour.id) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setDeleteConfirmTarget(activeLabour)}
+                                className="bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-300 text-xs font-bold rounded-lg gap-1 shadow-2xs"
+                              >
+                                <Trash2 className="h-3.5 w-3.5 text-rose-600" /> Delete Permanently
+                              </Button>
+                            )}
+                          </div>
+                        )}
 
                         <div className="text-left sm:text-right bg-emerald-50 p-3 rounded-xl border border-emerald-100">
                           <span className="text-[10px] uppercase font-bold text-emerald-900">Daily Wage (₹/day)</span>
@@ -806,7 +811,7 @@ function LaboursComponent() {
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
-                            {isManagerOrCeo && (
+                            {canFullEdit && (
                               <Button
                                 type="button"
                                 size="sm"
@@ -1309,57 +1314,55 @@ function LaboursComponent() {
                         <Badge className="bg-emerald-100 text-emerald-800 text-[10px]">{l.status}</Badge>
                       </td>
                       <td className="p-3 text-right pr-4">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {isManagerOrCeo && (
-                            <>
+                        {canFullEdit && (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenEdit(l)}
+                              className="h-7 text-[11px] font-bold text-blue-700 border-blue-300 hover:bg-blue-50 rounded-lg gap-1"
+                            >
+                              <Edit className="h-3 w-3" /> Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleResetPin(l.id)}
+                              className="h-7 text-[11px] font-bold text-purple-700 border-purple-300 hover:bg-purple-50 rounded-lg gap-1"
+                            >
+                              <KeyRound className="h-3 w-3" /> Reset PIN
+                            </Button>
+                            {l.isActive === false ? (
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleOpenEdit(l)}
-                                className="h-7 text-[11px] font-bold text-blue-700 border-blue-300 hover:bg-blue-50 rounded-lg gap-1"
+                                onClick={() => setReactivateConfirmTarget(l)}
+                                className="h-7 text-[11px] font-bold text-emerald-700 border-emerald-300 hover:bg-emerald-50 rounded-lg gap-1"
                               >
-                                <Edit className="h-3 w-3" /> Edit
+                                <UserCheck className="h-3 w-3" /> Reactivate
                               </Button>
+                            ) : (
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleResetPin(l.id)}
-                                className="h-7 text-[11px] font-bold text-purple-700 border-purple-300 hover:bg-purple-50 rounded-lg gap-1"
+                                onClick={() => setDeactivateConfirmTarget(l)}
+                                className="h-7 text-[11px] font-bold text-amber-800 border-amber-300 hover:bg-amber-50 rounded-lg gap-1"
                               >
-                                <KeyRound className="h-3 w-3" /> Reset PIN
+                                <AlertTriangle className="h-3 w-3 text-amber-600" /> Deactivate
                               </Button>
-                            </>
-                          )}
-                          {l.isActive === false ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setReactivateConfirmTarget(l)}
-                              className="h-7 text-[11px] font-bold text-emerald-700 border-emerald-300 hover:bg-emerald-50 rounded-lg gap-1"
-                            >
-                              <UserCheck className="h-3 w-3" /> Reactivate
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setDeactivateConfirmTarget(l)}
-                              className="h-7 text-[11px] font-bold text-amber-800 border-amber-300 hover:bg-amber-50 rounded-lg gap-1"
-                            >
-                              <AlertTriangle className="h-3 w-3 text-amber-600" /> Deactivate
-                            </Button>
-                          )}
-                          {!hasLabourHistory(l.id) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setDeleteConfirmTarget(l)}
-                              className="h-7 text-[11px] font-bold text-rose-700 border-rose-300 hover:bg-rose-50 rounded-lg gap-1"
-                            >
-                              <Trash2 className="h-3 w-3 text-rose-600" /> Delete
-                            </Button>
-                          )}
-                        </div>
+                            )}
+                            {!hasLabourHistory(l.id) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setDeleteConfirmTarget(l)}
+                                className="h-7 text-[11px] font-bold text-rose-700 border-rose-300 hover:bg-rose-50 rounded-lg gap-1"
+                              >
+                                <Trash2 className="h-3 w-3 text-rose-600" /> Delete
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}

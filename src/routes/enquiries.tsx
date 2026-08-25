@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { uploadImage } from "~/server/upload";
 import { cn } from "@/lib/utils";
 import { useRobotics } from "@/lib/robotics-context";
+import { canEdit, canConvertEnquiry } from "@/lib/permissions";
 import type { Enquiry, CustomerDecision, SiteVisitStatus } from "@/lib/robotics-types";
 import { SmartComboBox } from "@/components/ui/SmartComboBox";
 import { DataPagination } from "@/components/ui/DataPagination";
@@ -78,7 +79,12 @@ function EnquiriesComponent() {
     deleteEnquiry,
     approveAndConvertEnquiryToProject,
     checkEngineerAvailability,
+    currentUser,
   } = useRobotics();
+
+  const canConvert = canConvertEnquiry(currentUser);
+  const canFullEdit = canEdit(currentUser);
+
   const navigate = useNavigate();
   const { filter } = Route.useSearch();
   const initialDecisionFilter = filter === "todayVisits" ? "Today's Visits" : "ALL";
@@ -520,7 +526,7 @@ function EnquiriesComponent() {
                             </SelectTrigger>
                             <SelectContent className="rounded-xl">
                               <SelectItem value="Follow Up">Follow Up</SelectItem>
-                              <SelectItem value="Approved">Approved</SelectItem>
+                              <SelectItem value="Approved" disabled={!canConvert}>Approved</SelectItem>
                               <SelectItem value="Cancelled">Cancelled</SelectItem>
                             </SelectContent>
                           </Select>
@@ -535,7 +541,7 @@ function EnquiriesComponent() {
                               >
                                 <CheckCircle2 className="h-3.5 w-3.5" /> View Project &rarr;
                               </Button>
-                            ) : enq.customerDecision === "Approved" ? (
+                            ) : enq.customerDecision === "Approved" && canConvert ? (
                               <Button
                                 size="sm"
                                 onClick={() => handleConvert(enq.id)}
@@ -554,15 +560,17 @@ function EnquiriesComponent() {
                               </Button>
                             )}
 
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setDeleteTargetId(enq.id)}
-                              className="h-7 w-7 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                              title="Delete Enquiry"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+                            {canFullEdit && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setDeleteTargetId(enq.id)}
+                                className="h-7 w-7 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                                title="Delete Enquiry"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -630,7 +638,7 @@ function EnquiriesComponent() {
                         </Button>
                       );
                     }
-                    if (activeEnquiry.customerDecision === "Approved") {
+                    if (activeEnquiry.customerDecision === "Approved" && canConvert) {
                       return (
                         <Button
                           onClick={() => handleConvert(activeEnquiry.id)}
@@ -968,7 +976,7 @@ function EnquiriesComponent() {
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
                           <SelectItem value="Follow Up">Follow Up</SelectItem>
-                          <SelectItem value="Approved">Approved</SelectItem>
+                          <SelectItem value="Approved" disabled={!canConvert}>Approved</SelectItem>
                           <SelectItem value="Cancelled">Cancelled</SelectItem>
                         </SelectContent>
                       </Select>
@@ -1012,15 +1020,19 @@ function EnquiriesComponent() {
                       <div>
                         <p className="font-bold text-emerald-950">Customer Has Approved Quotation!</p>
                         <p className="text-[11px] text-emerald-800 mt-0.5">
-                          Click "Convert To Project" to generate project record automatically with 100% inherited enquiry data. Zero re-entry required!
+                          {canConvert
+                            ? `Click "Convert To Project" to generate project record automatically with 100% inherited enquiry data. Zero re-entry required!`
+                            : `Quotation is marked Approved. Conversion to Project can be initiated by Management (RS/CEO).`}
                         </p>
                       </div>
-                      <Button
-                        onClick={() => handleConvert(activeEnquiry.id)}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs gap-1.5 shadow-xs whitespace-nowrap"
-                      >
-                        <Sparkles className="h-4 w-4" /> Convert To Project
-                      </Button>
+                      {canConvert && (
+                        <Button
+                          onClick={() => handleConvert(activeEnquiry.id)}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs gap-1.5 shadow-xs whitespace-nowrap"
+                        >
+                          <Sparkles className="h-4 w-4" /> Convert To Project
+                        </Button>
+                      )}
                     </div>
                   )}
                 </CardContent>
@@ -1028,7 +1040,7 @@ function EnquiriesComponent() {
             </div>
 
             <DialogFooter className="pt-3 border-t flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
-              {activeEnquiry.customerDecision === "Approved" && !activeEnquiry.projectId && (
+              {activeEnquiry.customerDecision === "Approved" && !activeEnquiry.projectId && canConvert && (
                 <Button
                   type="button"
                   onClick={() => {

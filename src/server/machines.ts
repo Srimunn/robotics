@@ -6,6 +6,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { db } from "~/lib/db";
 import { generateSafeId } from "./utils";
 import type { MachineCondition, StockActionType } from "@prisma/client";
+import { assertCanEdit } from "./permissions";
 
 export const issueMachineToProject = createServerFn({ method: "POST" })
   .validator(
@@ -17,9 +18,12 @@ export const issueMachineToProject = createServerFn({ method: "POST" })
       expectedReturnDate?: string | null;
       issuedBy: string;
       remarks?: string;
+      requestedByRole?: string | null;
+      requestedBySubRole?: string | null;
     }) => input
   )
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     return db.$transaction(async (tx) => {
       const machine = await tx.machine.findUnique({ where: { id: data.machineId } });
       if (!machine) throw new Error("Machine not found");
@@ -97,9 +101,12 @@ export const returnMachineFromProject = createServerFn({ method: "POST" })
       condition: MachineCondition;
       returnRemarks?: string;
       returnedBy?: string;
+      requestedByRole?: string | null;
+      requestedBySubRole?: string | null;
     }) => input
   )
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     return db.$transaction(async (tx) => {
       const rec = await tx.machineIssueRecord.findUnique({ where: { id: data.issueRecordId } });
       if (!rec) throw new Error("Issue record not found");

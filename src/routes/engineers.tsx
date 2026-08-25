@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useRobotics } from "@/lib/robotics-context";
+import { canEdit } from "@/lib/permissions";
 import type { Engineer } from "@/lib/robotics-types";
 import {
   UserCheck,
@@ -56,6 +57,8 @@ export const Route = createFileRoute("/engineers")({
 function EngineersPageComponent() {
   const { engineers, enquiries, projects, addEngineer, updateEngineer, deleteEngineer, currentUser } = useRobotics();
   const navigate = useNavigate();
+
+  const canFullEdit = canEdit(currentUser);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -121,20 +124,22 @@ function EngineersPageComponent() {
 
   const filteredEngineers = useMemo(() => {
     return engineerRoster.filter((eng) => {
-      const matchesSearch =
-        !searchQuery ||
-        eng.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      const matchSearch =
         eng.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         eng.phone.includes(searchQuery) ||
+        eng.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         eng.specialty.toLowerCase().includes(searchQuery.toLowerCase());
 
-      const matchesStatus = statusFilter === "all" || eng.status.toLowerCase() === statusFilter.toLowerCase();
-      return matchesSearch && matchesStatus;
+      const matchStatus =
+        statusFilter === "all" ||
+        (statusFilter === "available" && eng.status === "Available") ||
+        (statusFilter === "assigned" && eng.status === "Assigned");
+
+      return matchSearch && matchStatus;
     });
   }, [engineerRoster, searchQuery, statusFilter]);
 
   const handleOpenAddModal = () => {
-    setEditingEng(null);
     setFormName("");
     setFormPhone("");
     setFormSpecialty("Robotic Welding & Hydraulics Specialist");
@@ -151,17 +156,8 @@ function EngineersPageComponent() {
 
   const handleSaveEngineer = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName.trim()) {
-      toast.error("Engineer Name is required");
-      return;
-    }
-    const cleanPhone = formPhone.replace(/\D/g, "");
-    if (cleanPhone.length < 10) {
-      toast.error("Phone Number must be at least 10 digits");
-      return;
-    }
-    if (cleanPhone.length > 10) {
-      toast.error("Mobile Number cannot exceed 10 digits");
+    if (!formName.trim() || !formPhone.trim()) {
+      toast.error("Please fill in name and phone number");
       return;
     }
 
@@ -169,40 +165,39 @@ function EngineersPageComponent() {
       updateEngineer(editingEng.id, {
         name: formName.trim(),
         phone: formPhone.trim(),
-        specialty: formSpecialty.trim(),
+        specialty: formSpecialty,
       });
-      toast.success("Engineer Details Updated");
+      toast.success("Engineer profile updated successfully");
+      setEditingEng(null);
     } else {
       addEngineer({
         name: formName.trim(),
         phone: formPhone.trim(),
-        specialty: formSpecialty.trim(),
+        specialty: formSpecialty,
       });
-      toast.success("Engineer Registered Successfully");
+      toast.success("New engineer created successfully");
+      setIsAddModalOpen(false);
     }
-    setIsAddModalOpen(false);
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto min-h-screen">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-card p-6 rounded-xl border border-border shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400">
-            <UserCheck className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Engineers</h1>
-          </div>
+    <div className="space-y-5">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-card p-6 rounded-xl border border-border shadow-xs">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Engineers</h1>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            onClick={handleOpenAddModal}
-            className="text-xs font-semibold h-9 rounded-xl bg-purple-600 hover:bg-purple-700 text-white gap-1.5 shadow-sm cursor-pointer"
-          >
-            <Plus className="h-4 w-4" />
-            Add Engineer
-          </Button>
+
+        <div className="flex items-center gap-2">
+          {canFullEdit && (
+            <Button
+              onClick={handleOpenAddModal}
+              className="text-xs font-semibold h-9 rounded-xl bg-purple-600 hover:bg-purple-700 text-white gap-1.5 shadow-sm cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              Add Engineer
+            </Button>
+          )}
         </div>
       </div>
 
@@ -308,9 +303,11 @@ function EngineersPageComponent() {
                       <UserCheck className="h-8 w-8 text-purple-600/60 stroke-[1.5]" />
                       <p className="text-base font-semibold text-foreground">No engineers assigned.</p>
                       <p className="text-xs text-muted-foreground">Add engineer profiles to enable site visit assignments.</p>
-                      <Button size="sm" onClick={() => setIsAddModalOpen(true)} className="mt-2 bg-purple-600 hover:bg-purple-700 text-white gap-1 rounded-lg">
-                        <Plus className="h-3.5 w-3.5" /> Add Engineer Profile
-                      </Button>
+                      {canFullEdit && (
+                        <Button size="sm" onClick={() => setIsAddModalOpen(true)} className="mt-2 bg-purple-600 hover:bg-purple-700 text-white gap-1 rounded-lg">
+                          <Plus className="h-3.5 w-3.5" /> Add Engineer Profile
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -358,32 +355,33 @@ function EngineersPageComponent() {
                     </TableCell>
 
                     <TableCell className="text-right pr-4">
-                      <div className="flex items-center justify-end gap-1">
+                      {canFullEdit && (
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleOpenEditModal(eng)}
+                            title="Edit Engineer"
+                            className="h-7 w-7 rounded-lg text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
 
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleOpenEditModal(eng)}
-                          title="Edit Engineer"
-                          className="h-7 w-7 rounded-lg text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => {
-                            if (confirm(`Remove engineer ${eng.name}?`)) {
-                              deleteEngineer(eng.id);
-                            }
-                          }}
-                          title="Delete Engineer"
-                          className="h-7 w-7 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => {
+                              if (confirm(`Remove engineer ${eng.name}?`)) {
+                                deleteEngineer(eng.id);
+                              }
+                            }}
+                            title="Delete Engineer"
+                            className="h-7 w-7 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))

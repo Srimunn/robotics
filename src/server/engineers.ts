@@ -4,6 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "~/lib/db";
 import { cleanPhone, generateSafeId } from "./utils";
+import { assertCanEdit } from "./permissions";
 
 export const listEngineers = createServerFn({ method: "GET" }).handler(async () => {
   return db.engineer.findMany({ orderBy: { name: "asc" } });
@@ -14,11 +15,14 @@ const engineerInput = z.object({
   phone: z.string().min(1),
   specialty: z.string().min(1),
   email: z.string().email().optional().nullable(),
+  requestedByRole: z.string().optional().nullable(),
+  requestedBySubRole: z.string().optional().nullable(),
 });
 
 export const addEngineer = createServerFn({ method: "POST" })
   .validator((input: unknown) => engineerInput.parse(input))
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     const id = await generateSafeId(db.engineer, "ENG");
     return db.engineer.create({
       data: {
@@ -33,8 +37,9 @@ export const addEngineer = createServerFn({ method: "POST" })
   });
 
 export const updateEngineer = createServerFn({ method: "POST" })
-  .validator((input: { id: string; updates: Partial<z.infer<typeof engineerInput>> }) => input)
+  .validator((input: { id: string; updates: Partial<z.infer<typeof engineerInput>>; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     const { id, updates } = data;
     return db.engineer.update({
       where: { id },
@@ -46,8 +51,10 @@ export const updateEngineer = createServerFn({ method: "POST" })
   });
 
 export const deleteEngineer = createServerFn({ method: "POST" })
-  .validator((input: { id: string }) => input)
+  .validator((input: { id: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     await db.engineer.delete({ where: { id: data.id } });
     return { ok: true };
   });
+

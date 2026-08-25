@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "~/lib/db";
 import { toNumber, generateSafeId } from "./utils";
 import { recalculateProject } from "./recalc";
+import { assertCanEdit } from "./permissions";
 
 function formatPayment<T extends Record<string, any>>(p: T | null) {
   if (!p) return null;
@@ -35,11 +36,14 @@ const paymentInput = z.object({
   chequeDate: z.coerce.date().optional().nullable(),
   proofUrl: z.string().optional().nullable(),
   proofName: z.string().optional().nullable(),
+  requestedByRole: z.string().optional().nullable(),
+  requestedBySubRole: z.string().optional().nullable(),
 });
 
 export const addPayment = createServerFn({ method: "POST" })
   .validator((input: unknown) => paymentInput.parse(input))
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     // Duplicate reference check
     const uniqCheck: Array<[string, string | null | undefined]> = [
       ["transactionId", data.transactionId],
@@ -99,8 +103,9 @@ export const addPayment = createServerFn({ method: "POST" })
   });
 
 export const deletePayment = createServerFn({ method: "POST" })
-  .validator((input: { id: string }) => input)
+  .validator((input: { id: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     return db.$transaction(async (tx) => {
       const pay = await tx.payment.findUnique({ where: { id: data.id } });
       if (!pay) throw new Error("Payment not found");
@@ -115,9 +120,12 @@ export const addPaymentStage = createServerFn({ method: "POST" })
     (input: {
       projectId: string;
       stage: { stageName: string; amount: number; dueDate: string; paymentNotes?: string };
+      requestedByRole?: string | null;
+      requestedBySubRole?: string | null;
     }) => input
   )
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     return db.$transaction(async (tx) => {
       const stageId = `STG-${Math.random().toString(36).slice(2, 8)}`;
       await tx.paymentStageItem.create({
@@ -142,9 +150,12 @@ export const updatePaymentStage = createServerFn({ method: "POST" })
       projectId: string;
       stageId: string;
       updates: Partial<{ stageName: string; amount: number; dueDate: string; paymentNotes: string }>;
+      requestedByRole?: string | null;
+      requestedBySubRole?: string | null;
     }) => input
   )
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     return db.$transaction(async (tx) => {
       await tx.paymentStageItem.update({
         where: { id: data.stageId },
@@ -159,8 +170,9 @@ export const updatePaymentStage = createServerFn({ method: "POST" })
   });
 
 export const deletePaymentStage = createServerFn({ method: "POST" })
-  .validator((input: { projectId: string; stageId: string }) => input)
+  .validator((input: { projectId: string; stageId: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     return db.$transaction(async (tx) => {
       await tx.paymentStageItem.delete({ where: { id: data.stageId } });
       await recalculateProject(tx, data.projectId);
@@ -170,9 +182,10 @@ export const deletePaymentStage = createServerFn({ method: "POST" })
 
 export const applyPresetPaymentPlan = createServerFn({ method: "POST" })
   .validator(
-    (input: { projectId: string; presetType: "100_ADVANCE" | "50_50" | "20_30_50" | "100_CREDIT" }) => input
+    (input: { projectId: string; presetType: "100_ADVANCE" | "50_50" | "20_30_50" | "100_CREDIT"; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input
   )
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     return db.$transaction(async (tx) => {
       const proj = await tx.project.findUnique({ where: { id: data.projectId } });
       if (!proj) throw new Error("Project not found");

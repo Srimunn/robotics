@@ -5,6 +5,7 @@
 // ============================================================
 
 export { calculateHoursFromTimes, calculateEarnedWage } from "~/server/calculations";
+export { canEdit, canEditEnquiries, canConvertEnquiry } from "~/lib/permissions";
 
 import {
   getSettings,
@@ -678,6 +679,8 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
       const payload = {
         ...input,
         createdByRole: input.createdByRole || creatorRole,
+        requestedByRole: currentUser?.role,
+        requestedBySubRole: currentUser?.subRole,
       };
       const created = await addEnquiryFn({ data: payload as any });
       return mapEnquiryFromDb(created as any);
@@ -689,19 +692,19 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Enquiry> }) => {
       const payload: any = { ...updates };
       if (updates.customerDecision) payload.customerDecision = toDb.customerDecision(updates.customerDecision);
-      return updateEnquiryFn({ data: { id, updates: payload } });
+      return updateEnquiryFn({ data: { id, updates: payload, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } });
     },
     onSuccess: () => { invalidate("enquiries", "projects", "customers"); toast.success("Enquiry updated"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const deleteEnquiryM = useMutation({
-    mutationFn: async (id: string) => deleteEnquiryFn({ data: { id } }),
+    mutationFn: async (id: string) => deleteEnquiryFn({ data: { id, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("enquiries", "customers"); toast.success("Enquiry deleted"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const approveConvertM = useMutation({
     mutationFn: async (enquiryId: string) => {
-      const proj = await approveAndConvertEnquiryToProjectFn({ data: { enquiryId } });
+      const proj = await approveAndConvertEnquiryToProjectFn({ data: { enquiryId, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } });
       return proj ? mapProjectFromDb(proj as any) : undefined;
     },
     onSuccess: (proj) => { invalidate("enquiries", "projects", "customers"); if (proj) toast.success(`Project ${proj.id} created from Enquiry!`); },
@@ -713,39 +716,39 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Project> }) => {
       const payload: any = { ...updates };
       if (updates.customerDecision) payload.customerDecision = toDb.customerDecision(updates.customerDecision);
-      return updateProjectFn({ data: { id, updates: payload } });
+      return updateProjectFn({ data: { id, updates: payload, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } });
     },
     onSuccess: () => { invalidate("projects", "enquiries", "customers"); toast.success("Project updated & synchronized"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const deleteProjectM = useMutation({
-    mutationFn: async (id: string) => deleteProjectFn({ data: { id } }),
+    mutationFn: async (id: string) => deleteProjectFn({ data: { id, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("projects", "enquiries"); toast.success("Project deleted"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const updateProjectStatusM = useMutation({
-    mutationFn: async ({ id, status, note }: { id: string; status: ProjectStatus; note?: string }) => updateProjectStatusFn({ data: { id, status, note } }),
+    mutationFn: async ({ id, status, note }: { id: string; status: ProjectStatus; note?: string }) => updateProjectStatusFn({ data: { id, status, note, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: (_out, { status }) => { invalidate("projects"); toast.success(`Project status changed to ${status}`); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const updateFollowUpTagM = useMutation({
-    mutationFn: async ({ projectId, followUpTag }: { projectId: string; followUpTag: "MD" | "Team" | null }) => updateFollowUpTagFn({ data: { projectId, followUpTag } }),
+    mutationFn: async ({ projectId, followUpTag }: { projectId: string; followUpTag: "MD" | "Team" | null }) => updateFollowUpTagFn({ data: { projectId, followUpTag, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("projects"); toast.success("Follow-up tag updated"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const assignLaboursM = useMutation({
-    mutationFn: async (v: { projectId: string; assignments: { labourId: string; weeklyWage: number; assignedDate?: string }[] }) => assignLaboursToProjectFn({ data: v }),
+    mutationFn: async (v: { projectId: string; assignments: { labourId: string; weeklyWage: number; assignedDate?: string }[] }) => assignLaboursToProjectFn({ data: { ...v, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("projects", "labours"); toast.success("Labours assigned"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const unassignLabourM = useMutation({
-    mutationFn: async (v: { projectId: string; labourId: string }) => unassignLabourFromProjectFn({ data: v }),
+    mutationFn: async (v: { projectId: string; labourId: string }) => unassignLabourFromProjectFn({ data: { ...v, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("projects", "labours"); toast.success("Labour unassigned"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const updateProjectLabourLogM = useMutation({
     mutationFn: async ({ projectId, log }: { projectId: string; log: ProjectLabourLog }) =>
-      updateProjectLabourLogFn({ data: { projectId, log: {
+      updateProjectLabourLogFn({ data: { projectId, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole, log: {
         labourId: log.labourId,
         date: log.date,
         inTime: log.inTime,
@@ -768,34 +771,34 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   // Labours
   const addLabourM = useMutation({
     mutationFn: async (input: Omit<Labour, "id">) => {
-      const created = await addLabourFn({ data: input as any });
+      const created = await addLabourFn({ data: { ...(input as any), requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } });
       return mapLabourFromDb(created as any);
     },
     onSuccess: (created) => { invalidate("labours"); toast.success(`Labour ${created.name} added! LoginID=${created.loginId} PIN=${created.pin}`); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const updateLabourM = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Labour> }) => updateLabourFn({ data: { id, updates: updates as any } }),
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Labour> }) => updateLabourFn({ data: { id, updates: updates as any, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("labours"); toast.success("Labour updated"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const deleteLabourM = useMutation({
-    mutationFn: async (id: string) => deleteLabourFn({ data: { id } }),
+    mutationFn: async (id: string) => deleteLabourFn({ data: { id, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("labours"); toast.success("Labour deleted"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const deactivateLabourM = useMutation({
-    mutationFn: async (id: string) => deactivateLabourFn({ data: { id } }),
+    mutationFn: async (id: string) => deactivateLabourFn({ data: { id, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("labours"); toast.success("Labour deactivated"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const reactivateLabourM = useMutation({
-    mutationFn: async (id: string) => reactivateLabourFn({ data: { id } }),
+    mutationFn: async (id: string) => reactivateLabourFn({ data: { id, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("labours"); toast.success("Labour reactivated!"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const deleteLabourPermanentlyM = useMutation({
-    mutationFn: async (id: string) => deleteLabourPermanentlyFn({ data: { id } }),
+    mutationFn: async (id: string) => deleteLabourPermanentlyFn({ data: { id, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("labours"); toast.success("Labour permanently deleted"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
@@ -816,6 +819,8 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
       remarks: rec.remarks,
       inPhotoUrl: rec.inPhotoUrl,
       outPhotoUrl: rec.outPhotoUrl,
+      requestedByRole: currentUser?.role,
+      requestedBySubRole: currentUser?.subRole,
     } }),
     onSuccess: () => { invalidate("attendance", "projects"); toast.success("Attendance recorded"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
@@ -825,36 +830,36 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   // Payments
   const addPaymentM = useMutation({
     mutationFn: async (pay: Omit<Payment, "id" | "createdAt">) => {
-      const created = await addPaymentFn({ data: pay as any });
+      const created = await addPaymentFn({ data: { ...(pay as any), requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } });
       return mapPaymentFromDb(created as any);
     },
     onSuccess: (pay) => { invalidate("payments", "projects"); toast.success(`Payment ${pay.id} of ₹${pay.amount.toLocaleString("en-IN")} recorded`); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const deletePaymentM = useMutation({
-    mutationFn: async (id: string) => deletePaymentFn({ data: { id } }),
+    mutationFn: async (id: string) => deletePaymentFn({ data: { id, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("payments", "projects"); toast.success("Payment removed"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const addPaymentStageM = useMutation({
     mutationFn: async ({ projectId, stage }: { projectId: string; stage: Omit<PaymentStageItem, "id" | "status"> }) =>
-      addPaymentStageFn({ data: { projectId, stage: { stageName: stage.stageName, amount: stage.amount, dueDate: stage.dueDate, paymentNotes: stage.paymentNotes } } }),
+      addPaymentStageFn({ data: { projectId, stage: { stageName: stage.stageName, amount: stage.amount, dueDate: stage.dueDate, paymentNotes: stage.paymentNotes }, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("projects"); toast.success("Payment stage added"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const updatePaymentStageM = useMutation({
     mutationFn: async ({ projectId, stageId, updates }: { projectId: string; stageId: string; updates: Partial<PaymentStageItem> }) =>
-      updatePaymentStageFn({ data: { projectId, stageId, updates: updates as any } }),
+      updatePaymentStageFn({ data: { projectId, stageId, updates: updates as any, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("projects"); toast.success("Payment stage updated"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const deletePaymentStageM = useMutation({
-    mutationFn: async ({ projectId, stageId }: { projectId: string; stageId: string }) => deletePaymentStageFn({ data: { projectId, stageId } }),
+    mutationFn: async ({ projectId, stageId }: { projectId: string; stageId: string }) => deletePaymentStageFn({ data: { projectId, stageId, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("projects"); toast.success("Payment stage removed"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const applyPresetM = useMutation({
-    mutationFn: async (v: { projectId: string; presetType: "100_ADVANCE" | "50_50" | "20_30_50" | "100_CREDIT" }) => applyPresetPaymentPlanFn({ data: v }),
+    mutationFn: async (v: { projectId: string; presetType: "100_ADVANCE" | "50_50" | "20_30_50" | "100_CREDIT" }) => applyPresetPaymentPlanFn({ data: { ...v, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("projects"); toast.success("Preset payment plan applied"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
@@ -862,19 +867,19 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   // Engineers
   const addEngineerM = useMutation({
     mutationFn: async (input: Omit<Engineer, "id">) => {
-      const created = await addEngineerFn({ data: input as any });
+      const created = await addEngineerFn({ data: { ...(input as any), requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } });
       return mapEngineerFromDb(created);
     },
     onSuccess: (created) => { invalidate("engineers"); toast.success(`Engineer ${created.name} registered`); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const updateEngineerM = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Engineer> }) => updateEngineerFn({ data: { id, updates: updates as any } }),
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Engineer> }) => updateEngineerFn({ data: { id, updates: updates as any, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("engineers"); toast.success("Engineer updated"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const deleteEngineerM = useMutation({
-    mutationFn: async (id: string) => deleteEngineerFn({ data: { id } }),
+    mutationFn: async (id: string) => deleteEngineerFn({ data: { id, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("engineers"); toast.success("Engineer deleted"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
@@ -882,24 +887,24 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   // Master Data
   const addMasterDataItemM = useMutation({
     mutationFn: async ({ category, value }: { category: MasterDataCategory; value: string }) => {
-      const created = await addMasterDataItemFn({ data: { category, value } });
+      const created = await addMasterDataItemFn({ data: { category, value, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } });
       return mapMasterDataFromDb(created);
     },
     onSuccess: (item) => { invalidate("masterData"); toast.success(`"${item.value}" saved (${item.category})`); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const updateMasterDataItemM = useMutation({
-    mutationFn: async ({ id, value }: { id: string; value: string }) => updateMasterDataItemFn({ data: { id, value } }),
+    mutationFn: async ({ id, value }: { id: string; value: string }) => updateMasterDataItemFn({ data: { id, value, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("masterData"); toast.success("Value updated"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const deleteMasterDataItemM = useMutation({
-    mutationFn: async (id: string) => deleteMasterDataItemFn({ data: { id } }),
+    mutationFn: async (id: string) => deleteMasterDataItemFn({ data: { id, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("masterData"); toast.success("Value removed"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const toggleMasterDataItemActiveM = useMutation({
-    mutationFn: async (id: string) => toggleMasterDataItemActiveFn({ data: { id } }),
+    mutationFn: async (id: string) => toggleMasterDataItemActiveFn({ data: { id, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("masterData"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
@@ -907,7 +912,7 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   // Machines
   const addMachineM = useMutation({
     mutationFn: async (input: Omit<Machine, "id" | "createdAt" | "issuedQuantity" | "repairQuantity" | "lostQuantity">) => {
-      const payload: any = { ...input, condition: toDb.machineCondition(input.condition) };
+      const payload: any = { ...input, condition: toDb.machineCondition(input.condition), requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole };
       const created = await addMachineFn({ data: payload });
       return mapMachineFromDb(created);
     },
@@ -916,7 +921,7 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   });
   const updateMachineM = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Machine> }) => {
-      const payload: any = { ...updates };
+      const payload: any = { ...updates, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole };
       if (updates.condition) payload.condition = toDb.machineCondition(updates.condition);
       return updateMachineFn({ data: { id, updates: payload } });
     },
@@ -924,13 +929,13 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const deleteMachineM = useMutation({
-    mutationFn: async (id: string) => deleteMachineFn({ data: { id } }),
+    mutationFn: async (id: string) => deleteMachineFn({ data: { id, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("machines"); toast.success("Machine deleted"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const issueMachineM = useMutation({
     mutationFn: async (params: { machineId: string; projectId: string; quantity: number; issueDate: string; expectedReturnDate?: string | null; issuedBy: string; remarks?: string }) => {
-      const rec = await issueMachineToProjectFn({ data: params });
+      const rec = await issueMachineToProjectFn({ data: { ...params, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } });
       return rec ? mapMachineIssueFromDb(rec as any) : undefined;
     },
     onSuccess: (rec) => { invalidate("machines", "machineIssues", "projects", "stockAuditLogs"); if (rec) toast.success(`Issued ${rec.quantity}× ${rec.machineName}`); },
@@ -938,7 +943,7 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   });
   const returnMachineM = useMutation({
     mutationFn: async (params: { issueRecordId: string; returnQty: number; condition: MachineCondition; returnRemarks?: string; returnedBy?: string }) =>
-      returnMachineFromProjectFn({ data: { ...params, condition: toDb.machineCondition(params.condition) } }),
+      returnMachineFromProjectFn({ data: { ...params, condition: toDb.machineCondition(params.condition), requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: (_out, p) => { invalidate("machines", "machineIssues", "projects", "stockAuditLogs"); toast.success(`Returned ${p.returnQty} unit(s)`); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
@@ -946,25 +951,25 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   // Materials
   const addMaterialM = useMutation({
     mutationFn: async (input: Omit<Material, "id" | "createdAt">) => {
-      const created = await addMaterialFn({ data: input as any });
+      const created = await addMaterialFn({ data: { ...(input as any), requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } });
       return mapMaterialFromDb(created as any);
     },
     onSuccess: (m) => { invalidate("materials", "stockAuditLogs"); toast.success(`Material ${m.id} created!`); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const updateMaterialM = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Material> }) => updateMaterialFn({ data: { id, updates: updates as any } }),
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Material> }) => updateMaterialFn({ data: { id, updates: updates as any, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("materials"); toast.success("Material updated"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const deleteMaterialM = useMutation({
-    mutationFn: async (id: string) => deleteMaterialFn({ data: { id } }),
+    mutationFn: async (id: string) => deleteMaterialFn({ data: { id, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("materials"); toast.success("Material deleted"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const issueMaterialM = useMutation({
     mutationFn: async (params: { materialId: string; projectId: string; quantity: number; issueDate: string; issuedBy: string; remarks?: string }) => {
-      const rec = await issueMaterialToProjectFn({ data: params });
+      const rec = await issueMaterialToProjectFn({ data: { ...params, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } });
       return rec ? mapMaterialIssueFromDb(rec as any) : undefined;
     },
     onSuccess: (rec) => { invalidate("materials", "materialIssues", "projects", "stockAuditLogs"); if (rec) toast.success(`Issued ${rec.quantity} of ${rec.materialName}`); },
@@ -972,7 +977,7 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   });
   const addProjectMaterialNoteM = useMutation({
     mutationFn: async (params: { projectId: string; description: string; date: string }) => {
-      const rec = await addProjectMaterialNoteFn({ data: params });
+      const rec = await addProjectMaterialNoteFn({ data: { ...params, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } });
       return rec ? mapMaterialIssueFromDb(rec as any) : undefined;
     },
     onSuccess: () => { invalidate("projects", "materialIssues"); toast.success("Material note added"); },
@@ -980,19 +985,19 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   });
   const updateProjectMaterialNoteM = useMutation({
     mutationFn: async (params: { id: string; description: string; date: string }) => {
-      const rec = await updateProjectMaterialNoteFn({ data: params });
+      const rec = await updateProjectMaterialNoteFn({ data: { ...params, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } });
       return rec ? mapMaterialIssueFromDb(rec as any) : undefined;
     },
     onSuccess: () => { invalidate("projects", "materialIssues"); toast.success("Material note updated"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const deleteProjectMaterialNoteM = useMutation({
-    mutationFn: async (id: string) => deleteProjectMaterialNoteFn({ data: { id } }),
+    mutationFn: async (id: string) => deleteProjectMaterialNoteFn({ data: { id, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("projects", "materialIssues"); toast.success("Material note deleted"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const adjustStockM = useMutation({
-    mutationFn: async (params: { itemType: StockItemType; itemId: string; newQuantity: number; reason: string; actor: string }) => adjustStockFn({ data: params }),
+    mutationFn: async (params: { itemType: StockItemType; itemId: string; newQuantity: number; reason: string; actor: string }) => adjustStockFn({ data: { ...params, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("machines", "materials", "stockAuditLogs"); toast.success("Stock level updated"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
@@ -1000,14 +1005,14 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   // Documents
   const addDocumentM = useMutation({
     mutationFn: async (input: Omit<ProjectDocument, "id" | "uploadedAt">) => {
-      const created = await addDocumentFn({ data: input as any });
+      const created = await addDocumentFn({ data: { ...(input as any), requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } });
       return mapProjectDocumentFromDb(created);
     },
     onSuccess: (doc) => { invalidate("documents"); toast.success(`Document ${doc.title} uploaded`); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const deleteDocumentM = useMutation({
-    mutationFn: async (id: string) => deleteDocumentFn({ data: { id } }),
+    mutationFn: async (id: string) => deleteDocumentFn({ data: { id, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("documents"); toast.success("Document deleted"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
@@ -1015,7 +1020,7 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   // Attendance verify
   const verifyAttendanceM = useMutation({
     mutationFn: async ({ attendanceId, status, verifierName, comments }: { attendanceId: string; status: "Verified" | "Rejected"; verifierName: string; comments?: string }) =>
-      verifyAttendanceRecordFn({ data: { attendanceId, status, verifierName, comments } }),
+      verifyAttendanceRecordFn({ data: { attendanceId, status, verifierName, comments, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: (_out, { status, verifierName }) => {
       invalidate("attendance", "projects");
       toast.success(status === "Verified" ? `Attendance Verified by ${verifierName}` : `Attendance Rejected by ${verifierName}`);
@@ -1025,7 +1030,7 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
 
   // Settings
   const updateSettingsM = useMutation({
-    mutationFn: async (s: Partial<SystemSettings>) => updateSettingsFn({ data: s as any }),
+    mutationFn: async (s: Partial<SystemSettings>) => updateSettingsFn({ data: { ...(s as any), requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("settings"); toast.success("Settings saved"); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });

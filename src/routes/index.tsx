@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useRobotics, calculateHoursFromTimes, calculateEarnedWage } from "@/lib/robotics-context";
+import { canEdit } from "@/lib/permissions";
 import type {
   Enquiry,
   Project,
@@ -115,6 +116,8 @@ function DashboardComponent() {
     addMasterDataItem,
     updateProjectLabourLog,
   } = useRobotics();
+
+  const canFullEdit = canEdit(currentUser);
 
   console.log({ role: currentUser?.role, enquiriesCount: enquiries.length, projectsCount: projects.length });
 
@@ -1308,7 +1311,7 @@ function DashboardComponent() {
                             >
                               Open Project
                             </Button>
-                            {proj.status !== "Ongoing" && proj.status !== "Completed" && (
+                            {canFullEdit && proj.status !== "Ongoing" && proj.status !== "Completed" && (
                               <Button
                                 size="sm"
                                 onClick={(e) => {
@@ -1341,14 +1344,16 @@ function DashboardComponent() {
                       Permanent staff assigned today pending In Time check-in ({permanentLabourPendingCheckIn.length})
                     </CardDescription>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setAttendanceOpen(true)}
-                    className="text-xs text-rose-700 border-rose-200 bg-rose-50 hover:bg-rose-100 shrink-0 self-start sm:self-center"
-                  >
-                    Quick Check-In
-                  </Button>
+                  {canFullEdit && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setAttendanceOpen(true)}
+                      className="text-xs text-rose-700 border-rose-200 bg-rose-50 hover:bg-rose-100 shrink-0 self-start sm:self-center"
+                    >
+                      Quick Check-In
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
@@ -1382,16 +1387,18 @@ function DashboardComponent() {
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 animate-pulse shrink-0">
                                 Check-In Pending
                               </span>
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedAttLabourId(lab.id);
-                                  setAttendanceOpen(true);
-                                }}
-                                className="h-7 text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white shrink-0"
-                              >
-                                Check In
-                              </Button>
+                              {canFullEdit && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedAttLabourId(lab.id);
+                                    setAttendanceOpen(true);
+                                  }}
+                                  className="h-7 text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white shrink-0"
+                                >
+                                  Check In
+                                </Button>
+                              )}
                             </div>
                           </div>
                         );
@@ -1450,17 +1457,19 @@ function DashboardComponent() {
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shrink-0">
                               Priority: High
                             </span>
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                setSelectedPayProjectId(proj.id);
-                                setPayAmountInput(proj.balanceAmount);
-                                setRecordPayOpen(true);
-                              }}
-                              className="h-7 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
-                            >
-                              Record Payment
-                            </Button>
+                            {canFullEdit && (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedPayProjectId(proj.id);
+                                  setPayAmountInput(proj.balanceAmount);
+                                  setRecordPayOpen(true);
+                                }}
+                                className="h-7 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
+                              >
+                                Record Payment
+                              </Button>
+                            )}
                           </div>
                         </div>
                       ))

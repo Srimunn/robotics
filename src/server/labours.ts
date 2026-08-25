@@ -4,6 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "~/lib/db";
 import { cleanPhone, generateSafeId } from "./utils";
+import { assertCanEdit } from "./permissions";
 
 export const listLabours = createServerFn({ method: "GET" }).handler(async () => {
   return db.labour.findMany({
@@ -24,11 +25,14 @@ const labourInput = z.object({
   pin: z.string().optional(),
   photoUrl: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
+  requestedByRole: z.string().optional().nullable(),
+  requestedBySubRole: z.string().optional().nullable(),
 });
 
 export const addLabour = createServerFn({ method: "POST" })
   .validator((input: unknown) => labourInput.parse(input))
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     const id = await generateSafeId(db.labour, "LBR");
     const cleanName = data.name.trim().split(" ")[0].replace(/[^a-zA-Z0-9]/g, "");
     const loginId = data.loginId?.trim() || cleanName.toLowerCase() || id.toLowerCase();
@@ -56,8 +60,9 @@ export const addLabour = createServerFn({ method: "POST" })
   });
 
 export const updateLabour = createServerFn({ method: "POST" })
-  .validator((input: { id: string; updates: Partial<z.infer<typeof labourInput>> }) => input)
+  .validator((input: { id: string; updates: Partial<z.infer<typeof labourInput>>; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     const { id, updates } = data;
     const updatesData: any = { ...updates };
     if (updates.phone) updatesData.phone = cleanPhone(updates.phone);
@@ -74,8 +79,9 @@ export const updateLabour = createServerFn({ method: "POST" })
   });
 
 export const deleteLabour = createServerFn({ method: "POST" })
-  .validator((input: { id: string }) => input)
+  .validator((input: { id: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     try {
       await db.projectLabourAssignment.deleteMany({ where: { labourId: data.id } });
       await db.labourWageHistory.deleteMany({ where: { labourId: data.id } });
@@ -94,8 +100,9 @@ export const deleteLabour = createServerFn({ method: "POST" })
   });
 
 export const deactivateLabour = createServerFn({ method: "POST" })
-  .validator((input: { id: string }) => input)
+  .validator((input: { id: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     await db.projectLabourAssignment.updateMany({
       where: { labourId: data.id, isActive: true },
       data: { isActive: false },
@@ -107,8 +114,9 @@ export const deactivateLabour = createServerFn({ method: "POST" })
   });
 
 export const reactivateLabour = createServerFn({ method: "POST" })
-  .validator((input: { id: string }) => input)
+  .validator((input: { id: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     return db.labour.update({
       where: { id: data.id },
       data: { isActive: true } as any,
@@ -116,8 +124,9 @@ export const reactivateLabour = createServerFn({ method: "POST" })
   });
 
 export const deleteLabourPermanently = createServerFn({ method: "POST" })
-  .validator((input: { id: string }) => input)
+  .validator((input: { id: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     const { id } = data;
     const [attCount, logCount, assignCount, wageCount] = await Promise.all([
       db.attendanceRecord.count({ where: { labourId: id } }),
@@ -133,4 +142,5 @@ export const deleteLabourPermanently = createServerFn({ method: "POST" })
     await db.labour.delete({ where: { id } });
     return { ok: true };
   });
+
 

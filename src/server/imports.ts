@@ -4,6 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "~/lib/db";
 import { cleanPhone } from "./utils";
+import { assertCanEdit } from "./permissions";
 
 const importedProjectSchema = z.object({
   customerName: z.string().min(1),
@@ -28,13 +29,16 @@ const importedProjectSchema = z.object({
 const importProjectsInput = z.object({
   projects: z.array(importedProjectSchema),
   dedupeByNameOnly: z.boolean().optional().default(false),
+  requestedByRole: z.string().optional().nullable(),
+  requestedBySubRole: z.string().optional().nullable(),
 });
 
 export const importProjects = createServerFn({ method: "POST" })
-  .validator((input: { projects: z.infer<typeof importedProjectSchema>[]; dedupeByNameOnly?: boolean }) =>
+  .validator((input: { projects: z.infer<typeof importedProjectSchema>[]; dedupeByNameOnly?: boolean; requestedByRole?: string | null; requestedBySubRole?: string | null }) =>
     importProjectsInput.parse(input)
   )
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     const { projects, dedupeByNameOnly } = data;
     if (!projects || projects.length === 0) {
       return { inserted: 0, skipped: 0 };
@@ -170,13 +174,16 @@ const importedMachineSchema = z.object({
 
 const importMachinesInput = z.object({
   machines: z.array(importedMachineSchema),
+  requestedByRole: z.string().optional().nullable(),
+  requestedBySubRole: z.string().optional().nullable(),
 });
 
 export const importMachines = createServerFn({ method: "POST" })
-  .validator((input: { machines: z.infer<typeof importedMachineSchema>[] }) =>
+  .validator((input: { machines: z.infer<typeof importedMachineSchema>[]; requestedByRole?: string | null; requestedBySubRole?: string | null }) =>
     importMachinesInput.parse(input)
   )
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     const { machines } = data;
     if (!machines || machines.length === 0) {
       return { inserted: 0, skipped: 0 };

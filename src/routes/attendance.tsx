@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useRobotics, calculateHoursFromTimes, calculateEarnedWage } from "@/lib/robotics-context";
+import { canEdit } from "@/lib/permissions";
 import type { AttendanceRecord, LabourType } from "@/lib/robotics-types";
 import * as XLSX from "xlsx";
 import { DataPagination } from "@/components/ui/DataPagination";
@@ -58,6 +59,8 @@ export const Route = createFileRoute("/attendance")({
 
 function AttendancePageComponent() {
   const { labours, attendance, projects, updateProjectLabourLog, verifyAttendanceRecord, currentUser } = useRobotics();
+
+  const canFullEdit = canEdit(currentUser);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -265,16 +268,18 @@ function AttendancePageComponent() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            onClick={() => {
-              if (labours.length > 0) setAttLabourId(labours[0].id);
-              if (projects.length > 0) setAttProjectId(projects[0].id);
-              setMarkAttendanceOpen(true);
-            }}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold h-9 rounded-xl gap-1.5 shadow-xs"
-          >
-            <CalendarCheck className="h-4 w-4" /> Mark Attendance
-          </Button>
+          {canFullEdit && (
+            <Button
+              onClick={() => {
+                if (labours.length > 0) setAttLabourId(labours[0].id);
+                if (projects.length > 0) setAttProjectId(projects[0].id);
+                setMarkAttendanceOpen(true);
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold h-9 rounded-xl gap-1.5 shadow-xs"
+            >
+              <CalendarCheck className="h-4 w-4" /> Mark Attendance
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={() => {
@@ -526,18 +531,20 @@ function AttendancePageComponent() {
 
                     <TableCell className="text-right pr-4">
                       <div className="flex items-center justify-end gap-1.5">
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setAttLabourId(labour.id);
-                            if (projectFilter !== "all") setAttProjectId(projectFilter);
-                            else if (projects.length > 0) setAttProjectId(projects[0].id);
-                            setMarkAttendanceOpen(true);
-                          }}
-                          className="h-7 text-[11px] font-bold rounded-lg gap-1 bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs"
-                        >
-                          <Clock className="h-3 w-3" /> Log Time
-                        </Button>
+                        {canFullEdit && (
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setAttLabourId(labour.id);
+                              if (projectFilter !== "all") setAttProjectId(projectFilter);
+                              else if (projects.length > 0) setAttProjectId(projects[0].id);
+                              setMarkAttendanceOpen(true);
+                            }}
+                            className="h-7 text-[11px] font-bold rounded-lg gap-1 bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs"
+                          >
+                            <Clock className="h-3 w-3" /> Log Time
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"

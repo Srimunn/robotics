@@ -6,6 +6,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { db } from "~/lib/db";
 import { toNullableNumber, generateSafeId } from "./utils";
 import type { StockItemType } from "@prisma/client";
+import { assertCanEdit } from "./permissions";
 
 function formatMaterialIssue<T extends Record<string, any>>(mi: T | null) {
   if (!mi) return null;
@@ -25,9 +26,12 @@ export const issueMaterialToProject = createServerFn({ method: "POST" })
       issueDate: string;
       issuedBy: string;
       remarks?: string;
+      requestedByRole?: string | null;
+      requestedBySubRole?: string | null;
     }) => input
   )
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     return db.$transaction(async (tx) => {
       const mat = await tx.material.findUnique({ where: { id: data.materialId } });
       if (!mat) throw new Error("Material not found");
@@ -93,9 +97,10 @@ export const issueMaterialToProject = createServerFn({ method: "POST" })
 
 export const adjustStock = createServerFn({ method: "POST" })
   .validator(
-    (input: { itemType: StockItemType; itemId: string; newQuantity: number; reason: string; actor: string }) => input
+    (input: { itemType: StockItemType; itemId: string; newQuantity: number; reason: string; actor: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input
   )
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     return db.$transaction(async (tx) => {
       if (data.itemType === "Machine") {
         const m = await tx.machine.findUnique({ where: { id: data.itemId } });
@@ -149,9 +154,12 @@ export const addProjectMaterialNote = createServerFn({ method: "POST" })
       projectId: string;
       description: string;
       date: string;
+      requestedByRole?: string | null;
+      requestedBySubRole?: string | null;
     }) => input
   )
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     return db.$transaction(async (tx) => {
       const project = await tx.project.findUnique({ where: { id: data.projectId } });
       if (!project) throw new Error("Project not found");
@@ -192,9 +200,12 @@ export const updateProjectMaterialNote = createServerFn({ method: "POST" })
       id: string;
       description: string;
       date: string;
+      requestedByRole?: string | null;
+      requestedBySubRole?: string | null;
     }) => input
   )
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     return db.$transaction(async (tx) => {
       const existing = await tx.materialIssueRecord.findUnique({ where: { id: data.id } });
       if (!existing) throw new Error("Material note not found");
@@ -212,8 +223,10 @@ export const updateProjectMaterialNote = createServerFn({ method: "POST" })
   });
 
 export const deleteProjectMaterialNote = createServerFn({ method: "POST" })
-  .validator((input: { id: string }) => input)
+  .validator((input: { id: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     await db.materialIssueRecord.delete({ where: { id: data.id } });
     return { ok: true };
   });
+

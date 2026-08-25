@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useRobotics } from "@/lib/robotics-context";
+import { canEdit } from "@/lib/permissions";
 import type { Material, MaterialIssueRecord, StockAuditLog } from "@/lib/robotics-types";
 import { SmartComboBox } from "@/components/ui/SmartComboBox";
 import {
@@ -68,7 +69,10 @@ function MaterialsPageComponent() {
     deleteMaterial,
     issueMaterialToProject,
     adjustStock,
+    currentUser,
   } = useRobotics();
+
+  const canFullEdit = canEdit(currentUser);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -268,13 +272,15 @@ function MaterialsPageComponent() {
             <History className="h-3.5 w-3.5 text-purple-600" />
             Audit Trail
           </Button>
-          <Button
-            onClick={handleOpenAddModal}
-            className="text-xs font-semibold h-9 rounded-xl bg-purple-600 hover:bg-purple-700 text-white gap-1.5 shadow-sm"
-          >
-            <Plus className="h-4 w-4" />
-            Add New Material
-          </Button>
+          {canFullEdit && (
+            <Button
+              onClick={handleOpenAddModal}
+              className="text-xs font-semibold h-9 rounded-xl bg-purple-600 hover:bg-purple-700 text-white gap-1.5 shadow-sm"
+            >
+              <Plus className="h-4 w-4" />
+              Add New Material
+            </Button>
+          )}
         </div>
       </div>
 
@@ -422,9 +428,11 @@ function MaterialsPageComponent() {
                         <p className="text-base font-semibold text-foreground">Material stock is empty.</p>
                         <p className="text-xs text-muted-foreground">Add consumable parts and materials to track inventory and job costing.</p>
                       </div>
-                      <Button size="sm" onClick={() => setIsAddModalOpen(true)} className="mt-2 bg-blue-600 hover:bg-blue-700 text-white gap-1.5 rounded-lg shadow-xs">
-                        <Plus className="h-4 w-4" /> Add Material Stock
-                      </Button>
+                      {canFullEdit && (
+                        <Button size="sm" onClick={() => setIsAddModalOpen(true)} className="mt-2 bg-blue-600 hover:bg-blue-700 text-white gap-1.5 rounded-lg shadow-xs">
+                          <Plus className="h-4 w-4" /> Add Material Stock
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -476,51 +484,53 @@ function MaterialsPageComponent() {
                       </TableCell>
 
                       <TableCell className="text-right pr-4">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            size="sm"
-                            disabled={m.currentStock <= 0}
-                            onClick={() => handleOpenIssueModal(m)}
-                            className="h-7 px-2 text-[11px] font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-lg gap-1 shadow-xs"
-                          >
-                            <Send className="h-3 w-3" />
-                            Issue
-                          </Button>
+                        {canFullEdit && (
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              size="sm"
+                              disabled={m.currentStock <= 0}
+                              onClick={() => handleOpenIssueModal(m)}
+                              className="h-7 px-2 text-[11px] font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-lg gap-1 shadow-xs"
+                            >
+                              <Send className="h-3 w-3" />
+                              Issue
+                            </Button>
 
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => handleOpenAdjustModal(m)}
-                            title="Adjust / Restock"
-                            className="h-7 w-7 rounded-lg text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-                          >
-                            <PlusCircle className="h-3.5 w-3.5 text-emerald-600" />
-                          </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleOpenAdjustModal(m)}
+                              title="Adjust / Restock"
+                              className="h-7 w-7 rounded-lg text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+                            >
+                              <PlusCircle className="h-3.5 w-3.5 text-emerald-600" />
+                            </Button>
 
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => handleOpenEditModal(m)}
-                            title="Edit Material"
-                            className="h-7 w-7 rounded-lg text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleOpenEditModal(m)}
+                              title="Edit Material"
+                              className="h-7 w-7 rounded-lg text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
 
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => {
-                              if (confirm(`Delete material ${m.name} (${m.id})?`)) {
-                                deleteMaterial(m.id);
-                              }
-                            }}
-                            title="Delete Material"
-                            className="h-7 w-7 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                if (confirm(`Delete material ${m.name} (${m.id})?`)) {
+                                  deleteMaterial(m.id);
+                                }
+                              }}
+                              title="Delete Material"
+                              className="h-7 w-7 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   );

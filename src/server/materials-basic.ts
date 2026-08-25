@@ -4,6 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "~/lib/db";
 import { toNumber, generateSafeId } from "./utils";
+import { assertCanEdit } from "./permissions";
 
 const materialInput = z.object({
   name: z.string(),
@@ -14,11 +15,14 @@ const materialInput = z.object({
   supplier: z.string(),
   purchaseCost: z.number().min(0),
   remarks: z.string().optional().nullable(),
+  requestedByRole: z.string().optional().nullable(),
+  requestedBySubRole: z.string().optional().nullable(),
 });
 
 export const addMaterial = createServerFn({ method: "POST" })
   .validator((input: unknown) => materialInput.parse(input))
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     const year = new Date().getFullYear();
     const id = await generateSafeId(db.material, `MAT-${year}`);
     const material = await db.material.create({
@@ -55,8 +59,9 @@ export const addMaterial = createServerFn({ method: "POST" })
   });
 
 export const updateMaterial = createServerFn({ method: "POST" })
-  .validator((input: { id: string; updates: Partial<z.infer<typeof materialInput>> }) => input)
+  .validator((input: { id: string; updates: Partial<z.infer<typeof materialInput>>; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     const updated = await db.material.update({ where: { id: data.id }, data: data.updates as any });
     return {
       ...updated,
@@ -65,8 +70,10 @@ export const updateMaterial = createServerFn({ method: "POST" })
   });
 
 export const deleteMaterial = createServerFn({ method: "POST" })
-  .validator((input: { id: string }) => input)
+  .validator((input: { id: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     await db.material.delete({ where: { id: data.id } });
     return { ok: true };
   });
+

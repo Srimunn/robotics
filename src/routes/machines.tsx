@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useRobotics } from "@/lib/robotics-context";
+import { canEdit } from "@/lib/permissions";
 import type {
   Machine,
   MachineCondition,
@@ -82,7 +83,10 @@ function MachinesPageComponent() {
     deleteMachine,
     issueMachineToProject,
     returnMachineFromProject,
+    currentUser,
   } = useRobotics();
+
+  const canFullEdit = canEdit(currentUser);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -306,13 +310,15 @@ function MachinesPageComponent() {
             <History className="h-3.5 w-3.5 text-slate-500" />
             Audit Logs
           </Button>
-          <Button
-            onClick={handleOpenAddModal}
-            className="text-xs font-semibold h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-sm"
-          >
-            <Plus className="h-4 w-4" />
-            Add Tool
-          </Button>
+          {canFullEdit && (
+            <Button
+              onClick={handleOpenAddModal}
+              className="text-xs font-semibold h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-sm"
+            >
+              <Plus className="h-4 w-4" />
+              Add Tool
+            </Button>
+          )}
         </div>
       </div>
 
@@ -561,15 +567,17 @@ function MachinesPageComponent() {
 
                         <TableCell className="text-right pr-4">
                           <div className="flex items-center justify-end gap-1">
-                            <Button
-                              size="sm"
-                              disabled={!isAvailable}
-                              onClick={() => handleOpenIssueModal(m)}
-                              className="h-7 px-2.5 text-[11px] font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg gap-1 shadow-xs"
-                            >
-                              <Send className="h-3 w-3" />
-                              Issue
-                            </Button>
+                            {canFullEdit && (
+                              <Button
+                                size="sm"
+                                disabled={!isAvailable}
+                                onClick={() => handleOpenIssueModal(m)}
+                                className="h-7 px-2.5 text-[11px] font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg gap-1 shadow-xs"
+                              >
+                                <Send className="h-3 w-3" />
+                                Issue
+                              </Button>
+                            )}
 
                             <Button
                               size="icon"
@@ -581,25 +589,29 @@ function MachinesPageComponent() {
                               <History className="h-3.5 w-3.5" />
                             </Button>
 
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleOpenEditModal(m)}
-                              title="Edit Machine"
-                              className="h-7 w-7 rounded-lg text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
+                            {canFullEdit && (
+                              <>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => handleOpenEditModal(m)}
+                                  title="Edit Machine"
+                                  className="h-7 w-7 rounded-lg text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
 
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setDeleteTargetId(m.id)}
-                              title="Delete Machine"
-                              className="h-7 w-7 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => setDeleteTargetId(m.id)}
+                                  title="Delete Machine"
+                                  className="h-7 w-7 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -675,14 +687,16 @@ function MachinesPageComponent() {
                   </div>
 
                   <div className="pt-3 border-t flex items-center justify-between gap-2">
-                    <Button
-                      size="sm"
-                      disabled={!isAvailable}
-                      onClick={() => handleOpenIssueModal(m)}
-                      className="h-8 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg gap-1 shadow-xs flex-1"
-                    >
-                      <Send className="h-3.5 w-3.5" /> Issue
-                    </Button>
+                    {canFullEdit && (
+                      <Button
+                        size="sm"
+                        disabled={!isAvailable}
+                        onClick={() => handleOpenIssueModal(m)}
+                        className="h-8 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg gap-1 shadow-xs flex-1"
+                      >
+                        <Send className="h-3.5 w-3.5" /> Issue
+                      </Button>
+                    )}
                     <div className="flex items-center gap-1">
                       <Button
                         size="icon"
@@ -693,24 +707,28 @@ function MachinesPageComponent() {
                       >
                         <History className="h-4 w-4" />
                       </Button>
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        onClick={() => handleOpenEditModal(m)}
-                        title="Edit Machine"
-                        className="h-8 w-8 rounded-lg text-slate-600"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        onClick={() => setDeleteTargetId(m.id)}
-                        title="Delete Machine"
-                        className="h-8 w-8 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canFullEdit && (
+                        <>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            onClick={() => handleOpenEditModal(m)}
+                            title="Edit Machine"
+                            className="h-8 w-8 rounded-lg text-slate-600"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            onClick={() => setDeleteTargetId(m.id)}
+                            title="Delete Machine"
+                            className="h-8 w-8 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </Card>

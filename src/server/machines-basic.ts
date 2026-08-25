@@ -4,6 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "~/lib/db";
 import { generateSafeId } from "./utils";
+import { assertCanEdit } from "./permissions";
 
 const machineInput = z.object({
   toolName: z.string(),
@@ -15,11 +16,14 @@ const machineInput = z.object({
   unit: z.string(),
   condition: z.enum(["Good", "Damaged", "RepairRequired", "Lost"]).default("Good"),
   remarks: z.string().optional().nullable(),
+  requestedByRole: z.string().optional().nullable(),
+  requestedBySubRole: z.string().optional().nullable(),
 });
 
 export const addMachine = createServerFn({ method: "POST" })
   .validator((input: unknown) => machineInput.parse(input))
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     const year = new Date().getFullYear();
     const id = await generateSafeId(db.machine, `MCH-${year}`);
     const machine = await db.machine.create({
@@ -54,14 +58,17 @@ export const addMachine = createServerFn({ method: "POST" })
   });
 
 export const updateMachine = createServerFn({ method: "POST" })
-  .validator((input: { id: string; updates: Partial<z.infer<typeof machineInput>> }) => input)
+  .validator((input: { id: string; updates: Partial<z.infer<typeof machineInput>>; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     return db.machine.update({ where: { id: data.id }, data: data.updates as any });
   });
 
 export const deleteMachine = createServerFn({ method: "POST" })
-  .validator((input: { id: string }) => input)
+  .validator((input: { id: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     await db.machine.delete({ where: { id: data.id } });
     return { ok: true };
   });
+

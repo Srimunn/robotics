@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useRobotics } from "@/lib/robotics-context";
+import { canEdit } from "@/lib/permissions";
 import { toast } from "sonner";
 import { MasterDataManager } from "@/components/erp/MasterDataManager";
 import {
@@ -32,6 +33,8 @@ export const Route = createFileRoute("/settings")({
 function SettingsComponent() {
   const { settings, updateSettings, resetDemoData, resetToCleanDemoMode, currentUser } = useRobotics();
 
+  const canFullEdit = canEdit(currentUser);
+
   const [activeTab, setActiveTab] = useState<"SETTINGS" | "MASTER_DATA">("MASTER_DATA");
   const [formState, setFormState] = useState({ ...settings });
 
@@ -57,7 +60,7 @@ function SettingsComponent() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Settings</h1>
         </div>
         <div className="flex items-center gap-2">
-          {activeTab === "SETTINGS" && (
+          {canFullEdit && activeTab === "SETTINGS" && (
             <Button
               onClick={handleSave}
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1.5 shadow-xs"

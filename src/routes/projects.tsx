@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { uploadImage } from "~/server/upload";
 import { useRobotics, calculateHoursFromTimes, calculateEarnedWage } from "@/lib/robotics-context";
+import { canEdit } from "@/lib/permissions";
 import type { Project, ProjectStatus, ProjectLabourLog, LabourType, MachineCondition, MachineIssueRecord, MaterialIssueRecord, PaymentStageItem, PaymentStatus, ProjectLabourAssignment } from "@/lib/robotics-types";
 import { SmartComboBox } from "@/components/ui/SmartComboBox";
 import { DataPagination } from "@/components/ui/DataPagination";
@@ -136,8 +137,11 @@ function ProjectsComponent() {
     applyPresetPaymentPlan,
     addLabour,
     addMasterDataItem,
+    currentUser,
   } = useRobotics();
   const navigate = useNavigate();
+
+  const canFullEdit = canEdit(currentUser);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(status || "ALL");
@@ -792,44 +796,60 @@ function ProjectsComponent() {
                           </Badge>
                         </td>
                       <td className="p-3">
-                        <Select
-                          value={p.status}
-                          onValueChange={(val: ProjectStatus) => {
-                            if (val === "Closed") {
-                              setClosingProjectTarget(p);
-                            } else {
-                              updateProjectStatus(p.id, val);
-                            }
-                          }}
-                        >
-                          <SelectTrigger
-                            onClick={(e) => e.stopPropagation()}
-                            className="h-7 w-28 text-xs font-medium rounded-lg"
+                        {canFullEdit ? (
+                          <Select
+                            value={p.status}
+                            onValueChange={(val: ProjectStatus) => {
+                              if (val === "Closed") {
+                                setClosingProjectTarget(p);
+                              } else {
+                                updateProjectStatus(p.id, val);
+                              }
+                            }}
                           >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl">
-                            <SelectItem value="Scheduled">Scheduled</SelectItem>
-                            <SelectItem value="Ongoing">Ongoing</SelectItem>
-                            <SelectItem value="Completed">Completed</SelectItem>
-                            <SelectItem value="Closed">Closed</SelectItem>
-                          </SelectContent>
-                        </Select>
+                            <SelectTrigger
+                              onClick={(e) => e.stopPropagation()}
+                              className="h-7 w-28 text-xs font-medium rounded-lg"
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl">
+                              <SelectItem value="Scheduled">Scheduled</SelectItem>
+                              <SelectItem value="Ongoing">Ongoing</SelectItem>
+                              <SelectItem value="Completed">Completed</SelectItem>
+                              <SelectItem value="Closed">Closed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Badge
+                            className={`text-[10px] font-bold ${
+                              p.status === "Ongoing"
+                                ? "bg-emerald-600 text-white"
+                                : p.status === "Completed"
+                                ? "bg-emerald-700 text-white"
+                                : "bg-blue-600 text-white"
+                            }`}
+                          >
+                            {p.status}
+                          </Badge>
+                        )}
                       </td>
                       <td className="p-3 text-right pr-4 whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                           <Button size="sm" variant="ghost" onClick={() => setActiveProject(p)} className="h-7 text-xs text-blue-600 gap-1 font-semibold">
                             View Details <ChevronRight className="h-3.5 w-3.5" />
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setDeleteTargetId(p.id)}
-                            className="h-7 w-7 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                            title="Delete Project"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          {canFullEdit && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setDeleteTargetId(p.id)}
+                              className="h-7 w-7 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                              title="Delete Project"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -988,17 +1008,19 @@ function ProjectsComponent() {
                               ) : (
                                 <span className="text-slate-400 italic">Not specified</span>
                               )}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setPhoneInput(activeProject.phone || "");
-                                  setIsEditingPhone(true);
-                                }}
-                                className="text-slate-400 hover:text-blue-600 opacity-50 group-hover/edit:opacity-100 transition-opacity p-0.5 rounded cursor-pointer"
-                                title="Edit phone number"
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </button>
+                              {canFullEdit && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPhoneInput(activeProject.phone || "");
+                                    setIsEditingPhone(true);
+                                  }}
+                                  className="text-slate-400 hover:text-blue-600 opacity-50 group-hover/edit:opacity-100 transition-opacity p-0.5 rounded cursor-pointer"
+                                  title="Edit phone number"
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                              )}
                             </>
                           )}
                         </div>
@@ -1050,17 +1072,19 @@ function ProjectsComponent() {
                               ) : (
                                 <span className="text-slate-400 italic">Not specified</span>
                               )}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setLocationInput(activeProject.location || "");
-                                  setIsEditingLocation(true);
-                                }}
-                                className="text-slate-400 hover:text-blue-600 opacity-50 group-hover/edit:opacity-100 transition-opacity p-0.5 rounded cursor-pointer shrink-0"
-                                title="Edit site location"
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </button>
+                              {canFullEdit && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setLocationInput(activeProject.location || "");
+                                    setIsEditingLocation(true);
+                                  }}
+                                  className="text-slate-400 hover:text-blue-600 opacity-50 group-hover/edit:opacity-100 transition-opacity p-0.5 rounded cursor-pointer shrink-0"
+                                  title="Edit site location"
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                              )}
                             </>
                           )}
                         </div>
@@ -1120,18 +1144,20 @@ function ProjectsComponent() {
                         </div>
                       </div>
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setPayAmount(activeProject.balanceAmount > 0 ? activeProject.balanceAmount : activeProject.projectValue);
-                        setPayRef("");
-                        setPayRemarksInput("Received via Project Financial Cockpit");
-                        setPaymentOpen(true);
-                      }}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs gap-1.5 shadow-sm"
-                    >
-                      <DollarSign className="h-4 w-4" /> Receive Payment
-                    </Button>
+                    {canFullEdit && (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setPayAmount(activeProject.balanceAmount > 0 ? activeProject.balanceAmount : activeProject.projectValue);
+                          setPayRef("");
+                          setPayRemarksInput("Received via Project Financial Cockpit");
+                          setPaymentOpen(true);
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs gap-1.5 shadow-sm"
+                      >
+                        <DollarSign className="h-4 w-4" /> Receive Payment
+                      </Button>
+                    )}
                   </CardHeader>
                   <CardContent className="p-4 space-y-5">
                     {/* Financial KPI Cards & Progress */}
@@ -1197,15 +1223,17 @@ function ProjectsComponent() {
                       <HardHat className="h-3.5 w-3.5 text-blue-600" /> Labours
                     </CardTitle>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => setAddLabourModalOpen(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1 shadow-xs font-semibold"
-                    >
-                      <Plus className="h-3.5 w-3.5" /> Assign Existing Labours
-                    </Button>
-                  </div>
+                  {canFullEdit && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => setAddLabourModalOpen(true)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1 shadow-xs font-semibold"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Assign Existing Labours
+                      </Button>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="w-full overflow-hidden">
@@ -1230,7 +1258,7 @@ function ProjectsComponent() {
                             return (
                               <tr>
                                 <td colSpan={6} className="p-4 text-center text-muted-foreground">
-                                  No labours assigned to this project yet. Click "Assign Existing Labours" to select labours.
+                                  No labours assigned to this project yet.
                                 </td>
                               </tr>
                             );
@@ -1273,14 +1301,16 @@ function ProjectsComponent() {
                                         </Badge>
                                       </td>
                                       <td className="p-2.5 text-right pr-3">
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => handleUnassignLabour(assignment.labourId)}
-                                          className="h-7 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950 border-rose-200 dark:border-rose-900 rounded-lg gap-1 font-medium"
-                                        >
-                                          <X className="h-3.5 w-3.5" /> Unassign
-                                        </Button>
+                                        {canFullEdit && (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleUnassignLabour(assignment.labourId)}
+                                            className="h-7 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950 border-rose-200 dark:border-rose-900 rounded-lg gap-1 font-medium"
+                                          >
+                                            <X className="h-3.5 w-3.5" /> Unassign
+                                          </Button>
+                                        )}
                                       </td>
                                     </tr>
                                   );
@@ -1422,29 +1452,31 @@ function ProjectsComponent() {
                                 <td className="p-2.5 font-extrabold text-emerald-700">₹{earnedWage.toLocaleString("en-IN")}</td>
                                 <td className="p-2.5 text-muted-foreground max-w-xs truncate">{workDesc}</td>
                                 <td className="p-2.5 text-right pr-3">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setEditingLogData({
-                                        labourId: lId,
-                                        labourName: lab?.name || lId,
-                                        labourType: lab?.type || "Permanent",
-                                        dailyWage: dailyWageVal,
-                                        weeklyWage: dailyWageVal * 6,
-                                        date: new Date().toISOString().slice(0, 10),
-                                        inTime: inTime || "09:00 AM",
-                                        outTime: outTime || "06:00 PM",
-                                        attendance: attendanceStatus as any,
-                                        hoursWorked: hours || 8.5,
-                                        workDescription: workDesc,
-                                      });
-                                      setEditLogOpen(true);
-                                    }}
-                                    className="h-6 text-[11px] gap-1"
-                                  >
-                                    <Edit3 className="h-3 w-3" /> Log In/Out Time
-                                  </Button>
+                                  {canFullEdit && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        setEditingLogData({
+                                          labourId: lId,
+                                          labourName: lab?.name || lId,
+                                          labourType: lab?.type || "Permanent",
+                                          dailyWage: dailyWageVal,
+                                          weeklyWage: dailyWageVal * 6,
+                                          date: new Date().toISOString().slice(0, 10),
+                                          inTime: inTime || "09:00 AM",
+                                          outTime: outTime || "06:00 PM",
+                                          attendance: attendanceStatus as any,
+                                          hoursWorked: hours || 8.5,
+                                          workDescription: workDesc,
+                                        });
+                                        setEditLogOpen(true);
+                                      }}
+                                      className="h-6 text-[11px] gap-1"
+                                    >
+                                      <Edit3 className="h-3 w-3" /> Log In/Out Time
+                                    </Button>
+                                  )}
                                 </td>
                               </tr>
                             );
@@ -1466,7 +1498,7 @@ function ProjectsComponent() {
                 <CardContent className="p-3 space-y-2">
                   {(activeProject.labourLogs || []).length === 0 ? (
                     <p className="text-muted-foreground text-center py-2">
-                      No daily work logs recorded yet. Log In Time above to record site progress.
+                      No daily work logs recorded yet.
                     </p>
                   ) : (
                     (activeProject.labourLogs || []).map((log, i) => (
@@ -1543,21 +1575,23 @@ function ProjectsComponent() {
                       <Wrench className="h-3.5 w-3.5 text-blue-600" /> Tools Used
                     </CardTitle>
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      const avail = machines.filter((m) => m.availableQuantity > 0);
-                      if (avail.length > 0) setProjIssueMachineId(avail[0].id);
-                      setProjIssueMachineQty(1);
-                      setProjIssueMachineReturnDate(new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10));
-                      setProjIssueMachineBy("");
-                      setProjIssueMachineRemarks("");
-                      setProjIssueMachineOpen(true);
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Issue Machine
-                  </Button>
+                  {canFullEdit && (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        const avail = machines.filter((m) => m.availableQuantity > 0);
+                        if (avail.length > 0) setProjIssueMachineId(avail[0].id);
+                        setProjIssueMachineQty(1);
+                        setProjIssueMachineReturnDate(new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10));
+                        setProjIssueMachineBy("");
+                        setProjIssueMachineRemarks("");
+                        setProjIssueMachineOpen(true);
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs gap-1"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Issue Machine
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="w-full overflow-hidden">
@@ -1579,7 +1613,7 @@ function ProjectsComponent() {
                         machineIssues.filter((m) => m.projectId === activeProject.id).length === 0) ? (
                           <tr>
                             <td colSpan={8} className="p-4 text-center text-muted-foreground">
-                              No machines issued to this project yet. Click "Issue Machine" above to deploy tools.
+                              No machines issued to this project yet.
                             </td>
                           </tr>
                         ) : (
@@ -1621,7 +1655,7 @@ function ProjectsComponent() {
                                     </Badge>
                                   </td>
                                   <td className="p-2.5 text-right pr-3">
-                                    {remainingToReturn > 0 && (
+                                    {canFullEdit && remainingToReturn > 0 && (
                                       <Button
                                         size="sm"
                                         variant="outline"
@@ -1655,18 +1689,20 @@ function ProjectsComponent() {
                   <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
                     <Package className="h-3.5 w-3.5 text-amber-600" /> Section 7.5: Material Issue Log (Reference Notes)
                   </CardTitle>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setEditingMatNote(null);
-                      setMatNoteDesc("");
-                      setMatNoteDate(new Date().toISOString().slice(0, 10));
-                      setIsAddMaterialNoteOpen(true);
-                    }}
-                    className="bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs gap-1.5 h-7 shadow-xs font-semibold"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Add Material Note
-                  </Button>
+                  {canFullEdit && (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setEditingMatNote(null);
+                        setMatNoteDesc("");
+                        setMatNoteDate(new Date().toISOString().slice(0, 10));
+                        setIsAddMaterialNoteOpen(true);
+                      }}
+                      className="bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs gap-1.5 h-7 shadow-xs font-semibold"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Add Material Note
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
@@ -1683,7 +1719,7 @@ function ProjectsComponent() {
                         materialIssues.filter((m) => m.projectId === activeProject.id).length === 0) ? (
                           <tr>
                             <td colSpan={3} className="p-4 text-center text-muted-foreground">
-                              No material notes recorded for this project yet. Click "Add Material Note" to log materials used.
+                              No material notes recorded for this project yet.
                             </td>
                           </tr>
                         ) : (
@@ -1698,31 +1734,33 @@ function ProjectsComponent() {
                                   {mat.materialName}
                                 </td>
                                 <td className="p-2.5 text-right pr-3">
-                                  <div className="flex items-center justify-end gap-1">
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      onClick={() => {
-                                        setEditingMatNote(mat);
-                                        setMatNoteDesc(mat.materialName);
-                                        setMatNoteDate(mat.issueDate || new Date().toISOString().slice(0, 10));
-                                        setIsAddMaterialNoteOpen(true);
-                                      }}
-                                      title="Edit Note"
-                                      className="h-7 w-7 rounded-lg text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-                                    >
-                                      <Pencil className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      onClick={() => deleteProjectMaterialNote(mat.id)}
-                                      title="Delete Note"
-                                      className="h-7 w-7 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </div>
+                                  {canFullEdit && (
+                                    <div className="flex items-center justify-end gap-1">
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => {
+                                          setEditingMatNote(mat);
+                                          setMatNoteDesc(mat.materialName);
+                                          setMatNoteDate(mat.issueDate || new Date().toISOString().slice(0, 10));
+                                          setIsAddMaterialNoteOpen(true);
+                                        }}
+                                        title="Edit Note"
+                                        className="h-7 w-7 rounded-lg text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                      >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => deleteProjectMaterialNote(mat.id)}
+                                        title="Delete Note"
+                                        className="h-7 w-7 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
+                                  )}
                                 </td>
                               </tr>
                             ))
@@ -1857,14 +1895,16 @@ function ProjectsComponent() {
                             }
                           }}
                         />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => document.getElementById(`proj-quotation-pdf-input-${activeProject.id}`)?.click()}
-                          className="text-xs gap-1.5 rounded-lg border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 font-semibold shadow-2xs"
-                        >
-                          <Upload className="h-3.5 w-3.5 text-blue-600" /> Upload Quotation PDF
-                        </Button>
+                        {canFullEdit && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => document.getElementById(`proj-quotation-pdf-input-${activeProject.id}`)?.click()}
+                            className="text-xs gap-1.5 rounded-lg border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 font-semibold shadow-2xs"
+                          >
+                            <Upload className="h-3.5 w-3.5 text-blue-600" /> Upload Quotation PDF
+                          </Button>
+                        )}
                       </div>
                     );
                   })()}
@@ -1908,39 +1948,43 @@ function ProjectsComponent() {
                               if (w) w.document.write(`<img src="${activeProject.beforeWorkPhotoUrl}" style="max-width:100%; max-height:100vh; display:block; margin:auto;" />`);
                             }}
                           />
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => {
-                                updateProject(activeProject.id, { beforeWorkPhotoUrl: "" });
-                                setActiveProject({ ...activeProject, beforeWorkPhotoUrl: "" });
-                                toast.success("Before Work photo removed");
-                              }}
-                              className="h-7 text-xs gap-1 font-bold"
-                            >
-                              <Trash2 className="h-3 w-3" /> Remove Photo
-                            </Button>
-                          </div>
+                          {canFullEdit && (
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => {
+                                  updateProject(activeProject.id, { beforeWorkPhotoUrl: "" });
+                                  setActiveProject({ ...activeProject, beforeWorkPhotoUrl: "" });
+                                  toast.success("Before Work photo removed");
+                                }}
+                                className="h-7 text-xs gap-1 font-bold"
+                              >
+                                <Trash2 className="h-3 w-3" /> Remove Photo
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="border-2 border-dashed border-amber-300 dark:border-amber-700/60 rounded-xl p-6 text-center space-y-3 bg-white dark:bg-card">
                           <Camera className="h-8 w-8 text-amber-500 mx-auto" />
                           <div>
                             <p className="text-xs font-bold text-amber-900 dark:text-amber-200">No Before Work Photo Uploaded</p>
-                            <p className="text-[10px] text-muted-foreground">Upload initial site damage or pre-servicing condition image.</p>
+                            <p className="text-[10px] text-muted-foreground">Pre-servicing condition image.</p>
                           </div>
-                          <PhotoCapture
-                            folder="project-work"
-                            label="Upload Before Photo"
-                            currentPhotoUrl={activeProject.beforeWorkPhotoUrl}
-                            onUploaded={(url) => {
-                              updateProject(activeProject.id, { beforeWorkPhotoUrl: url });
-                              setActiveProject({ ...activeProject, beforeWorkPhotoUrl: url });
-                              toast.success("Before Work Photo uploaded successfully to Cloudinary!");
-                            }}
-                            className="flex justify-center"
-                          />
+                          {canFullEdit && (
+                            <PhotoCapture
+                              folder="project-work"
+                              label="Upload Before Photo"
+                              currentPhotoUrl={activeProject.beforeWorkPhotoUrl}
+                              onUploaded={(url) => {
+                                updateProject(activeProject.id, { beforeWorkPhotoUrl: url });
+                                setActiveProject({ ...activeProject, beforeWorkPhotoUrl: url });
+                                toast.success("Before Work Photo uploaded successfully to Cloudinary!");
+                              }}
+                              className="flex justify-center"
+                            />
+                          )}
                         </div>
                       )}
                     </div>
@@ -1967,39 +2011,43 @@ function ProjectsComponent() {
                               if (w) w.document.write(`<img src="${activeProject.afterWorkPhotoUrl}" style="max-width:100%; max-height:100vh; display:block; margin:auto;" />`);
                             }}
                           />
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => {
-                                updateProject(activeProject.id, { afterWorkPhotoUrl: "" });
-                                setActiveProject({ ...activeProject, afterWorkPhotoUrl: "" });
-                                toast.success("After Work photo removed");
-                              }}
-                              className="h-7 text-xs gap-1 font-bold"
-                            >
-                              <Trash2 className="h-3 w-3" /> Remove Photo
-                            </Button>
-                          </div>
+                          {canFullEdit && (
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => {
+                                  updateProject(activeProject.id, { afterWorkPhotoUrl: "" });
+                                  setActiveProject({ ...activeProject, afterWorkPhotoUrl: "" });
+                                  toast.success("After Work photo removed");
+                                }}
+                                className="h-7 text-xs gap-1 font-bold"
+                              >
+                                <Trash2 className="h-3 w-3" /> Remove Photo
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="border-2 border-dashed border-emerald-300 dark:border-emerald-700/60 rounded-xl p-6 text-center space-y-3 bg-white dark:bg-card">
                           <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto" />
                           <div>
                             <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">No After Work Photo Uploaded</p>
-                            <p className="text-[10px] text-muted-foreground">Upload post-servicing completed work verification image.</p>
+                            <p className="text-[10px] text-muted-foreground">Post-servicing completed work verification image.</p>
                           </div>
-                          <PhotoCapture
-                            folder="project-work"
-                            label="Upload After Photo"
-                            currentPhotoUrl={activeProject.afterWorkPhotoUrl}
-                            onUploaded={(url) => {
-                              updateProject(activeProject.id, { afterWorkPhotoUrl: url });
-                              setActiveProject({ ...activeProject, afterWorkPhotoUrl: url });
-                              toast.success("After Work Photo uploaded successfully to Cloudinary!");
-                            }}
-                            className="flex justify-center"
-                          />
+                          {canFullEdit && (
+                            <PhotoCapture
+                              folder="project-work"
+                              label="Upload After Photo"
+                              currentPhotoUrl={activeProject.afterWorkPhotoUrl}
+                              onUploaded={(url) => {
+                                updateProject(activeProject.id, { afterWorkPhotoUrl: url });
+                                setActiveProject({ ...activeProject, afterWorkPhotoUrl: url });
+                                toast.success("After Work Photo uploaded successfully to Cloudinary!");
+                              }}
+                              className="flex justify-center"
+                            />
+                          )}
                         </div>
                       )}
 
@@ -2029,13 +2077,15 @@ function ProjectsComponent() {
                 >
                   Cancel
                 </Button>
-                <Button
-                  type="button"
-                  onClick={handleSaveActiveProject}
-                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs gap-1 font-bold shadow-md px-5 h-9"
-                >
-                  <Save className="h-4 w-4" /> Save & Update Project
-                </Button>
+                {canFullEdit && (
+                  <Button
+                    type="button"
+                    onClick={handleSaveActiveProject}
+                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs gap-1 font-bold shadow-md px-5 h-9"
+                  >
+                    <Save className="h-4 w-4" /> Save & Update Project
+                  </Button>
+                )}
               </div>
             </DialogFooter>
           </DialogContent>

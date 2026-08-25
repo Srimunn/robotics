@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useRobotics } from "@/lib/robotics-context";
+import { canEdit } from "@/lib/permissions";
 import type { MasterDataCategory, MasterDataItem } from "@/lib/robotics-types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,7 +56,10 @@ export function MasterDataManager() {
     updateMasterDataItem,
     deleteMasterDataItem,
     toggleMasterDataItemActive,
+    currentUser,
   } = useRobotics();
+
+  const canFullEdit = canEdit(currentUser);
 
   const [selectedCategory, setSelectedCategory] = useState<MasterDataCategory>("Lead Source");
   const [searchQuery, setSearchQuery] = useState("");
@@ -176,17 +180,19 @@ export function MasterDataManager() {
             </div>
 
             {/* Quick Add Form */}
-            <form onSubmit={handleAdd} className="flex items-center gap-2 pt-2 border-t border-dashed">
-              <Input
-                placeholder={`Add new value to ${selectedCategory}...`}
-                value={newValueInput}
-                onChange={(e) => setNewValueInput(e.target.value)}
-                className="h-9 text-xs rounded-lg flex-1"
-              />
-              <Button type="submit" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white text-xs gap-1.5 h-9 rounded-lg px-4">
-                <Plus className="h-4 w-4" /> Add Value
-              </Button>
-            </form>
+            {canFullEdit && (
+              <form onSubmit={handleAdd} className="flex items-center gap-2 pt-2 border-t border-dashed">
+                <Input
+                  placeholder={`Add new value to ${selectedCategory}...`}
+                  value={newValueInput}
+                  onChange={(e) => setNewValueInput(e.target.value)}
+                  className="h-9 text-xs rounded-lg flex-1"
+                />
+                <Button type="submit" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white text-xs gap-1.5 h-9 rounded-lg px-4">
+                  <Plus className="h-4 w-4" /> Add Value
+                </Button>
+              </form>
+            )}
           </CardHeader>
 
           <CardContent className="p-0">
@@ -239,37 +245,39 @@ export function MasterDataManager() {
                         })}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenEdit(item)}
-                            title="Rename / Edit Value"
-                            className="h-7 w-7 text-slate-600 hover:text-blue-600"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => toggleMasterDataItemActive(item.id)}
-                            title={item.isActive ? "Deactivate" : "Activate"}
-                            className={`h-7 w-7 ${item.isActive ? "text-amber-600 hover:text-amber-700" : "text-emerald-600 hover:text-emerald-700"}`}
-                          >
-                            <Power className="h-3.5 w-3.5" />
-                          </Button>
-                          {!item.isDefault && (
+                        {canFullEdit && (
+                          <div className="flex items-center justify-end gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => deleteMasterDataItem(item.id)}
-                              title="Delete Value"
-                              className="h-7 w-7 text-rose-500 hover:text-rose-700"
+                              onClick={() => handleOpenEdit(item)}
+                              title="Rename / Edit Value"
+                              className="h-7 w-7 text-slate-600 hover:text-blue-600"
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
+                              <Pencil className="h-3.5 w-3.5" />
                             </Button>
-                          )}
-                        </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => toggleMasterDataItemActive(item.id)}
+                              title={item.isActive ? "Deactivate" : "Activate"}
+                              className={`h-7 w-7 ${item.isActive ? "text-amber-600 hover:text-amber-700" : "text-emerald-600 hover:text-emerald-700"}`}
+                            >
+                              <Power className="h-3.5 w-3.5" />
+                            </Button>
+                            {!item.isDefault && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => deleteMasterDataItem(item.id)}
+                                title="Delete Value"
+                                className="h-7 w-7 text-rose-500 hover:text-rose-700"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

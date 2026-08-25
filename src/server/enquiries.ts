@@ -4,6 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "~/lib/db";
 import { cleanPhone, toNumber, toNullableNumber, generateSafeId } from "./utils";
+import { assertCanEdit, assertCanConvertEnquiry, assertCanUpdateEnquiry } from "./permissions";
 
 function formatEnquiry<T extends Record<string, any>>(e: T | null) {
   if (!e) return null;
@@ -100,10 +101,11 @@ const enquiryUpdate = enquiryCreate.partial().extend({
 });
 
 export const updateEnquiry = createServerFn({ method: "POST" })
-  .validator((input: { id: string; updates: z.infer<typeof enquiryUpdate> }) => input)
+  .validator((input: { id: string; updates: z.infer<typeof enquiryUpdate>; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
     const { id, updates } = data;
     const parsed = enquiryUpdate.parse(updates);
+    assertCanUpdateEnquiry(parsed, data);
 
     return db.$transaction(async (tx) => {
       let engName: string | null | undefined = parsed.assignedEngineerName;
@@ -195,16 +197,18 @@ export const updateEnquiry = createServerFn({ method: "POST" })
   });
 
 export const deleteEnquiry = createServerFn({ method: "POST" })
-  .validator((input: { id: string }) => input)
+  .validator((input: { id: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     await db.enquiry.delete({ where: { id: data.id } });
     return { ok: true };
   });
 
 /** One-click: Approved Enquiry → new Project (inherits all fields, seeds activity log, links back). */
 export const approveAndConvertEnquiryToProject = createServerFn({ method: "POST" })
-  .validator((input: { enquiryId: string }) => input)
+  .validator((input: { enquiryId: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanConvertEnquiry(data);
     return db.$transaction(async (tx) => {
       const enq = await tx.enquiry.findUnique({ where: { id: data.enquiryId } });
       if (!enq) throw new Error("Enquiry not found");

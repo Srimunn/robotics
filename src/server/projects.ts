@@ -2,20 +2,11 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import type { VerificationStatus, AttendanceStatus } from "@prisma/client";
+import type { AttendanceStatus, VerificationStatus } from "@prisma/client";
 import { db } from "~/lib/db";
 import { cleanPhone, toNumber, toNullableNumber } from "./utils";
-
 import { calculateHoursFromTimes, calculateEarnedWage } from "./calculations";
-
-function mapAttendanceStatusToDb(s?: string | null): AttendanceStatus {
-  if (!s) return "Present";
-  if (s === "Half Day" || s === "HalfDay") return "HalfDay";
-  if (s === "Absent") return "Absent";
-  if (s === "Leave") return "Leave";
-  if (s === "Overtime") return "Overtime";
-  return "Present";
-}
+import { assertCanEdit } from "./permissions";
 
 function formatProject<T extends Record<string, any>>(p: T | null) {
   if (!p) return null;
@@ -56,8 +47,9 @@ const projectUpdate = z.object({
 
 /** updateProject with bi-directional sync back to linked Enquiry. */
 export const updateProject = createServerFn({ method: "POST" })
-  .validator((input: { id: string; updates: z.infer<typeof projectUpdate> }) => input)
+  .validator((input: { id: string; updates: z.infer<typeof projectUpdate>; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     const parsed = projectUpdate.parse(data.updates);
     return db.$transaction(async (tx) => {
       const current = await tx.project.findUnique({ where: { id: data.id } });
@@ -136,15 +128,17 @@ export const updateProject = createServerFn({ method: "POST" })
   });
 
 export const deleteProject = createServerFn({ method: "POST" })
-  .validator((input: { id: string }) => input)
+  .validator((input: { id: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     await db.project.delete({ where: { id: data.id } });
     return { ok: true };
   });
 
 export const updateProjectStatus = createServerFn({ method: "POST" })
-  .validator((input: { id: string; status: "Waiting" | "Scheduled" | "Ongoing" | "Completed" | "Closed"; note?: string }) => input)
+  .validator((input: { id: string; status: "Waiting" | "Scheduled" | "Ongoing" | "Completed" | "Closed"; note?: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     return db.$transaction(async (tx) => {
       const proj = await tx.project.findUnique({ where: { id: data.id } });
       if (!proj) throw new Error("Project not found");
@@ -175,8 +169,9 @@ export const updateProjectStatus = createServerFn({ method: "POST" })
 
 /** Assign labours to a project (with per-labour daily wage, conflict-checked). */
 export const assignLaboursToProject = createServerFn({ method: "POST" })
-  .validator((input: { projectId: string; assignments: Array<{ labourId: string; weeklyWage?: number; dailyWage?: number; assignedDate?: string }> }) => input)
+  .validator((input: { projectId: string; assignments: Array<{ labourId: string; weeklyWage?: number; dailyWage?: number; assignedDate?: string }>; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     return db.$transaction(async (tx) => {
       const project = await tx.project.findUnique({ where: { id: data.projectId } });
       if (!project) throw new Error("Project not found");
@@ -251,8 +246,9 @@ export const assignLaboursToProject = createServerFn({ method: "POST" })
 
 /** Unassign a labour from a project without deleting the ProjectLabourAssignment record (sets isActive: false). */
 export const unassignLabourFromProject = createServerFn({ method: "POST" })
-  .validator((input: { projectId: string; labourId: string }) => input)
+  .validator((input: { projectId: string; labourId: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     return db.$transaction(async (tx) => {
       const existing = await tx.projectLabourAssignment.findFirst({
         where: { projectId: data.projectId, labourId: data.labourId },
@@ -291,6 +287,8 @@ export const unassignLabourFromProject = createServerFn({ method: "POST" })
 
 const updateLabourLogInput = z.object({
   projectId: z.string().min(1, "Project ID is required"),
+  requestedByRole: z.string().optional().nullable(),
+  requestedBySubRole: z.string().optional().nullable(),
   log: z.object({
     labourId: z.string().min(1, "Labour ID is required"),
     date: z.string().min(1, "Date is required"),
@@ -318,10 +316,19 @@ const mapVerStatusToDb = (v?: string | null): VerificationStatus | undefined => 
   return undefined;
 };
 
+const mapAttendanceStatusToDb = (v?: string | null): AttendanceStatus => {
+  if (v === "Absent") return "Absent";
+  if (v === "Leave") return "Leave";
+  if (v === "HalfDay" || v === "Half Day") return "HalfDay";
+  if (v === "Overtime") return "Overtime";
+  return "Present";
+};
+
 /** Record/update a labour's daily log — auto-derives attendance, hours, earnings; also syncs central AttendanceRecord. */
 export const updateProjectLabourLog = createServerFn({ method: "POST" })
   .validator((input: unknown) => updateLabourLogInput.parse(input))
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     return db.$transaction(async (tx) => {
       const proj = await tx.project.findUnique({ where: { id: data.projectId } });
       if (!proj) throw new Error("Project not found");
@@ -449,17 +456,19 @@ export const updateProjectLabourLog = createServerFn({ method: "POST" })
   });
 
 export const updateFollowUpTag = createServerFn({ method: "POST" })
-  .validator((input: { projectId: string; followUpTag?: string | null }) =>
+  .validator((input: { projectId: string; followUpTag?: string | null; requestedByRole?: string | null; requestedBySubRole?: string | null }) =>
     z.object({
       projectId: z.string(),
       followUpTag: z.string().optional().nullable(),
+      requestedByRole: z.string().optional().nullable(),
+      requestedBySubRole: z.string().optional().nullable(),
     }).parse(input)
   )
   .handler(async ({ data }) => {
+    assertCanEdit(data);
     const updated = await db.project.update({
       where: { id: data.projectId },
       data: { followUpTag: data.followUpTag || null },
     });
     return formatProject(updated);
   });
-
