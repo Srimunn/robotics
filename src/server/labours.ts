@@ -83,10 +83,13 @@ export const deleteLabour = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     assertCanEdit(data);
     try {
+      await db.attendanceRecord.deleteMany({ where: { labourId: data.id } });
+      await db.projectLabourLog.deleteMany({ where: { labourId: data.id } });
       await db.projectLabourAssignment.deleteMany({ where: { labourId: data.id } });
       await db.labourWageHistory.deleteMany({ where: { labourId: data.id } });
       await db.labour.delete({ where: { id: data.id } });
     } catch {
+      await db.attendanceRecord.deleteMany({ where: { labourId: data.id } }).catch(() => {});
       await db.projectLabourAssignment.updateMany({
         where: { labourId: data.id, isActive: true },
         data: { isActive: false },
