@@ -199,11 +199,13 @@ function EnquiriesComponent() {
       (e.assignedEngineerName && e.assignedEngineerName.toLowerCase().includes(searchQuery.toLowerCase()));
 
     const todayStr = new Date().toISOString().slice(0, 10);
+    const visitDateStr = e.siteVisitDate ? String(e.siteVisitDate).slice(0, 10) : "";
+
     const matchesDecision =
       decisionFilter === "ALL"
         ? true
         : decisionFilter === "Today's Visits" || decisionFilter === "todayVisits"
-        ? e.siteVisitDate === todayStr || (e.siteVisitStatus !== "Completed" && Boolean(e.siteVisitDate))
+        ? visitDateStr === todayStr
         : decisionFilter === "Follow-up" || decisionFilter === "Follow Up"
         ? e.customerDecision === "Follow Up" || e.customerDecision === "Follow-up" || (e.customerDecision as string) === "FollowUp"
         : e.customerDecision === decisionFilter;
@@ -414,16 +416,30 @@ function EnquiriesComponent() {
                           <PhoneCall className="h-6 w-6 stroke-[1.5]" />
                         </div>
                         <div className="space-y-1">
-                          <p className="text-base font-semibold text-foreground">No enquiries created yet.</p>
-                          <p className="text-xs text-muted-foreground">Create your first enquiry to begin tracking leads and converting projects.</p>
+                          <p className="text-base font-semibold text-foreground">
+                            {decisionFilter === "Today's Visits"
+                              ? "No site visits scheduled for today."
+                              : searchQuery || decisionFilter !== "ALL"
+                              ? "No matching enquiries found."
+                              : "No enquiries created yet."}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {decisionFilter === "Today's Visits"
+                              ? "Enquiries with site visit dates scheduled for today will appear here."
+                              : searchQuery || decisionFilter !== "ALL"
+                              ? "Try adjusting your search or filter criteria."
+                              : "Create your first enquiry to begin tracking leads and converting projects."}
+                          </p>
                         </div>
-                        <Button
-                          size="sm"
-                          onClick={() => setCreateOpen(true)}
-                          className="mt-2 bg-blue-600 hover:bg-blue-700 text-white gap-1.5 rounded-lg shadow-xs"
-                        >
-                          <Plus className="h-4 w-4" /> Create Enquiry
-                        </Button>
+                        {decisionFilter === "ALL" && !searchQuery && (
+                          <Button
+                            size="sm"
+                            onClick={() => setCreateOpen(true)}
+                            className="mt-2 bg-blue-600 hover:bg-blue-700 text-white gap-1.5 rounded-lg shadow-xs"
+                          >
+                            <Plus className="h-4 w-4" /> Create Enquiry
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>

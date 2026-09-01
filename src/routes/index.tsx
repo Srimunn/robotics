@@ -170,16 +170,15 @@ function DashboardComponent() {
   const [activeProjectModal, setActiveProjectModal] = useState<Project | null>(null);
 
   // ---------------------------------------------------------------------------
-  // TODAY'S CALCULATED METRICS
+  // TODAY'S CALCULATED METRICS (Strict Today's Date)
   // ---------------------------------------------------------------------------
-  const realTodayStr = new Date().toISOString().slice(0, 10);
-  const seedTodayStr = "2026-07-28";
-  const todayStr = realTodayStr;
+  const todayStr = new Date().toISOString().slice(0, 10);
 
-  // Card 1: Today's Site Visits (Enquiries with siteVisitDate or assigned engineer)
-  const todaysSiteVisits = enquiries.filter(
-    (e) => e.siteVisitStatus !== "Completed" || e.siteVisitDate === todayStr || e.siteVisitDate === seedTodayStr
-  );
+  // Card 1: Today's Site Visits (Enquiries with siteVisitDate matching today's date)
+  const todaysSiteVisits = enquiries.filter((e) => {
+    if (!e.siteVisitDate) return false;
+    return String(e.siteVisitDate).slice(0, 10) === todayStr;
+  });
 
   // Card 2: Today's Scheduled / Ongoing Projects
   const todaysScheduledProjects = projects.filter(
@@ -190,7 +189,7 @@ function DashboardComponent() {
   const permanentLabourPendingCheckIn = labours.filter((l) => {
     if (l.isActive === false) return false;
     if (l.type !== "Permanent") return false;
-    const attRecord = attendance[`${l.id}_${todayStr}`] || attendance[`${l.id}_${seedTodayStr}`];
+    const attRecord = attendance[`${l.id}_${todayStr}`];
     const isCheckedIn = attRecord && attRecord.status === "Present" && Boolean(attRecord.inTime);
     return !isCheckedIn;
   });
@@ -204,19 +203,15 @@ function DashboardComponent() {
   );
 
   // Today's Summary Right Side Panel Indicators
-  const newEnquiriesToday = enquiries.filter(
-    (e) =>
-      e.enquiryDate === todayStr ||
-      e.enquiryDate === seedTodayStr ||
-      e.customerDecision === "Thinking" ||
-      e.customerDecision === "Follow-up" ||
-      e.customerDecision === "Follow Up" ||
-      e.customerStatus === "Prospective"
-  ).length;
+  const newEnquiriesToday = enquiries.filter((e) => {
+    if (!e.enquiryDate) return false;
+    return String(e.enquiryDate).slice(0, 10) === todayStr;
+  }).length;
 
-  const siteVisitsCompletedCount = enquiries.filter(
-    (e) => e.siteVisitStatus === "Completed"
-  ).length;
+  const siteVisitsCompletedCount = enquiries.filter((e) => {
+    if (!e.siteVisitDate) return false;
+    return (e.siteVisitStatus === "Visited" || e.siteVisitStatus === "Completed") && String(e.siteVisitDate).slice(0, 10) === todayStr;
+  }).length;
 
   // Machine & Material KPI Calculations
   const kpiTotalMachines = machines.reduce((acc, m) => acc + m.currentStock, 0);
@@ -226,9 +221,9 @@ function DashboardComponent() {
   const kpiLowStockMaterials = materials.filter((m) => m.currentStock <= m.minimumStock).length;
   const kpiTotalInventoryValuation = materials.reduce((acc, m) => acc + m.currentStock * m.purchaseCost, 0);
   const kpiTodaysMaterialConsumption = materialIssues
-    .filter((mi) => mi.issueDate === todayStr || mi.issueDate === seedTodayStr)
+    .filter((mi) => mi.issueDate === todayStr)
     .reduce((acc, mi) => acc + (mi.totalCost || 0), 0);
-  const kpiTodaysMachineIssues = machineIssues.filter((mi) => mi.issueDate === todayStr || mi.issueDate === seedTodayStr).length;
+  const kpiTodaysMachineIssues = machineIssues.filter((mi) => mi.issueDate === todayStr).length;
 
   const projectsStartedCount = projects.filter(
     (p) => p.status === "Ongoing"
@@ -245,14 +240,14 @@ function DashboardComponent() {
   const permanentLabourWorkingCount = labours.filter((l) => {
     if (l.isActive === false) return false;
     if (l.type !== "Permanent") return false;
-    const rec = attendance[`${l.id}_${todayStr}`] || attendance[`${l.id}_${seedTodayStr}`];
+    const rec = attendance[`${l.id}_${todayStr}`];
     return rec && rec.status === "Present";
   }).length;
 
   const contractLabourWorkingCount = labours.filter((l) => {
     if (l.isActive === false) return false;
     if (l.type !== "Contract") return false;
-    const rec = attendance[`${l.id}_${todayStr}`] || attendance[`${l.id}_${seedTodayStr}`];
+    const rec = attendance[`${l.id}_${todayStr}`];
     return rec && rec.status === "Present";
   }).length;
 
