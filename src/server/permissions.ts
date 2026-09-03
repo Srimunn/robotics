@@ -6,6 +6,7 @@ export interface RequestUserMeta {
 /**
  * Ensures caller is authorized to perform mutations across standard ERP modules.
  * Throws an error if caller is in view-only subRoles ("CS" or "BS").
+ * CEO, RS, and DRS have full mutating access.
  */
 export function assertCanEdit(meta?: RequestUserMeta) {
   if (meta?.requestedBySubRole === "CS" || meta?.requestedBySubRole === "BS") {
@@ -15,7 +16,7 @@ export function assertCanEdit(meta?: RequestUserMeta) {
 
 /**
  * Ensures caller is authorized to convert an Enquiry to a Project.
- * Strictly restricted to CEO and RS.
+ * Strictly restricted to CEO, RS, and DRS. CS and BS cannot convert enquiries.
  */
 export function assertCanConvertEnquiry(meta?: RequestUserMeta) {
   if (meta?.requestedBySubRole === "CS" || meta?.requestedBySubRole === "BS") {

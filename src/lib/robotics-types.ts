@@ -440,7 +440,7 @@ export interface AttendanceRecord {
 
 export interface CurrentUser {
   role: "CEO" | "Worker" | "Labor";
-  subRole?: "RS" | "CS" | "BS";
+  subRole?: "RS" | "CS" | "BS" | "DRS";
   id?: string;
   name: string;
 }

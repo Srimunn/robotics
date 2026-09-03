@@ -194,7 +194,7 @@ const defaultSettings: SystemSettings = {
 
 type RoboticsContextType = {
   currentUser: CurrentUser | null;
-  login: (role: "CEO" | "Worker" | "Labor" | "RS" | "CS" | "BS", loginIdOrId?: string, pin?: string) => boolean;
+  login: (role: "CEO" | "Worker" | "Labor" | "RS" | "CS" | "BS" | "DRS", loginIdOrId?: string, pin?: string) => boolean;
   logout: (isAutoTimeout?: boolean) => void;
   isLoading: boolean;
 
@@ -558,7 +558,7 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   };
 
   // ---------- Login / Logout ----------
-  const login = (role: "CEO" | "Worker" | "Labor" | "RS" | "CS" | "BS", loginIdOrId?: string, pin?: string): boolean => {
+  const login = (role: "CEO" | "Worker" | "Labor" | "RS" | "CS" | "BS" | "DRS", loginIdOrId?: string, pin?: string): boolean => {
     if (!pin || !pin.trim()) { toast.error("Security PIN is required"); return false; }
     const trimmedPin = pin.trim();
     if (role === "CEO") {
@@ -571,6 +571,12 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
       if (trimmedPin !== "5678") { toast.error("Incorrect Robotics Service PIN"); return false; }
       setCurrentUser({ role: "Worker", subRole: "RS", name: "Robotics Service" });
       toast.success("Robotics Service session initiated");
+      return true;
+    }
+    if (role === "DRS") {
+      if (trimmedPin !== "9753") { toast.error("Incorrect Deepak Robotics PIN"); return false; }
+      setCurrentUser({ role: "Worker", subRole: "DRS", name: "Deepak Robotics" });
+      toast.success("Deepak Robotics session initiated");
       return true;
     }
     if (role === "CS") {

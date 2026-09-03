@@ -8,11 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Briefcase, Lock, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-type AppRole = "Admin" | "RS" | "CS" | "BS" | "Labour";
+type AppRole = "Admin" | "RS" | "DRS" | "CS" | "BS" | "Labour";
 
 const ROLES: { id: AppRole; label: string; description: string }[] = [
   { id: "Admin", label: "Admin", description: "CEO Executive Login" },
   { id: "RS", label: "RS", description: "Robotics Service Login" },
+  { id: "DRS", label: "DRS", description: "Deepak Robotics Login" },
   { id: "CS", label: "CS", description: "Construction Solutions Login" },
   { id: "BS", label: "BS", description: "Builder Supply Login" },
   { id: "Labour", label: "Labour", description: "Field Crew Member Login" },
@@ -51,6 +52,8 @@ export function LoginPage() {
       success = login("CEO", undefined, pin);
     } else if (selectedRole === "RS") {
       success = login("RS", undefined, pin);
+    } else if (selectedRole === "DRS") {
+      success = login("DRS", undefined, pin);
     } else if (selectedRole === "CS") {
       success = login("CS", undefined, pin);
     } else if (selectedRole === "BS") {
@@ -96,13 +99,13 @@ export function LoginPage() {
                 {ROLES.find((r) => r.id === selectedRole)?.description}
               </span>
             </div>
-            <div className="grid grid-cols-5 gap-1.5">
+            <div className="grid grid-cols-6 gap-1 sm:gap-1.5">
               {ROLES.map((role) => (
                 <button
                   key={role.id}
                   type="button"
                   onClick={() => handleRoleChange(role.id)}
-                  className={`h-9 rounded-xl text-xs font-bold transition-all duration-200 border cursor-pointer flex items-center justify-center ${
+                  className={`h-9 rounded-xl text-[11px] sm:text-xs font-bold transition-all duration-200 border cursor-pointer flex items-center justify-center px-0.5 sm:px-1 ${
                     selectedRole === role.id
                       ? "bg-blue-600 text-white border-blue-600 shadow-xs"
                       : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
