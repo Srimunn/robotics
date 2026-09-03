@@ -1104,3 +1104,267 @@ export const generatePayrollPdfReport = createServerFn({ method: "POST" })
     };
   });
 
+/** Server function to generate comprehensive Machine / Tool History Report PDF */
+export const generateMachineHistoryReport = createServerFn({ method: "POST" })
+  .validator((input: { machineId: string }) => input)
+  .handler(async ({ data }) => {
+    const { machineId } = data;
+
+    const machine = await db.machine.findUnique({
+      where: { id: machineId },
+      include: {
+        issues: {
+          include: {
+            project: {
+              select: {
+                id: true,
+                customerName: true,
+                location: true,
+              },
+            },
+          },
+          orderBy: { issueDate: "desc" },
+        },
+      },
+    });
+
+    if (!machine) {
+      throw new Error(`Machine ${machineId} not found`);
+    }
+
+    const auditLogs = await db.stockAuditLog.findMany({
+      where: { itemId: machineId },
+      orderBy: { timestamp: "desc" },
+    });
+
+    const nowStr = formatPdfDate(new Date());
+
+    // Compute quick stats
+    const totalLifetimeIssued = machine.issues.length;
+    const damagedOrLostReturns = machine.issues.filter(
+      (iss) =>
+        iss.conditionOnReturn === "Damaged" ||
+        iss.conditionOnReturn === "Lost" ||
+        iss.conditionOnReturn === "RepairRequired" ||
+        (iss.status as string) === "UnderRepair" ||
+        (iss.status as string) === "Lost"
+    ).length;
+    const activeIssues = machine.issues.filter(
+      (iss) =>
+        iss.status === "Issued" ||
+        (iss.status as string) === "PartiallyReturned" ||
+        (iss.status as string) === "Partially Returned"
+    );
+
+    const pdfBuffer = await renderPdf(async (doc) => {
+      // 1. Header & Title Banner
+      doc
+        .fontSize(16)
+        .font("Helvetica-Bold")
+        .fillColor("#0f172a")
+        .text("Robotics Bricks & Blocks — Machine History Report", { align: "center" })
+        .moveDown(0.2);
+
+      doc
+        .fontSize(8.5)
+        .font("Helvetica")
+        .fillColor("#475569")
+        .text(`Machine ID: ${machine.id} | Generated on: ${nowStr}`, { align: "center" })
+        .moveDown(0.6);
+
+      doc.moveTo(30, doc.y).lineTo(565, doc.y).strokeColor("#cbd5e1").stroke().moveDown(0.6);
+
+      // 2. Overview Section Banner
+      const overviewY = doc.y;
+      doc.rect(30, overviewY, 535, 62).fillAndStroke("#f8fafc", "#cbd5e1");
+
+      doc.fillColor("#0f172a").fontSize(10).font("Helvetica-Bold").text(`${machine.id} — ${machine.toolName}`, 40, overviewY + 8);
+      doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#2563eb").text(`Condition: ${machine.condition}`, 400, overviewY + 8, { align: "right", width: 155 });
+
+      doc.font("Helvetica").fontSize(8).fillColor("#334155");
+      doc.text(`Brand: ${machine.brand || "—"} | Category: ${machine.category || "—"} | Unit: ${machine.unit || "Nos"}`, 40, overviewY + 24);
+      doc.text(`Attachment: ${machine.attachment || "Standard Attachment"}`, 40, overviewY + 36);
+      if (machine.remarks) {
+        doc.fillColor("#64748b").text(`Remarks: ${machine.remarks}`, 40, overviewY + 48);
+      }
+
+      doc.y = overviewY + 70;
+
+      // 3. Stock Summary Cards (Total, Available, Issued, Under Repair, Lost)
+      const stockY = doc.y;
+      const cardWidth = 101;
+      const cardGap = 7;
+
+      const cards = [
+        { label: "TOTAL STOCK", val: machine.currentStock, color: "#1e293b", bg: "#f1f5f9", stroke: "#cbd5e1" },
+        { label: "AVAILABLE", val: machine.availableQuantity, color: "#059669", bg: "#ecfdf5", stroke: "#a7f3d0" },
+        { label: "ISSUED TO SITES", val: machine.issuedQuantity, color: "#d97706", bg: "#fffbeb", stroke: "#fde68a" },
+        { label: "UNDER REPAIR", val: machine.repairQuantity, color: "#dc2626", bg: "#fef2f2", stroke: "#fecaca" },
+        { label: "LOST", val: machine.lostQuantity, color: "#e11d48", bg: "#fff1f2", stroke: "#fecdd3" },
+      ];
+
+      cards.forEach((c, idx) => {
+        const cx = 30 + idx * (cardWidth + cardGap);
+        doc.rect(cx, stockY, cardWidth, 38).fillAndStroke(c.bg, c.stroke);
+        doc.fontSize(6.5).font("Helvetica-Bold").fillColor("#64748b").text(c.label, cx + 5, stockY + 6, { width: cardWidth - 10, align: "center" });
+        doc.fontSize(13).font("Helvetica-Bold").fillColor(c.color).text(String(c.val), cx + 5, stockY + 18, { width: cardWidth - 10, align: "center" });
+      });
+
+      doc.y = stockY + 46;
+
+      // Quick KPI Stats Banner
+      const kpiY = doc.y;
+      doc.rect(30, kpiY, 535, 22).fillAndStroke("#eff6ff", "#bfdbfe");
+      doc.fontSize(8).font("Helvetica-Bold").fillColor("#1e40af");
+      doc.text(`Lifetime Issues: ${totalLifetimeIssued} times   |   Damaged / Lost Returns: ${damagedOrLostReturns} times   |   Active Deployments: ${activeIssues.length}`, 40, kpiY + 6);
+
+      doc.y = kpiY + 30;
+
+      // 4. Currently Deployed Section
+      doc.fillColor("#0f172a").fontSize(9.5).font("Helvetica-Bold").text("CURRENTLY DEPLOYED TO SITES", 30, doc.y);
+      doc.moveDown(0.2);
+
+      if (activeIssues.length === 0) {
+        doc.fontSize(8).font("Helvetica-Oblique").fillColor("#64748b").text("No active site deployments. All units are currently in warehouse inventory or maintenance.", 40, doc.y);
+        doc.moveDown(0.5);
+      } else {
+        // Table Header
+        const depHeadY = doc.y;
+        doc.rect(30, depHeadY, 535, 16).fillAndStroke("#1e293b", "#0f172a");
+        doc.fontSize(7.5).font("Helvetica-Bold").fillColor("#ffffff");
+        doc.text("PROJECT ID", 36, depHeadY + 4);
+        doc.text("CUSTOMER & SITE LOCATION", 120, depHeadY + 4);
+        doc.text("QTY", 325, depHeadY + 4, { align: "center", width: 40 });
+        doc.text("ISSUE DATE", 375, depHeadY + 4);
+        doc.text("ISSUED BY", 450, depHeadY + 4);
+
+        doc.y = depHeadY + 18;
+
+        for (let i = 0; i < activeIssues.length; i++) {
+          const rec = activeIssues[i];
+          if (doc.y > 720) doc.addPage();
+          const rowY = doc.y;
+          const bg = i % 2 === 0 ? "#ffffff" : "#f8fafc";
+          doc.rect(30, rowY, 535, 20).fillAndStroke(bg, "#e2e8f0");
+
+          doc.fontSize(7.5).font("Helvetica-Bold").fillColor("#2563eb").text(rec.projectId, 36, rowY + 5);
+          doc.font("Helvetica").fontSize(7.5).fillColor("#1e293b");
+          const siteText = `${rec.customerName}${rec.project?.location ? ` • ${rec.project.location}` : ""}`;
+          doc.text(siteText, 120, rowY + 5, { width: 195, height: 12, ellipsis: true });
+          doc.text(`${rec.quantity} ${machine.unit}`, 325, rowY + 5, { align: "center", width: 40 });
+          doc.text(formatPdfDate(rec.issueDate), 375, rowY + 5);
+          doc.text(rec.issuedBy || "—", 450, rowY + 5, { width: 105, height: 12, ellipsis: true });
+
+          doc.y = rowY + 22;
+        }
+        doc.moveDown(0.3);
+      }
+
+      // 5. Complete Issue & Return History Section
+      if (doc.y > 660) doc.addPage();
+      doc.fillColor("#0f172a").fontSize(9.5).font("Helvetica-Bold").text("COMPLETE ISSUE & RETURN HISTORY", 30, doc.y);
+      doc.moveDown(0.2);
+
+      if (machine.issues.length === 0) {
+        doc.fontSize(8).font("Helvetica-Oblique").fillColor("#64748b").text("No issue records found for this machine.", 40, doc.y);
+        doc.moveDown(0.5);
+      } else {
+        const histHeadY = doc.y;
+        doc.rect(30, histHeadY, 535, 16).fillAndStroke("#334155", "#1e293b");
+        doc.fontSize(7).font("Helvetica-Bold").fillColor("#ffffff");
+        doc.text("STATUS", 35, histHeadY + 4);
+        doc.text("PROJECT / CUSTOMER", 95, histHeadY + 4);
+        doc.text("QTY", 215, histHeadY + 4);
+        doc.text("ISSUED (DATE / BY)", 250, histHeadY + 4);
+        doc.text("RETURNED (DATE / BY)", 350, histHeadY + 4);
+        doc.text("CONDITION / REMARKS", 455, histHeadY + 4);
+
+        doc.y = histHeadY + 18;
+
+        for (let i = 0; i < machine.issues.length; i++) {
+          const iss = machine.issues[i];
+          if (doc.y > 720) doc.addPage();
+          const rowY = doc.y;
+          const bg = i % 2 === 0 ? "#ffffff" : "#f8fafc";
+          doc.rect(30, rowY, 535, 24).fillAndStroke(bg, "#e2e8f0");
+
+          doc.fontSize(7).font("Helvetica-Bold");
+          if (iss.status === "Issued") {
+            doc.fillColor("#d97706").text("Issued", 35, rowY + 4);
+          } else if (iss.status === "Returned") {
+            doc.fillColor("#059669").text("Returned", 35, rowY + 4);
+          } else {
+            doc.fillColor("#2563eb").text(iss.status, 35, rowY + 4);
+          }
+
+          doc.font("Helvetica-Bold").fontSize(7).fillColor("#2563eb").text(iss.projectId, 95, rowY + 4);
+          doc.font("Helvetica").fontSize(6.5).fillColor("#475569").text(iss.customerName, 95, rowY + 13, { width: 115, height: 9, ellipsis: true });
+
+          doc.font("Helvetica").fontSize(7).fillColor("#0f172a").text(`${iss.quantity} ${machine.unit}`, 215, rowY + 4);
+
+          doc.text(formatPdfDate(iss.issueDate), 250, rowY + 4);
+          doc.fontSize(6.5).fillColor("#64748b").text(`By: ${iss.issuedBy || "—"}`, 250, rowY + 13, { width: 95, height: 9, ellipsis: true });
+
+          doc.fontSize(7).fillColor("#0f172a").text(iss.actualReturnedDate ? formatPdfDate(iss.actualReturnedDate) : "—", 350, rowY + 4);
+          doc.fontSize(6.5).fillColor("#64748b").text(iss.status === "Returned" ? "Returned to Store" : "Pending Return", 350, rowY + 13);
+
+          const condText = iss.conditionOnReturn ? `Cond: ${iss.conditionOnReturn}` : "—";
+          doc.fontSize(7).fillColor("#0f172a").text(condText, 455, rowY + 4);
+          const remarkText = iss.returnRemarks || iss.remarks || "";
+          if (remarkText) {
+            doc.fontSize(6.5).fillColor("#64748b").text(remarkText, 455, rowY + 13, { width: 105, height: 9, ellipsis: true });
+          }
+
+          doc.y = rowY + 26;
+        }
+        doc.moveDown(0.3);
+      }
+
+      // 6. Stock Audit Trail Section
+      if (doc.y > 660) doc.addPage();
+      doc.fillColor("#0f172a").fontSize(9.5).font("Helvetica-Bold").text("STOCK AUDIT TRAIL", 30, doc.y);
+      doc.moveDown(0.2);
+
+      if (auditLogs.length === 0) {
+        doc.fontSize(8).font("Helvetica-Oblique").fillColor("#64748b").text("No stock audit log entries for this machine.", 40, doc.y);
+        doc.moveDown(0.5);
+      } else {
+        const auditHeadY = doc.y;
+        doc.rect(30, auditHeadY, 535, 16).fillAndStroke("#475569", "#334155");
+        doc.fontSize(7).font("Helvetica-Bold").fillColor("#ffffff");
+        doc.text("DATE & TIME", 35, auditHeadY + 4);
+        doc.text("ACTION TYPE", 140, auditHeadY + 4);
+        doc.text("QTY CHANGE", 230, auditHeadY + 4);
+        doc.text("PREV -> NEW", 300, auditHeadY + 4);
+        doc.text("ACTOR", 375, auditHeadY + 4);
+        doc.text("NOTES", 445, auditHeadY + 4);
+
+        doc.y = auditHeadY + 18;
+
+        for (let i = 0; i < auditLogs.length; i++) {
+          const log = auditLogs[i];
+          if (doc.y > 720) doc.addPage();
+          const rowY = doc.y;
+          const bg = i % 2 === 0 ? "#ffffff" : "#f8fafc";
+          doc.rect(30, rowY, 535, 18).fillAndStroke(bg, "#e2e8f0");
+
+          doc.font("Helvetica").fontSize(7).fillColor("#0f172a").text(formatPdfDateTime(log.timestamp), 35, rowY + 5);
+          doc.font("Helvetica-Bold").fontSize(7).fillColor("#2563eb").text(log.actionType, 140, rowY + 5);
+          doc.font("Helvetica").fontSize(7).fillColor("#0f172a").text(`${log.quantity} ${machine.unit}`, 230, rowY + 5);
+          const prevNew = `${log.previousAvailable ?? "—"} -> ${log.newAvailable ?? "—"}`;
+          doc.text(prevNew, 300, rowY + 5);
+          doc.text(log.issuedByOrActor || "System", 375, rowY + 5, { width: 65, height: 10, ellipsis: true });
+          doc.fontSize(6.5).fillColor("#64748b").text(log.notes || "—", 445, rowY + 5, { width: 115, height: 10, ellipsis: true });
+
+          doc.y = rowY + 20;
+        }
+      }
+    });
+
+    return {
+      base64: pdfBuffer.toString("base64"),
+      filename: `machine-history-${machine.id}-${nowStr}.pdf`,
+    };
+  });
+
+

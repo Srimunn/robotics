@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useRobotics } from "@/lib/robotics-context";
 import { canEdit } from "@/lib/permissions";
@@ -494,7 +494,13 @@ function MachinesPageComponent() {
                     return (
                       <TableRow key={m.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/30 transition-colors">
                         <TableCell className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
-                          {m.id}
+                          <Link
+                            to="/tools/$machineId"
+                            params={{ machineId: m.id }}
+                            className="hover:underline hover:text-blue-700 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            {m.id}
+                          </Link>
                         </TableCell>
 
                         <TableCell>
@@ -643,7 +649,13 @@ function MachinesPageComponent() {
                 <Card key={m.id} className="rounded-xl border border-border/80 bg-white dark:bg-card p-4 space-y-3 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">{m.id}</span>
+                      <Link
+                        to="/tools/$machineId"
+                        params={{ machineId: m.id }}
+                        className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline hover:text-blue-700 transition-colors cursor-pointer"
+                      >
+                        {m.id}
+                      </Link>
                       <Badge
                         variant="outline"
                         className={`text-[10px] font-semibold ${
