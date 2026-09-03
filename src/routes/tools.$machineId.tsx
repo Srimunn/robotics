@@ -161,6 +161,17 @@ function MachineDetailPage() {
     ).length;
   }, [machineIssueHistory]);
   const activeIssuesCount = currentlyDeployed.length;
+  const activeIssuedUnits = useMemo(() => {
+    return currentlyDeployed.reduce(
+      (acc, iss) => acc + Math.max(0, iss.quantity - (iss.returnedQuantity || 0)),
+      0
+    );
+  }, [currentlyDeployed]);
+
+  const displayIssuedQuantity = activeIssuedUnits;
+  const displayAvailableQuantity = machine
+    ? Math.max(0, machine.currentStock - displayIssuedQuantity - machine.repairQuantity - machine.lostQuantity)
+    : 0;
 
   // Handle PDF Generation
   const handleDownloadPdf = async () => {
@@ -408,7 +419,7 @@ function MachineDetailPage() {
             <div>
               <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Available Stock</p>
               <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-emerald-600 dark:text-emerald-400">
-                {machine?.availableQuantity ?? 0} <span className="text-xs font-normal text-muted-foreground">{machine?.unit}</span>
+                {displayAvailableQuantity} <span className="text-xs font-normal text-muted-foreground">{machine?.unit}</span>
               </h3>
             </div>
             <div className="h-9 w-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 grid place-items-center text-emerald-600">
@@ -423,7 +434,7 @@ function MachineDetailPage() {
             <div>
               <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider">Issued to Sites</p>
               <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-amber-600 dark:text-amber-400">
-                {machine?.issuedQuantity ?? 0} <span className="text-xs font-normal text-muted-foreground">{machine?.unit}</span>
+                {displayIssuedQuantity} <span className="text-xs font-normal text-muted-foreground">{machine?.unit}</span>
               </h3>
             </div>
             <div className="h-9 w-9 rounded-lg bg-amber-50 dark:bg-amber-950/40 grid place-items-center text-amber-600">

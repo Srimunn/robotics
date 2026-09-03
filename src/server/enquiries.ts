@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "~/lib/db";
 import { cleanPhone, toNumber, toNullableNumber, generateSafeId } from "./utils";
 import { assertCanEdit, assertCanConvertEnquiry, assertCanUpdateEnquiry } from "./permissions";
+import { deleteProjectWithStockReversal } from "./projects";
 
 function formatEnquiry<T extends Record<string, any>>(e: T | null) {
   if (!e) return null;
@@ -200,8 +201,17 @@ export const deleteEnquiry = createServerFn({ method: "POST" })
   .validator((input: { id: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
     assertCanEdit(data);
-    await db.enquiry.delete({ where: { id: data.id } });
-    return { ok: true };
+    return db.$transaction(async (tx) => {
+      const enq = await tx.enquiry.findUnique({ where: { id: data.id } });
+      if (!enq) return { ok: true };
+
+      if (enq.projectId) {
+        await deleteProjectWithStockReversal(tx, enq.projectId);
+      }
+
+      await tx.enquiry.delete({ where: { id: data.id } });
+      return { ok: true };
+    }, { timeout: 30000, maxWait: 10000 });
   });
 
 /** One-click: Approved Enquiry → new Project (inherits all fields, seeds activity log, links back). */

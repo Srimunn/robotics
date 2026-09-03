@@ -127,12 +127,83 @@ export const updateProject = createServerFn({ method: "POST" })
     }, { timeout: 30000, maxWait: 10000 });
   });
 
+export async function deleteProjectWithStockReversal(tx: any, projectId: string) {
+  // 1. Fetch all machine issue records for this project
+  const machineIssues = await tx.machineIssueRecord.findMany({
+    where: { projectId },
+  });
+
+  for (const iss of machineIssues) {
+    const machine = await tx.machine.findUnique({ where: { id: iss.machineId } });
+    if (machine) {
+      const unreturnedQty = Math.max(0, iss.quantity - (iss.returnedQuantity || 0));
+      const repairQty =
+        iss.conditionOnReturn === "Damaged" ||
+        iss.conditionOnReturn === "RepairRequired" ||
+        iss.status === "UnderRepair"
+          ? iss.returnedQuantity || 0
+          : 0;
+      const lostQty =
+        iss.conditionOnReturn === "Lost" || iss.status === "Lost"
+          ? iss.returnedQuantity || 0
+          : 0;
+
+      const newIssued = Math.max(0, machine.issuedQuantity - unreturnedQty);
+      const newRepair = Math.max(0, machine.repairQuantity - repairQty);
+      const newLost = Math.max(0, machine.lostQuantity - lostQty);
+      const newAvailable = Math.max(0, machine.currentStock - newIssued - newRepair - newLost);
+
+      await tx.machine.update({
+        where: { id: machine.id },
+        data: {
+          issuedQuantity: newIssued,
+          repairQuantity: newRepair,
+          lostQuantity: newLost,
+          availableQuantity: newAvailable,
+        },
+      });
+    }
+  }
+
+  // 2. Fetch all material issue records for this project and refund stock
+  const materialIssues = await tx.materialIssueRecord.findMany({
+    where: { projectId },
+  });
+
+  for (const mi of materialIssues) {
+    if (mi.materialId) {
+      await tx.material.update({
+        where: { id: mi.materialId },
+        data: { currentStock: { increment: mi.quantity } },
+      });
+    }
+  }
+
+  // 3. Delete all stock audit logs related to this project
+  await tx.stockAuditLog.deleteMany({
+    where: { projectId },
+  });
+
+  // 4. Unlink any enquiry pointing to this project
+  await tx.enquiry.updateMany({
+    where: { projectId },
+    data: { projectId: null },
+  });
+
+  // 5. Delete the project (Prisma cascade handles activities, assignments, logs, paymentStages, payments, documents, etc.)
+  await tx.project.delete({
+    where: { id: projectId },
+  });
+}
+
 export const deleteProject = createServerFn({ method: "POST" })
   .validator((input: { id: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
     assertCanEdit(data);
-    await db.project.delete({ where: { id: data.id } });
-    return { ok: true };
+    return db.$transaction(async (tx) => {
+      await deleteProjectWithStockReversal(tx, data.id);
+      return { ok: true };
+    }, { timeout: 30000, maxWait: 10000 });
   });
 
 export const updateProjectStatus = createServerFn({ method: "POST" })

@@ -117,7 +117,43 @@ export const listPayments = createServerFn({ method: "GET" }).handler(async () =
 });
 
 export const listMachines = createServerFn({ method: "GET" }).handler(async () => {
-  return db.machine.findMany({ orderBy: { toolName: "asc" } });
+  const machines = await db.machine.findMany({ orderBy: { toolName: "asc" } });
+  const activeIssues = await db.machineIssueRecord.findMany({
+    where: {
+      status: { in: ["Issued", "PartiallyReturned"] },
+    },
+  });
+
+  const activeQtyByMachine = new Map<string, number>();
+  for (const iss of activeIssues) {
+    const remaining = Math.max(0, iss.quantity - (iss.returnedQuantity || 0));
+    activeQtyByMachine.set(iss.machineId, (activeQtyByMachine.get(iss.machineId) || 0) + remaining);
+  }
+
+  return Promise.all(
+    machines.map(async (m) => {
+      const actualIssued = activeQtyByMachine.get(m.id) || 0;
+      if (m.issuedQuantity !== actualIssued) {
+        const fixedAvailable = Math.max(0, m.currentStock - actualIssued - m.repairQuantity - m.lostQuantity);
+        db.machine
+          .update({
+            where: { id: m.id },
+            data: {
+              issuedQuantity: actualIssued,
+              availableQuantity: fixedAvailable,
+            },
+          })
+          .catch((err) => console.error("Auto-sync machine error:", err));
+
+        return {
+          ...m,
+          issuedQuantity: actualIssued,
+          availableQuantity: fixedAvailable,
+        };
+      }
+      return m;
+    })
+  );
 });
 
 export const listMachineIssues = createServerFn({ method: "GET" }).handler(async () => {

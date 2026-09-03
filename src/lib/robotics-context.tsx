@@ -699,7 +699,10 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   });
   const deleteEnquiryM = useMutation({
     mutationFn: async (id: string) => deleteEnquiryFn({ data: { id, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
-    onSuccess: () => { invalidate("enquiries", "customers"); toast.success("Enquiry deleted"); },
+    onSuccess: () => {
+      invalidate("enquiries", "projects", "customers", "machines", "machineIssues", "materials", "materialIssues", "stockAuditLogs");
+      toast.success("Enquiry deleted");
+    },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const approveConvertM = useMutation({
@@ -723,7 +726,10 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   });
   const deleteProjectM = useMutation({
     mutationFn: async (id: string) => deleteProjectFn({ data: { id, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
-    onSuccess: () => { invalidate("projects", "enquiries"); toast.success("Project deleted"); },
+    onSuccess: () => {
+      invalidate("projects", "enquiries", "customers", "machines", "machineIssues", "materials", "materialIssues", "stockAuditLogs");
+      toast.success("Project deleted");
+    },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const updateProjectStatusM = useMutation({
