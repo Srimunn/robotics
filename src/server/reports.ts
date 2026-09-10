@@ -178,13 +178,18 @@ function renderPdf(builder: (doc: any) => Promise<void>): Promise<Buffer> {
 
 /** Server function to generate Projects Report PDF with embedded before/after photos */
 export const generateProjectsReport = createServerFn({ method: "POST" })
-  .validator((input: { status?: string; startDate?: string; endDate?: string }) => input)
+  .validator((input: { status?: string; startDate?: string; endDate?: string; gstFilter?: string }) => input)
   .handler(async ({ data }) => {
-    const { status, startDate, endDate } = data;
+    const { status, startDate, endDate, gstFilter } = data;
 
     const where: any = {};
     if (status && status.toUpperCase() !== "ALL") {
       where.status = status;
+    }
+    if (gstFilter === "GST") {
+      where.isGST = true;
+    } else if (gstFilter === "NON_GST") {
+      where.isGST = false;
     }
 
     const projects = await db.project.findMany({
@@ -236,6 +241,8 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
       for (let i = 0; i < filteredProjects.length; i++) {
         const p = filteredProjects[i];
         const val = toNumber(p.projectValue);
+        const discount = toNumber(p.discountAmount);
+        const netPayable = Math.max(0, val - discount);
         const rec = toNumber(p.receivedAmount);
         const bal = toNumber(p.balanceAmount);
 
@@ -247,7 +254,7 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
 
         // 1. Project Title Banner
         doc.rect(30, startY, 535, 24).fillAndStroke("#1e293b", "#0f172a");
-        doc.fillColor("#ffffff").fontSize(10).font("Helvetica-Bold").text(`${p.id} — ${p.customerName}`, 38, startY + 6);
+        doc.fillColor("#ffffff").fontSize(10).font("Helvetica-Bold").text(`${p.id} — ${p.customerName} [${p.isGST ? "GST" : "Non-GST"}]`, 38, startY + 6);
         doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#38bdf8").text(`Status: ${p.status} | Pay Status: ${p.paymentStatus || "Pending"}`, 340, startY + 6, { align: "right" });
 
         doc.y = startY + 30;
@@ -263,8 +270,16 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
         doc.text(`Nature of Work: ${p.natureOfWork || "N/A"}`, 40, infoY + 24);
 
         doc.text(`Contract Value: INR ${val.toLocaleString("en-IN")}`, 230, infoY);
-        doc.text(`Received Amount: INR ${rec.toLocaleString("en-IN")}`, 230, infoY + 12);
-        doc.text(`Balance Amount: INR ${bal.toLocaleString("en-IN")}`, 230, infoY + 24);
+        if (discount > 0) {
+          doc.text(`Discount: -INR ${discount.toLocaleString("en-IN")}${p.discountedBy ? ` (${p.discountedBy})` : ""}`, 230, infoY + 10);
+          doc.text(`Net Payable: INR ${netPayable.toLocaleString("en-IN")}`, 230, infoY + 20);
+          doc.text(`Received Amount: INR ${rec.toLocaleString("en-IN")}`, 230, infoY + 30);
+          doc.text(`Balance Amount: INR ${bal.toLocaleString("en-IN")}`, 230, infoY + 40);
+        } else {
+          doc.text(`Net Payable: INR ${netPayable.toLocaleString("en-IN")}`, 230, infoY + 11);
+          doc.text(`Received Amount: INR ${rec.toLocaleString("en-IN")}`, 230, infoY + 22);
+          doc.text(`Balance Amount: INR ${bal.toLocaleString("en-IN")}`, 230, infoY + 33);
+        }
 
         // Before & After Photos
         const beforeBuffer = await fetchImageBuffer(p.beforeWorkPhotoUrl);
@@ -662,15 +677,25 @@ export const generateSingleProjectReport = createServerFn({ method: "POST" })
       doc.moveDown(0.3);
 
       const finY = doc.y;
-      doc.rect(30, finY, 535, 45).fillAndStroke("#f0fdf4", "#bbf7d0");
+      const discount = toNumber(project.discountAmount);
+      const netPayable = Math.max(0, projVal - discount);
+      doc.rect(30, finY, 535, discount > 0 ? 58 : 45).fillAndStroke("#f0fdf4", "#bbf7d0");
       doc.fontSize(9).font("Helvetica-Bold").fillColor("#14532d");
 
       doc.text(`Contract Value: INR ${projVal.toLocaleString("en-IN")}`, 40, finY + 10);
-      doc.text(`Total Received: INR ${recAmt.toLocaleString("en-IN")}`, 210, finY + 10);
-      doc.text(`Balance Due: INR ${balAmt.toLocaleString("en-IN")}`, 380, finY + 10);
-      doc.fontSize(8.5).font("Helvetica").fillColor("#166534").text(`Payment Status: ${project.paymentStatus}`, 40, finY + 26);
-
-      doc.y = finY + 53;
+      if (discount > 0) {
+        doc.text(`Discount: -INR ${discount.toLocaleString("en-IN")}${project.discountedBy ? ` (${project.discountedBy})` : ""}`, 210, finY + 10);
+        doc.text(`Net Payable: INR ${netPayable.toLocaleString("en-IN")}`, 380, finY + 10);
+        doc.text(`Total Received: INR ${recAmt.toLocaleString("en-IN")}`, 40, finY + 28);
+        doc.text(`Balance Due: INR ${balAmt.toLocaleString("en-IN")}`, 210, finY + 28);
+        doc.fontSize(8.5).font("Helvetica").fillColor("#166534").text(`Payment Status: ${project.paymentStatus} | Tax: ${project.isGST ? "GST" : "Non-GST"}`, 380, finY + 28);
+        doc.y = finY + 68;
+      } else {
+        doc.text(`Total Received: INR ${recAmt.toLocaleString("en-IN")}`, 210, finY + 10);
+        doc.text(`Balance Due: INR ${balAmt.toLocaleString("en-IN")}`, 380, finY + 10);
+        doc.fontSize(8.5).font("Helvetica").fillColor("#166534").text(`Payment Status: ${project.paymentStatus} | Tax: ${project.isGST ? "GST" : "Non-GST"}`, 40, finY + 26);
+        doc.y = finY + 53;
+      }
 
       // Section 4: Status History Timeline
       if (project.statusHistory && project.statusHistory.length > 0) {

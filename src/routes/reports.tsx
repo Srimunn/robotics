@@ -241,8 +241,10 @@ function ReportsComponent() {
         (p) => p.customerName.toLowerCase().trim() === c.name.toLowerCase().trim()
       );
       const totalVal = cProjs.reduce((s, p) => s + (p.projectValue || 0), 0);
+      const totalDiscount = cProjs.reduce((s, p) => s + (p.discountAmount ? Number(p.discountAmount) : 0), 0);
+      const totalNetPayable = Math.max(0, totalVal - totalDiscount);
       const totalRec = cProjs.reduce((s, p) => s + (p.receivedAmount || 0), 0);
-      const balanceDue = Math.max(0, totalVal - totalRec);
+      const balanceDue = cProjs.reduce((s, p) => s + (p.balanceAmount || 0), 0);
       const projectCount = cProjs.length;
       const latestProjectDate =
         cProjs.map((p) => p.scheduledDate || p.createdAt?.slice(0, 10)).sort().reverse()[0] || "";
@@ -251,6 +253,8 @@ function ReportsComponent() {
         customer: c,
         projects: cProjs,
         totalVal,
+        totalDiscount,
+        totalNetPayable,
         totalRec,
         balanceDue,
         projectCount,
@@ -327,6 +331,8 @@ function ReportsComponent() {
   });
 
   const revenueTotalContract = filteredRevenueReport.reduce((sum, p) => sum + (p.projectValue || 0), 0);
+  const revenueTotalDiscount = filteredRevenueReport.reduce((sum, p) => sum + (p.discountAmount ? Number(p.discountAmount) : 0), 0);
+  const revenueTotalNetPayable = filteredRevenueReport.reduce((sum, p) => sum + Math.max(0, (p.projectValue || 0) - (p.discountAmount ? Number(p.discountAmount) : 0)), 0);
   const revenueTotalReceived = filteredRevenueReport.reduce((sum, p) => sum + (p.receivedAmount || 0), 0);
   const revenueTotalBalance = filteredRevenueReport.reduce((sum, p) => sum + (p.balanceAmount || 0), 0);
 
@@ -383,6 +389,8 @@ function ReportsComponent() {
 
   const totalPendingReceivables = filteredPendingReport.reduce((sum, p) => sum + (p.balanceAmount || 0), 0);
   const totalPendingContractVal = filteredPendingReport.reduce((sum, p) => sum + (p.projectValue || 0), 0);
+  const totalPendingDiscount = filteredPendingReport.reduce((sum, p) => sum + (p.discountAmount ? Number(p.discountAmount) : 0), 0);
+  const totalPendingNetPayable = filteredPendingReport.reduce((sum, p) => sum + Math.max(0, (p.projectValue || 0) - (p.discountAmount ? Number(p.discountAmount) : 0)), 0);
   const totalPendingReceivedVal = filteredPendingReport.reduce((sum, p) => sum + (p.receivedAmount || 0), 0);
 
   // Work Report & Live Activity Timeline Custom Filtering States
@@ -454,6 +462,7 @@ function ReportsComponent() {
 
   // Projects Report Custom Filtering States
   const [projectStatusFilter, setProjectStatusFilter] = useState<string>("ALL");
+  const [projectGstFilter, setProjectGstFilter] = useState<"ALL" | "GST" | "NON_GST">("ALL");
   const [startDateFilter, setStartDateFilter] = useState<string>("");
   const [endDateFilter, setEndDateFilter] = useState<string>("");
   const [projectSearchQuery, setProjectSearchQuery] = useState<string>("");
@@ -464,6 +473,10 @@ function ReportsComponent() {
     if (projectStatusFilter !== "ALL" && p.status !== projectStatusFilter) {
       return false;
     }
+
+    // 1b. GST Filter
+    if (projectGstFilter === "GST" && !p.isGST) return false;
+    if (projectGstFilter === "NON_GST" && p.isGST) return false;
 
     // 2. Date Range Filter
     const pDate = p.scheduledDate || p.createdAt?.slice(0, 10) || "";
@@ -495,6 +508,8 @@ function ReportsComponent() {
   const waitingCount = projects.filter((p) => p.status === "Waiting").length;
   const completedCount = projects.filter((p) => p.status === "Completed").length;
   const closedCount = projects.filter((p) => p.status === "Closed").length;
+  const gstCount = projects.filter((p) => p.isGST).length;
+  const nonGstCount = projects.filter((p) => !p.isGST).length;
 
   // Enquiries Report Custom Filtering States
   const [enquiryDecisionFilter, setEnquiryDecisionFilter] = useState<string>("ALL");
@@ -611,6 +626,7 @@ function ReportsComponent() {
           status: projectStatusFilter,
           startDate: startDateFilter || undefined,
           endDate: endDateFilter || undefined,
+          gstFilter: projectGstFilter !== "ALL" ? projectGstFilter : undefined,
         },
       });
       if (res?.base64) {
@@ -846,13 +862,15 @@ function ReportsComponent() {
                     const dateLabel = revenueStartDateFilter || revenueEndDateFilter ? `_${revenueStartDateFilter}_to_${revenueEndDateFilter}` : "";
                     handleExportCSV(
                       `Custom_Revenue_Report_${statusLabel}${dateLabel}`,
-                      ["Project ID", "Customer Name", "Work Description", "Scheduled Date", "Contract Value (INR)", "Amount Received (INR)", "Balance Due (INR)", "Payment Status"],
+                      ["Project ID", "Customer Name", "Work Description", "Scheduled Date", "Contract Value (INR)", "Discount (INR)", "Net Payable (INR)", "Amount Received (INR)", "Balance Due (INR)", "Payment Status"],
                       filteredRevenueReport.map((p) => [
                         p.id,
                         p.customerName,
                         p.natureOfWork || "N/A",
                         p.scheduledDate || "N/A",
                         p.projectValue || 0,
+                        p.discountAmount ? Number(p.discountAmount) : 0,
+                        Math.max(0, (p.projectValue || 0) - (p.discountAmount ? Number(p.discountAmount) : 0)),
                         p.receivedAmount || 0,
                         p.balanceAmount || 0,
                         p.paymentStatus || "Unpaid",
@@ -871,13 +889,15 @@ function ReportsComponent() {
                     const dateLabel = revenueStartDateFilter || revenueEndDateFilter ? ` (${revenueStartDateFilter} to ${revenueEndDateFilter})` : "";
                     handleExportPDF(
                       `Custom Revenue & Billing Summary Report - ${statusLabel}${dateLabel}`,
-                      ["Project ID", "Customer Name", "Work Description", "Scheduled Date", "Contract Value (₹)", "Received (₹)", "Balance Due (₹)", "Status"],
+                      ["Project ID", "Customer Name", "Work Description", "Scheduled Date", "Contract Value (₹)", "Discount (₹)", "Net Payable (₹)", "Received (₹)", "Balance Due (₹)", "Status"],
                       filteredRevenueReport.map((p) => [
                         p.id,
                         p.customerName,
                         p.natureOfWork || "N/A",
                         p.scheduledDate || "N/A",
                         `₹${(p.projectValue || 0).toLocaleString("en-IN")}`,
+                        p.discountAmount ? `−₹${Number(p.discountAmount).toLocaleString("en-IN")}` : "—",
+                        `₹${Math.max(0, (p.projectValue || 0) - (p.discountAmount ? Number(p.discountAmount) : 0)).toLocaleString("en-IN")}`,
                         `₹${(p.receivedAmount || 0).toLocaleString("en-IN")}`,
                         `₹${(p.balanceAmount || 0).toLocaleString("en-IN")}`,
                         p.paymentStatus || "Unpaid",
@@ -976,13 +996,25 @@ function ReportsComponent() {
 
           <CardContent className="p-0">
             {/* Live Financial Metrics Summary Bar */}
-            <div className="p-3 bg-muted/20 border-b grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <div className="p-3 bg-muted/20 border-b grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
               <div className="flex items-center justify-between sm:justify-start gap-2">
                 <span className="text-muted-foreground font-semibold">Total Contract:</span>
                 <span className="font-extrabold text-foreground">₹{revenueTotalContract.toLocaleString("en-IN")}</span>
               </div>
 
-              <div className="flex items-center justify-between sm:justify-center gap-2 border-y sm:border-y-0 sm:border-x border-border/60 py-1 sm:py-0">
+              <div className="flex items-center justify-between sm:justify-center gap-2 border-x border-border/60 px-2">
+                <span className="text-amber-800 dark:text-amber-400 font-semibold">Discount:</span>
+                <span className="font-extrabold text-amber-700 dark:text-amber-400">
+                  {revenueTotalDiscount > 0 ? `−₹${revenueTotalDiscount.toLocaleString("en-IN")}` : "₹0"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between sm:justify-center gap-2 border-r border-border/60 pr-2">
+                <span className="text-indigo-700 dark:text-indigo-400 font-semibold">Net Payable:</span>
+                <span className="font-extrabold text-indigo-600 dark:text-indigo-400">₹{revenueTotalNetPayable.toLocaleString("en-IN")}</span>
+              </div>
+
+              <div className="flex items-center justify-between sm:justify-center gap-2 border-r border-border/60 pr-2">
                 <span className="text-muted-foreground font-semibold">Cash Received:</span>
                 <span className="font-extrabold text-emerald-600">₹{revenueTotalReceived.toLocaleString("en-IN")}</span>
               </div>
@@ -1001,6 +1033,8 @@ function ReportsComponent() {
                     <th className="p-3">Customer Name</th>
                     <th className="p-3">Scheduled Date</th>
                     <th className="p-3">Contract Value</th>
+                    <th className="p-3">Discount</th>
+                    <th className="p-3">Net Payable</th>
                     <th className="p-3">Amount Received</th>
                     <th className="p-3">Balance Amount</th>
                     <th className="p-3 text-right pr-4">Payment Status</th>
@@ -1009,7 +1043,7 @@ function ReportsComponent() {
                 <tbody className="divide-y">
                   {filteredRevenueReport.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="p-8 text-center text-muted-foreground font-medium">
+                      <td colSpan={9} className="p-8 text-center text-muted-foreground font-medium">
                         No revenue or billing records match the selected payment or date filters.
                       </td>
                     </tr>
@@ -1024,6 +1058,12 @@ function ReportsComponent() {
                         <td className="p-3 font-semibold text-foreground">{p.customerName}</td>
                         <td className="p-3 font-mono text-muted-foreground">{p.scheduledDate || "N/A"}</td>
                         <td className="p-3 font-bold text-foreground">₹{p.projectValue.toLocaleString("en-IN")}</td>
+                        <td className="p-3 font-semibold text-amber-700 dark:text-amber-400">
+                          {p.discountAmount ? `−₹${Number(p.discountAmount).toLocaleString("en-IN")}` : "—"}
+                        </td>
+                        <td className="p-3 font-bold text-indigo-700 dark:text-indigo-400">
+                          ₹{Math.max(0, (p.projectValue || 0) - (p.discountAmount ? Number(p.discountAmount) : 0)).toLocaleString("en-IN")}
+                        </td>
                         <td className="p-3 font-bold text-emerald-600">₹{p.receivedAmount.toLocaleString("en-IN")}</td>
                         <td className="p-3 font-bold text-rose-600">₹{p.balanceAmount.toLocaleString("en-IN")}</td>
                         <td className="p-3 text-right pr-4">
@@ -1069,18 +1109,22 @@ function ReportsComponent() {
                   size="sm"
                   onClick={() => {
                     const statusLabel = projectStatusFilter === "ALL" ? "All_Statuses" : projectStatusFilter;
+                    const gstLabel = projectGstFilter === "ALL" ? "" : `_${projectGstFilter}`;
                     const dateLabel = startDateFilter || endDateFilter ? `_${startDateFilter}_to_${endDateFilter}` : "";
                     handleExportCSV(
-                      `Custom_Projects_Report_${statusLabel}${dateLabel}`,
-                      ["Project ID", "Customer Name", "Work Description", "Lead Engineer", "Scheduled Date", "Location", "Contract Value (INR)", "Payment Status", "Project Status"],
+                      `Custom_Projects_Report_${statusLabel}${gstLabel}${dateLabel}`,
+                      ["Project ID", "Customer Name", "GST Status", "Work Description", "Lead Engineer", "Scheduled Date", "Location", "Contract Value (INR)", "Discount (INR)", "Net Payable (INR)", "Payment Status", "Project Status"],
                       filteredProjectsReport.map((p) => [
                         p.id,
                         p.customerName,
+                        p.isGST ? "GST" : "Non-GST",
                         p.natureOfWork,
                         p.assignedEngineerName || "Unassigned",
                         p.scheduledDate || "N/A",
                         p.location || "N/A",
                         p.projectValue,
+                        p.discountAmount ? Number(p.discountAmount) : 0,
+                        Math.max(0, (p.projectValue || 0) - (p.discountAmount ? Number(p.discountAmount) : 0)),
                         p.paymentStatus,
                         p.status,
                       ])
@@ -1122,6 +1166,29 @@ function ReportsComponent() {
                   className={`text-[11px] font-bold px-2.5 py-1 rounded-full border transition-all duration-150 cursor-pointer ${
                     projectStatusFilter === tab.id
                       ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                      : "bg-background text-foreground border-border hover:bg-accent"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* GST Filter Tabs */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              <span className="text-[11px] font-bold text-muted-foreground mr-1">Tax Classification:</span>
+              {[
+                { id: "ALL", label: `All (${projects.length})` },
+                { id: "GST", label: `GST (${gstCount})` },
+                { id: "NON_GST", label: `Non-GST (${nonGstCount})` },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setProjectGstFilter(tab.id as any)}
+                  className={`text-[11px] font-bold px-2.5 py-1 rounded-full border transition-all duration-150 cursor-pointer ${
+                    projectGstFilter === tab.id
+                      ? "bg-purple-600 text-white border-purple-600 shadow-xs"
                       : "bg-background text-foreground border-border hover:bg-accent"
                   }`}
                 >
@@ -1177,6 +1244,7 @@ function ReportsComponent() {
                   size="sm"
                   onClick={() => {
                     setProjectStatusFilter("ALL");
+                    setProjectGstFilter("ALL");
                     setStartDateFilter("");
                     setEndDateFilter("");
                     setProjectSearchQuery("");
@@ -1194,13 +1262,18 @@ function ReportsComponent() {
               <span className="font-semibold text-muted-foreground">
                 Showing <b className="text-foreground">{filteredProjectsReport.length}</b> of {projects.length} Projects
                 {projectStatusFilter !== "ALL" && ` (Status: ${projectStatusFilter})`}
+                {projectGstFilter !== "ALL" && ` (${projectGstFilter === "GST" ? "GST" : "Non-GST"})`}
                 {startDateFilter && ` (From: ${startDateFilter})`}
                 {endDateFilter && ` (To: ${endDateFilter})`}
               </span>
-              <span className="font-bold text-emerald-700">
-                Filtered Value: ₹
-                {filteredProjectsReport.reduce((acc, p) => acc + (p.projectValue || 0), 0).toLocaleString("en-IN")}
-              </span>
+              <div className="flex items-center gap-4">
+                <span className="font-semibold text-muted-foreground">
+                  Contract Value: <b className="text-foreground">₹{filteredProjectsReport.reduce((acc, p) => acc + (p.projectValue || 0), 0).toLocaleString("en-IN")}</b>
+                </span>
+                <span className="font-bold text-emerald-700">
+                  Net Payable: ₹{filteredProjectsReport.reduce((acc, p) => acc + Math.max(0, (p.projectValue || 0) - (p.discountAmount ? Number(p.discountAmount) : 0)), 0).toLocaleString("en-IN")}
+                </span>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -1209,18 +1282,21 @@ function ReportsComponent() {
                   <tr>
                     <th className="p-3 pl-4">Project ID</th>
                     <th className="p-3">Customer Name</th>
+                    <th className="p-3">GST Status</th>
                     <th className="p-3">Work Description</th>
                     <th className="p-3">Lead Engineer</th>
                     <th className="p-3">Scheduled Date</th>
                     <th className="p-3">Location</th>
                     <th className="p-3">Contract Value</th>
+                    <th className="p-3">Discount</th>
+                    <th className="p-3">Net Payable</th>
                     <th className="p-3 text-right pr-4">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {filteredProjectsReport.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-muted-foreground font-medium">
+                      <td colSpan={11} className="p-8 text-center text-muted-foreground font-medium">
                         No project deployment records match the selected status or date filters.
                       </td>
                     </tr>
@@ -1233,11 +1309,29 @@ function ReportsComponent() {
                           </Link>
                         </td>
                         <td className="p-3 font-semibold text-foreground">{p.customerName}</td>
+                        <td className="p-3">
+                          <Badge
+                            variant="outline"
+                            className={`text-[9px] font-bold px-1.5 py-0.5 whitespace-nowrap ${
+                              p.isGST
+                                ? "bg-blue-50 text-blue-700 border-blue-200"
+                                : "bg-slate-50 text-slate-600 border-slate-200"
+                            }`}
+                          >
+                            {p.isGST ? "GST" : "Non-GST"}
+                          </Badge>
+                        </td>
                         <td className="p-3 font-medium text-foreground">{p.natureOfWork}</td>
                         <td className="p-3 font-semibold text-purple-700">{p.assignedEngineerName || "Unassigned"}</td>
                         <td className="p-3 text-muted-foreground font-mono">{p.scheduledDate || "N/A"}</td>
                         <td className="p-3 text-muted-foreground">{p.location || "Hyderabad"}</td>
                         <td className="p-3 font-bold text-foreground">₹{p.projectValue.toLocaleString("en-IN")}</td>
+                        <td className="p-3 font-semibold text-amber-700 dark:text-amber-400">
+                          {p.discountAmount ? `−₹${Number(p.discountAmount).toLocaleString("en-IN")}` : "—"}
+                        </td>
+                        <td className="p-3 font-bold text-indigo-700 dark:text-indigo-400">
+                          ₹{Math.max(0, (p.projectValue || 0) - (p.discountAmount ? Number(p.discountAmount) : 0)).toLocaleString("en-IN")}
+                        </td>
                         <td className="p-3 text-right pr-4">
                           <Badge
                             className={`text-[10px] ${
@@ -1288,7 +1382,7 @@ function ReportsComponent() {
                     const dateLabel = pendingStartDateFilter || pendingEndDateFilter ? `_${pendingStartDateFilter}_to_${pendingEndDateFilter}` : "";
                     handleExportCSV(
                       `Custom_Pending_Collections_Report_${statusLabel}${dateLabel}`,
-                      ["Project ID", "Customer Name", "Contact Phone", "Work Description", "Scheduled / Due Date", "Contract Value (INR)", "Amount Received (INR)", "Outstanding Due (INR)", "Payment Status"],
+                      ["Project ID", "Customer Name", "Contact Phone", "Work Description", "Scheduled / Due Date", "Contract Value (INR)", "Discount (INR)", "Net Payable (INR)", "Amount Received (INR)", "Outstanding Due (INR)", "Payment Status"],
                       filteredPendingReport.map((p) => [
                         p.id,
                         p.customerName,
@@ -1296,6 +1390,8 @@ function ReportsComponent() {
                         p.natureOfWork || "N/A",
                         p.scheduledDate || "N/A",
                         p.projectValue || 0,
+                        p.discountAmount ? Number(p.discountAmount) : 0,
+                        Math.max(0, (p.projectValue || 0) - (p.discountAmount ? Number(p.discountAmount) : 0)),
                         p.receivedAmount || 0,
                         p.balanceAmount || 0,
                         p.paymentStatus || "Unpaid",
@@ -1314,7 +1410,7 @@ function ReportsComponent() {
                     const dateLabel = pendingStartDateFilter || pendingEndDateFilter ? ` (${pendingStartDateFilter} to ${pendingEndDateFilter})` : "";
                     handleExportPDF(
                       `Custom Pending Receivables & Collections Report - ${statusLabel}${dateLabel}`,
-                      ["Project ID", "Customer Name", "Contact Phone", "Work Description", "Scheduled / Due Date", "Contract Value (₹)", "Received (₹)", "Outstanding Due (₹)", "Status"],
+                      ["Project ID", "Customer Name", "Contact Phone", "Work Description", "Scheduled / Due Date", "Contract Value (₹)", "Discount (₹)", "Net Payable (₹)", "Received (₹)", "Outstanding Due (₹)", "Status"],
                       filteredPendingReport.map((p) => [
                         p.id,
                         p.customerName,
@@ -1322,6 +1418,8 @@ function ReportsComponent() {
                         p.natureOfWork || "N/A",
                         p.scheduledDate || "N/A",
                         `₹${(p.projectValue || 0).toLocaleString("en-IN")}`,
+                        p.discountAmount ? `−₹${Number(p.discountAmount).toLocaleString("en-IN")}` : "—",
+                        `₹${Math.max(0, (p.projectValue || 0) - (p.discountAmount ? Number(p.discountAmount) : 0)).toLocaleString("en-IN")}`,
                         `₹${(p.receivedAmount || 0).toLocaleString("en-IN")}`,
                         `₹${(p.balanceAmount || 0).toLocaleString("en-IN")}`,
                         p.paymentStatus || "Unpaid",
@@ -1419,20 +1517,32 @@ function ReportsComponent() {
 
           <CardContent className="p-0">
             {/* Live Financial Metrics Summary Bar */}
-            <div className="p-3 bg-rose-50/50 dark:bg-rose-950/20 border-b border-rose-100 dark:border-rose-900/30 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <div className="p-3 bg-rose-50/50 dark:bg-rose-950/20 border-b border-rose-100 dark:border-rose-900/30 grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
               <div className="flex items-center justify-between sm:justify-start gap-2">
-                <span className="text-rose-700 font-bold">Total Pending Due:</span>
-                <span className="font-extrabold text-rose-700 text-sm">₹{totalPendingReceivables.toLocaleString("en-IN")}</span>
+                <span className="text-muted-foreground font-semibold">Total Contract:</span>
+                <span className="font-extrabold text-foreground">₹{totalPendingContractVal.toLocaleString("en-IN")}</span>
               </div>
 
-              <div className="flex items-center justify-between sm:justify-center gap-2 border-y sm:border-y-0 sm:border-x border-rose-200/60 dark:border-rose-900/40 py-1 sm:py-0">
-                <span className="text-muted-foreground font-semibold">Cash Collected So Far:</span>
+              <div className="flex items-center justify-between sm:justify-center gap-2 border-x border-rose-200/60 dark:border-rose-900/40 px-2">
+                <span className="text-amber-800 dark:text-amber-400 font-semibold">Discount:</span>
+                <span className="font-extrabold text-amber-700 dark:text-amber-400">
+                  {totalPendingDiscount > 0 ? `−₹${totalPendingDiscount.toLocaleString("en-IN")}` : "₹0"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between sm:justify-center gap-2 border-r border-rose-200/60 dark:border-rose-900/40 pr-2">
+                <span className="text-indigo-700 dark:text-indigo-400 font-semibold">Net Payable:</span>
+                <span className="font-extrabold text-indigo-600 dark:text-indigo-400">₹{totalPendingNetPayable.toLocaleString("en-IN")}</span>
+              </div>
+
+              <div className="flex items-center justify-between sm:justify-center gap-2 border-r border-rose-200/60 dark:border-rose-900/40 pr-2">
+                <span className="text-muted-foreground font-semibold">Collected:</span>
                 <span className="font-extrabold text-emerald-600">₹{totalPendingReceivedVal.toLocaleString("en-IN")}</span>
               </div>
 
               <div className="flex items-center justify-between sm:justify-end gap-2">
-                <span className="text-muted-foreground font-semibold">Total Contract Value:</span>
-                <span className="font-extrabold text-foreground">₹{totalPendingContractVal.toLocaleString("en-IN")}</span>
+                <span className="text-rose-700 font-bold">Total Pending Due:</span>
+                <span className="font-extrabold text-rose-700 text-sm">₹{totalPendingReceivables.toLocaleString("en-IN")}</span>
               </div>
             </div>
 
@@ -1445,6 +1555,8 @@ function ReportsComponent() {
                     <th className="p-3">Contact Phone</th>
                     <th className="p-3">Scheduled / Due Date</th>
                     <th className="p-3">Contract Value</th>
+                    <th className="p-3">Discount</th>
+                    <th className="p-3">Net Payable</th>
                     <th className="p-3">Amount Received</th>
                     <th className="p-3 font-bold text-rose-600">Outstanding Due</th>
                     <th className="p-3 text-right pr-4">Status</th>
@@ -1453,7 +1565,7 @@ function ReportsComponent() {
                 <tbody className="divide-y">
                   {filteredPendingReport.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-muted-foreground font-medium">
+                      <td colSpan={10} className="p-8 text-center text-muted-foreground font-medium">
                         No pending collection balances match the selected filters.
                       </td>
                     </tr>
@@ -1469,6 +1581,12 @@ function ReportsComponent() {
                         <td className="p-3 text-muted-foreground font-mono">{p.phone || "N/A"}</td>
                         <td className="p-3 font-mono text-muted-foreground">{p.scheduledDate || "N/A"}</td>
                         <td className="p-3 font-medium">₹{p.projectValue.toLocaleString("en-IN")}</td>
+                        <td className="p-3 font-semibold text-amber-700 dark:text-amber-400">
+                          {p.discountAmount ? `−₹${Number(p.discountAmount).toLocaleString("en-IN")}` : "—"}
+                        </td>
+                        <td className="p-3 font-bold text-indigo-700 dark:text-indigo-400">
+                          ₹{Math.max(0, (p.projectValue || 0) - (p.discountAmount ? Number(p.discountAmount) : 0)).toLocaleString("en-IN")}
+                        </td>
                         <td className="p-3 font-bold text-emerald-600">₹{p.receivedAmount.toLocaleString("en-IN")}</td>
                         <td className="p-3 font-extrabold text-rose-600 text-sm">
                           ₹{p.balanceAmount.toLocaleString("en-IN")}

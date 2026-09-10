@@ -17,7 +17,9 @@ export async function recalculateProject(
 
   const totalReceived = project.payments.reduce((sum, p) => sum + Number(p.amount), 0);
   const projectValue = Number(project.projectValue);
-  const balance = Math.max(0, projectValue - totalReceived);
+  const discountAmount = project.discountAmount ? Number(project.discountAmount) : 0;
+  const netPayable = Math.max(0, projectValue - discountAmount);
+  const balance = Math.max(0, netPayable - totalReceived);
 
   const allocations = allocateToStages(
     totalReceived,
@@ -32,7 +34,7 @@ export async function recalculateProject(
   }
 
   const paymentStatus = computePaymentStatus(
-    projectValue,
+    netPayable,
     totalReceived,
     project.workCommittedDate,
     project.paymentStages.map((s) => ({

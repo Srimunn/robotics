@@ -23,6 +23,10 @@ function formatProject<T extends Record<string, any>>(p: T | null) {
     projectValue: toNumber(p.projectValue),
     receivedAmount: toNumber(p.receivedAmount),
     balanceAmount: toNumber(p.balanceAmount),
+    discountAmount: toNullableNumber(p.discountAmount),
+    isGST: Boolean(p.isGST),
+    discountedBy: p.discountedBy ?? null,
+    discountNote: p.discountNote ?? null,
   };
 }
 

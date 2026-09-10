@@ -7,6 +7,7 @@ import { db } from "~/lib/db";
 import { cleanPhone, toNumber, toNullableNumber } from "./utils";
 import { calculateHoursFromTimes, calculateEarnedWage } from "./calculations";
 import { assertCanEdit } from "./permissions";
+import { recalculateProject } from "./recalc";
 
 function formatProject<T extends Record<string, any>>(p: T | null) {
   if (!p) return null;
@@ -16,6 +17,10 @@ function formatProject<T extends Record<string, any>>(p: T | null) {
     projectValue: toNumber(p.projectValue),
     receivedAmount: toNumber(p.receivedAmount),
     balanceAmount: toNumber(p.balanceAmount),
+    discountAmount: toNullableNumber(p.discountAmount),
+    isGST: Boolean(p.isGST),
+    discountedBy: p.discountedBy ?? null,
+    discountNote: p.discountNote ?? null,
   };
 }
 
@@ -43,6 +48,10 @@ const projectUpdate = z.object({
   beforeWorkPhotoUrl: z.string().optional().nullable(),
   afterWorkPhotoUrl: z.string().optional().nullable(),
   internalNotes: z.string().optional(),
+  isGST: z.boolean().optional(),
+  discountAmount: z.number().optional().nullable(),
+  discountedBy: z.string().optional().nullable(),
+  discountNote: z.string().optional().nullable(),
 });
 
 /** updateProject with bi-directional sync back to linked Enquiry. */
@@ -56,9 +65,11 @@ export const updateProject = createServerFn({ method: "POST" })
       if (!current) throw new Error("Project not found");
 
       const newValue = parsed.projectValue !== undefined ? parsed.projectValue : Number(current.projectValue);
+      const discount = parsed.discountAmount !== undefined ? (parsed.discountAmount ? Number(parsed.discountAmount) : 0) : (current.discountAmount ? Number(current.discountAmount) : 0);
+      const netPayable = Math.max(0, newValue - discount);
       const received = Number(current.receivedAmount);
-      const balance = Math.max(0, newValue - received);
-      const paymentStatus = received >= newValue && newValue > 0 ? "Paid" : received > 0 ? "Partial" : "Pending";
+      const balance = Math.max(0, netPayable - received);
+      const paymentStatus = received >= netPayable && netPayable > 0 ? "Paid" : received > 0 ? "Partial" : "Pending";
 
       let engName: string | null | undefined = parsed.assignedEngineerName;
       let engId: string | null | undefined = parsed.assignedEngineerId;
@@ -89,10 +100,13 @@ export const updateProject = createServerFn({ method: "POST" })
       if (parsed.assignedEngineerId !== undefined || engId !== undefined) projectUpdateData.assignedEngineerId = engId;
       if (parsed.assignedEngineerName !== undefined || engName !== undefined) projectUpdateData.assignedEngineerName = engName;
 
-      const updated = await tx.project.update({
+      await tx.project.update({
         where: { id: data.id },
         data: projectUpdateData,
       });
+
+      // Recalculate stages, balances, and status accurately
+      await recalculateProject(tx, data.id);
 
       // Sync back to linked Enquiry
       const linkedEnq = await tx.enquiry.findFirst({ where: { projectId: data.id } });
@@ -123,8 +137,21 @@ export const updateProject = createServerFn({ method: "POST" })
         });
       }
 
-      return formatProject(updated);
+      const refreshed = await tx.project.findUnique({ where: { id: data.id } });
+      return formatProject(refreshed);
     }, { timeout: 30000, maxWait: 10000 });
+  });
+
+/** Lightweight server function to toggle project GST status directly */
+export const updateProjectGSTStatus = createServerFn({ method: "POST" })
+  .validator((input: { id: string; isGST: boolean; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
+  .handler(async ({ data }) => {
+    assertCanEdit(data);
+    const updated = await db.project.update({
+      where: { id: data.id },
+      data: { isGST: data.isGST },
+    });
+    return formatProject(updated);
   });
 
 export async function deleteProjectWithStockReversal(tx: any, projectId: string) {

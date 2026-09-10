@@ -60,9 +60,9 @@ export function calculateEarnedWage(
   return Math.round(wage);
 }
 
-/** Compute PaymentStatus from project total + received + stages */
+/** Compute PaymentStatus from project net payable (projectValue - discount) + received + stages */
 export function computePaymentStatus(
-  projectValue: number,
+  netPayable: number,
   receivedAmount: number,
   dueDate?: Date | null,
   paymentStages?: Array<{ dueDate: Date; amount: number; paidAmount?: number | null }>
@@ -75,11 +75,12 @@ export function computePaymentStatus(
   );
   const projectOverdue = dueDate && dueDate < today;
 
+  if (receivedAmount >= netPayable && netPayable > 0) return "Paid";
   if (receivedAmount === 0) {
     if (hasOverdueStage || projectOverdue) return "Overdue";
     return "Pending";
   }
-  if (receivedAmount >= projectValue && projectValue > 0) return "Paid";
+  if (receivedAmount >= netPayable) return "Paid";
   if (hasOverdueStage || projectOverdue) return "Overdue";
   return "Partial";
 }

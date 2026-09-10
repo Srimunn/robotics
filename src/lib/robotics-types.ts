@@ -259,6 +259,10 @@ export interface Project {
   receivedAmount: number;
   balanceAmount: number;
   paymentStatus: PaymentStatus;
+  isGST?: boolean;
+  discountAmount?: number | null;
+  discountedBy?: string | null;
+  discountNote?: string | null;
   beforeWorkPhotoUrl?: string;
   afterWorkPhotoUrl?: string;
   internalNotes: string;

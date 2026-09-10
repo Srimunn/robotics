@@ -83,6 +83,7 @@ import {
 } from "@/components/ui/select";
 import { generateSingleProjectReport } from "~/server/reports";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
 interface ProjectsSearch {
@@ -272,6 +273,89 @@ function ProjectsComponent() {
   const [payChequeNum, setPayChequeNum] = useState("");
   const [payChequeDate, setPayChequeDate] = useState(new Date().toISOString().slice(0, 10));
   const [payProofName, setPayProofName] = useState("");
+
+  // Discount Modal state
+  const [discountModalOpen, setDiscountModalOpen] = useState(false);
+  const [discountAmountInput, setDiscountAmountInput] = useState<number | "">("");
+  const [discountedByInput, setDiscountedByInput] = useState("");
+  const [discountNoteInput, setDiscountNoteInput] = useState("");
+  const [isSavingDiscount, setIsSavingDiscount] = useState(false);
+
+  const handleOpenDiscountModal = () => {
+    if (!activeProject) return;
+    setDiscountAmountInput(activeProject.discountAmount ?? "");
+    setDiscountedByInput(activeProject.discountedBy || "");
+    setDiscountNoteInput(activeProject.discountNote || "");
+    setDiscountModalOpen(true);
+  };
+
+  const handleSaveDiscount = async () => {
+    if (!activeProject) return;
+    try {
+      setIsSavingDiscount(true);
+      const parsedAmount = discountAmountInput === "" ? null : Number(discountAmountInput);
+      const by = discountedByInput.trim() || null;
+      const note = discountNoteInput.trim() || null;
+
+      await updateProject(activeProject.id, {
+        discountAmount: parsedAmount,
+        discountedBy: by,
+        discountNote: note,
+      });
+
+      const netPayable = Math.max(0, (activeProject.projectValue || 0) - (parsedAmount || 0));
+      const received = activeProject.receivedAmount || 0;
+      const newBalance = Math.max(0, netPayable - received);
+      const newPaymentStatus = received >= netPayable && netPayable > 0 ? "Paid" : received > 0 ? "Partial" : "Pending";
+
+      setActiveProject({
+        ...activeProject,
+        discountAmount: parsedAmount,
+        discountedBy: by,
+        discountNote: note,
+        balanceAmount: newBalance,
+        paymentStatus: newPaymentStatus,
+      });
+      setDiscountModalOpen(false);
+      toast.success(parsedAmount && parsedAmount > 0 ? "Discount applied successfully" : "Discount saved");
+    } catch (err: any) {
+      toast.error("Failed to save discount: " + (err?.message || err));
+    } finally {
+      setIsSavingDiscount(false);
+    }
+  };
+
+  const handleRemoveDiscount = async () => {
+    if (!activeProject) return;
+    try {
+      setIsSavingDiscount(true);
+      await updateProject(activeProject.id, {
+        discountAmount: null,
+        discountedBy: null,
+        discountNote: null,
+      });
+
+      const netPayable = activeProject.projectValue || 0;
+      const received = activeProject.receivedAmount || 0;
+      const newBalance = Math.max(0, netPayable - received);
+      const newPaymentStatus = received >= netPayable && netPayable > 0 ? "Paid" : received > 0 ? "Partial" : "Pending";
+
+      setActiveProject({
+        ...activeProject,
+        discountAmount: null,
+        discountedBy: null,
+        discountNote: null,
+        balanceAmount: newBalance,
+        paymentStatus: newPaymentStatus,
+      });
+      setDiscountModalOpen(false);
+      toast.success("Discount removed successfully");
+    } catch (err: any) {
+      toast.error("Failed to remove discount: " + (err?.message || err));
+    } finally {
+      setIsSavingDiscount(false);
+    }
+  };
 
   // Dynamic Payment Stage Modal States
   const [addStageOpen, setAddStageOpen] = useState(false);
@@ -811,43 +895,55 @@ function ProjectsComponent() {
                           </Badge>
                         </td>
                       <td className="p-3">
-                        {canFullEdit ? (
-                          <Select
-                            value={p.status}
-                            onValueChange={(val: ProjectStatus) => {
-                              if (val === "Closed") {
-                                setClosingProjectTarget(p);
-                              } else {
-                                updateProjectStatus(p.id, val);
-                              }
-                            }}
-                          >
-                            <SelectTrigger
-                              onClick={(e) => e.stopPropagation()}
-                              className="h-7 w-28 text-xs font-medium rounded-lg"
+                        <div className="flex items-center gap-1.5">
+                          {canFullEdit ? (
+                            <Select
+                              value={p.status}
+                              onValueChange={(val: ProjectStatus) => {
+                                if (val === "Closed") {
+                                  setClosingProjectTarget(p);
+                                } else {
+                                  updateProjectStatus(p.id, val);
+                                }
+                              }}
                             >
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-xl">
-                              <SelectItem value="Scheduled">Scheduled</SelectItem>
-                              <SelectItem value="Ongoing">Ongoing</SelectItem>
-                              <SelectItem value="Completed">Completed</SelectItem>
-                              <SelectItem value="Closed">Closed</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
+                              <SelectTrigger
+                                onClick={(e) => e.stopPropagation()}
+                                className="h-7 w-28 text-xs font-medium rounded-lg"
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl">
+                                <SelectItem value="Scheduled">Scheduled</SelectItem>
+                                <SelectItem value="Ongoing">Ongoing</SelectItem>
+                                <SelectItem value="Completed">Completed</SelectItem>
+                                <SelectItem value="Closed">Closed</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Badge
+                              className={`text-[10px] font-bold ${
+                                p.status === "Ongoing"
+                                  ? "bg-emerald-600 text-white"
+                                  : p.status === "Completed"
+                                  ? "bg-emerald-700 text-white"
+                                  : "bg-blue-600 text-white"
+                              }`}
+                            >
+                              {p.status}
+                            </Badge>
+                          )}
                           <Badge
-                            className={`text-[10px] font-bold ${
-                              p.status === "Ongoing"
-                                ? "bg-emerald-600 text-white"
-                                : p.status === "Completed"
-                                ? "bg-emerald-700 text-white"
-                                : "bg-blue-600 text-white"
+                            variant="outline"
+                            className={`text-[9px] font-bold px-1.5 py-0.5 whitespace-nowrap ${
+                              p.isGST
+                                ? "bg-blue-50 text-blue-700 border-blue-200"
+                                : "bg-slate-50 text-slate-600 border-slate-200"
                             }`}
                           >
-                            {p.status}
+                            {p.isGST ? "GST" : "Non-GST"}
                           </Badge>
-                        )}
+                        </div>
                       </td>
                       <td className="p-3 text-right pr-4 whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
@@ -910,6 +1006,38 @@ function ProjectsComponent() {
                     >
                       {activeProject.status}
                     </Badge>
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] font-bold px-2 py-0.5 ${
+                        activeProject.isGST
+                          ? "bg-blue-50 text-blue-700 border-blue-200"
+                          : "bg-slate-50 text-slate-600 border-slate-200"
+                      }`}
+                    >
+                      {activeProject.isGST ? "GST" : "Non-GST"}
+                    </Badge>
+                    {canFullEdit && (
+                      <div
+                        className="flex items-center gap-1.5 ml-1 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-md border border-border shadow-2xs"
+                        title="Toggle GST / Non-GST classification"
+                      >
+                        <span className="text-[10px] font-bold text-muted-foreground">
+                          {activeProject.isGST ? "GST" : "Non-GST"}
+                        </span>
+                        <Switch
+                          checked={Boolean(activeProject.isGST)}
+                          onCheckedChange={async (checked) => {
+                            try {
+                              await updateProject(activeProject.id, { isGST: checked });
+                              setActiveProject({ ...activeProject, isGST: checked });
+                              toast.success(`Project marked as ${checked ? "GST" : "Non-GST"}`);
+                            } catch (err: any) {
+                              toast.error("Failed to update GST status: " + (err?.message || err));
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
                     {activeProject.enquiryId && (
                       <Badge variant="outline" className="text-[10px] bg-blue-100/80 text-blue-800 border-blue-300">
                         Linked Enquiry: {activeProject.enquiryId}
@@ -1163,7 +1291,8 @@ function ProjectsComponent() {
                       <Button
                         size="sm"
                         onClick={() => {
-                          setPayAmount(activeProject.balanceAmount > 0 ? activeProject.balanceAmount : activeProject.projectValue);
+                          const netVal = Math.max(0, (activeProject.projectValue || 0) - (activeProject.discountAmount ? Number(activeProject.discountAmount) : 0));
+                          setPayAmount(activeProject.balanceAmount > 0 ? activeProject.balanceAmount : netVal);
                           setPayRef("");
                           setPayRemarksInput("Received via Project Financial Cockpit");
                           setPaymentOpen(true);
@@ -1178,28 +1307,56 @@ function ProjectsComponent() {
                     {/* Financial KPI Cards & Progress */}
                     {(() => {
                       const totalVal = activeProject.projectValue || 0;
+                      const discount = activeProject.discountAmount ? Number(activeProject.discountAmount) : 0;
+                      const netPayable = Math.max(0, totalVal - discount);
                       const collected = activeProject.receivedAmount || 0;
                       const outstanding = activeProject.balanceAmount || 0;
-                      const collPct = totalVal > 0 ? Math.min(100, Math.round((collected / totalVal) * 100)) : 0;
+                      const collPct = netPayable > 0 ? Math.min(100, Math.round((collected / netPayable) * 100)) : 0;
 
                       return (
                         <div className="space-y-4">
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                             <div className="p-3 rounded-xl border bg-slate-50/60 dark:bg-slate-900/40">
                               <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Contract Value</p>
                               <p className="text-lg font-extrabold text-foreground mt-0.5">₹{totalVal.toLocaleString("en-IN")}</p>
                             </div>
+
+                            <div className={`p-3 rounded-xl border ${discount > 0 ? "bg-amber-50/60 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/40" : "bg-slate-50/60 dark:bg-slate-900/40"}`}>
+                              <div className="flex items-center justify-between">
+                                <p className="text-[10px] uppercase font-bold text-amber-800 dark:text-amber-400 tracking-wider">Discount</p>
+                                {canFullEdit && (
+                                  <button
+                                    type="button"
+                                    onClick={handleOpenDiscountModal}
+                                    className="text-[10px] text-blue-600 hover:text-blue-800 font-bold underline cursor-pointer"
+                                  >
+                                    {discount > 0 ? "Edit" : "+ Add"}
+                                  </button>
+                                )}
+                              </div>
+                              <p className="text-lg font-extrabold text-amber-700 dark:text-amber-400 mt-0.5">
+                                {discount > 0 ? `−₹${discount.toLocaleString("en-IN")}` : "₹0"}
+                              </p>
+                              {discount > 0 && activeProject.discountedBy && (
+                                <p className="text-[10px] text-muted-foreground truncate" title={`Approved by: ${activeProject.discountedBy}`}>
+                                  by {activeProject.discountedBy}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="p-3 rounded-xl border bg-indigo-50/60 dark:bg-indigo-950/20 border-indigo-100 dark:border-indigo-900/40">
+                              <p className="text-[10px] uppercase font-bold text-indigo-700 dark:text-indigo-400 tracking-wider">Net Payable</p>
+                              <p className="text-lg font-extrabold text-indigo-600 dark:text-indigo-400 mt-0.5">₹{netPayable.toLocaleString("en-IN")}</p>
+                            </div>
+
                             <div className="p-3 rounded-xl border bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/40">
                               <p className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 tracking-wider">Collected Amount</p>
                               <p className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">₹{collected.toLocaleString("en-IN")}</p>
                             </div>
+
                             <div className="p-3 rounded-xl border bg-rose-50/60 dark:bg-rose-950/20 border-rose-100 dark:border-rose-900/40">
                               <p className="text-[10px] uppercase font-bold text-rose-700 dark:text-rose-400 tracking-wider">Outstanding Balance</p>
                               <p className="text-lg font-extrabold text-rose-600 dark:text-rose-400 mt-0.5">₹{outstanding.toLocaleString("en-IN")}</p>
-                            </div>
-                            <div className="p-3 rounded-xl border bg-blue-50/60 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/40">
-                              <p className="text-[10px] uppercase font-bold text-blue-700 dark:text-blue-400 tracking-wider">Collection Rate</p>
-                              <p className="text-lg font-extrabold text-blue-600 dark:text-blue-400 mt-0.5">{collPct}%</p>
                             </div>
                           </div>
 
@@ -1209,7 +1366,9 @@ function ProjectsComponent() {
                               <span className="font-semibold text-muted-foreground flex items-center gap-1">
                                 <Wallet className="h-3.5 w-3.5 text-blue-600" /> Revenue Collection Progress:
                               </span>
-                              <span className="font-extrabold text-foreground">{collPct}% Collected ({collected.toLocaleString("en-IN")} / {totalVal.toLocaleString("en-IN")})</span>
+                              <span className="font-extrabold text-foreground">
+                                {collPct}% Collected ({collected.toLocaleString("en-IN")} / {netPayable.toLocaleString("en-IN")} Net Payable)
+                              </span>
                             </div>
                             <div className="w-full h-3 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                               <div
@@ -2521,6 +2680,109 @@ function ProjectsComponent() {
         title="Delete Payment Record"
         description="This will remove this payment and recalculate the project balance. Continue?"
       />
+
+      {/* EDIT / ADD DISCOUNT DIALOG */}
+      <Dialog open={discountModalOpen} onOpenChange={setDiscountModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl border shadow-xl bg-white dark:bg-card">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2 text-foreground">
+              <Percent className="h-5 w-5 text-amber-600" />
+              {activeProject?.discountAmount ? "Edit Project Discount" : "Add Project Discount"}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Discounts are tracked as a separate line item and reduce net payable without altering the original Contract Value.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-xs">
+            <div className="p-3 bg-amber-50/70 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200">
+              <div className="flex justify-between font-semibold">
+                <span>Contract Value (Original):</span>
+                <span>₹{(activeProject?.projectValue || 0).toLocaleString("en-IN")}</span>
+              </div>
+              <div className="flex justify-between font-bold text-amber-700 dark:text-amber-300 mt-1">
+                <span>Discount to Apply:</span>
+                <span>−₹{(Number(discountAmountInput) || 0).toLocaleString("en-IN")}</span>
+              </div>
+              <div className="flex justify-between font-extrabold text-foreground border-t border-amber-200 dark:border-amber-800 pt-1 mt-1">
+                <span>Net Payable:</span>
+                <span>₹{Math.max(0, (activeProject?.projectValue || 0) - (Number(discountAmountInput) || 0)).toLocaleString("en-IN")}</span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-foreground">Discount Amount (₹) *</Label>
+              <Input
+                type="number"
+                min="0"
+                max={activeProject?.projectValue || undefined}
+                placeholder="e.g. 5000"
+                value={discountAmountInput}
+                onChange={(e) => setDiscountAmountInput(e.target.value === "" ? "" : Math.max(0, Number(e.target.value)))}
+                className="h-9 text-xs rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-foreground">Discount Authorized By</Label>
+              <Input
+                type="text"
+                placeholder="e.g. Managing Director / CEO / Branch Manager"
+                value={discountedByInput}
+                onChange={(e) => setDiscountedByInput(e.target.value)}
+                className="h-9 text-xs rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-foreground">Discount Note / Reason</Label>
+              <Textarea
+                placeholder="e.g. Approved special client concession / festive offer / bulk volume"
+                value={discountNoteInput}
+                onChange={(e) => setDiscountNoteInput(e.target.value)}
+                rows={2}
+                className="text-xs rounded-xl"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col sm:flex-row sm:justify-between items-center gap-2 pt-2 border-t">
+            {activeProject?.discountAmount ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isSavingDiscount}
+                onClick={handleRemoveDiscount}
+                className="w-full sm:w-auto text-rose-600 border-rose-200 hover:bg-rose-50 rounded-xl text-xs"
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove Discount
+              </Button>
+            ) : <div />}
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isSavingDiscount}
+                onClick={() => setDiscountModalOpen(false)}
+                className="rounded-xl text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={isSavingDiscount}
+                onClick={handleSaveDiscount}
+                className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs gap-1"
+              >
+                <Save className="h-3.5 w-3.5" /> Save Discount
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ADD PAYMENT STAGE MODAL */}
       <Dialog open={addStageOpen} onOpenChange={setAddStageOpen}>
