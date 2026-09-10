@@ -391,9 +391,9 @@ function EnquiriesComponent() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50/80 dark:bg-slate-900/50 text-muted-foreground border-b text-[11px] font-bold uppercase tracking-wider">
+          <div className="overflow-auto max-h-[calc(100vh-280px)] min-h-[350px]">
+            <table className="w-full text-left text-xs border-separate border-spacing-0">
+              <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 text-muted-foreground text-[11px] font-bold uppercase tracking-wider [&_th]:sticky [&_th]:top-0 [&_th]:bg-slate-50 [&_th]:dark:bg-slate-900 [&_th]:z-10 [&_th]:border-b [&_th]:border-slate-200 [&_th]:dark:border-slate-800 shadow-2xs">
                 <tr>
                   <th className="p-3 pl-4 whitespace-nowrap">ID</th>
                   <th className="p-3 whitespace-nowrap min-w-[160px]">CUSTOMER</th>
@@ -407,7 +407,7 @@ function EnquiriesComponent() {
                   <th className="p-3 text-right pr-4 whitespace-nowrap">ACTION</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y [&_td]:border-b [&_td]:border-slate-100 dark:[&_td]:border-slate-800">
                 {paginatedEnquiries.length === 0 ? (
                   <tr>
                     <td colSpan={10} className="p-12 text-center">

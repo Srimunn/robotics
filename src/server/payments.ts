@@ -102,6 +102,78 @@ export const addPayment = createServerFn({ method: "POST" })
     }, { timeout: 30000, maxWait: 10000 });
   });
 
+const updatePaymentInput = z.object({
+  id: z.string(),
+  paymentDate: z.coerce.date().optional(),
+  amount: z.number().positive().optional(),
+  mode: z.string().optional(),
+  referenceNumber: z.string().optional().nullable(),
+  remarks: z.string().optional().nullable(),
+  stageId: z.string().optional().nullable(),
+  stageName: z.string().optional().nullable(),
+  receivedBy: z.string().optional().nullable(),
+  receiptNumber: z.string().optional().nullable(),
+  upiApp: z.string().optional().nullable(),
+  transactionId: z.string().optional().nullable(),
+  upiReferenceNumber: z.string().optional().nullable(),
+  utrNumber: z.string().optional().nullable(),
+  bankName: z.string().optional().nullable(),
+  accountReceived: z.string().optional().nullable(),
+  chequeNumber: z.string().optional().nullable(),
+  chequeDate: z.coerce.date().optional().nullable(),
+  proofUrl: z.string().optional().nullable(),
+  proofName: z.string().optional().nullable(),
+  requestedByRole: z.string().optional().nullable(),
+  requestedBySubRole: z.string().optional().nullable(),
+});
+
+export const updatePayment = createServerFn({ method: "POST" })
+  .validator((input: unknown) => updatePaymentInput.parse(input))
+  .handler(async ({ data }) => {
+    assertCanEdit(data);
+    return db.$transaction(async (tx) => {
+      const existing = await tx.payment.findUnique({ where: { id: data.id } });
+      if (!existing) throw new Error("Payment not found");
+
+      const payment = await tx.payment.update({
+        where: { id: data.id },
+        data: {
+          paymentDate: data.paymentDate,
+          amount: data.amount,
+          mode: data.mode,
+          referenceNumber: data.referenceNumber !== undefined ? (data.referenceNumber ?? "") : undefined,
+          remarks: data.remarks !== undefined ? (data.remarks ?? "") : undefined,
+          stageId: data.stageId,
+          stageName: data.stageName,
+          receivedBy: data.receivedBy !== undefined ? (data.receivedBy ?? "Accounts & Credit Desk") : undefined,
+          receiptNumber: data.receiptNumber,
+          upiApp: data.upiApp,
+          transactionId: data.transactionId,
+          upiReferenceNumber: data.upiReferenceNumber,
+          utrNumber: data.utrNumber,
+          bankName: data.bankName,
+          accountReceived: data.accountReceived,
+          chequeNumber: data.chequeNumber,
+          chequeDate: data.chequeDate,
+          proofUrl: data.proofUrl,
+          proofName: data.proofName,
+        },
+      });
+
+      await tx.projectActivity.create({
+        data: {
+          projectId: existing.projectId,
+          event: "Payment Updated",
+          actor: data.receivedBy ?? "Accounts & Credit Desk",
+          details: `Payment ${data.id} updated: ₹${(data.amount ?? Number(existing.amount)).toLocaleString("en-IN")} via ${data.mode ?? existing.mode}`,
+        },
+      });
+
+      await recalculateProject(tx, existing.projectId);
+      return formatPayment(payment);
+    }, { timeout: 30000, maxWait: 10000 });
+  });
+
 export const deletePayment = createServerFn({ method: "POST" })
   .validator((input: { id: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {

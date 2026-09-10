@@ -437,9 +437,8 @@ function AttendancePageComponent() {
 
       {/* Aggregated Attendance Table */}
       <Card className="rounded-xl border border-border/80 bg-white dark:bg-card shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
+        <Table containerClassName="max-h-[calc(100vh-280px)] min-h-[350px]">
+          <TableHeader className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 shadow-2xs">
               <TableRow className="hover:bg-transparent">
                 <TableHead className="text-xs font-bold text-muted-foreground w-28">ID</TableHead>
                 <TableHead className="text-xs font-bold text-muted-foreground min-w-[200px]">WORKER</TableHead>
@@ -560,7 +559,6 @@ function AttendancePageComponent() {
               )}
             </TableBody>
           </Table>
-        </div>
 
         <DataPagination
           currentPage={currentPage}
@@ -603,7 +601,7 @@ function AttendancePageComponent() {
 
               <div className="max-h-80 overflow-y-auto border rounded-xl">
                 <Table>
-                  <TableHeader className="bg-slate-100 dark:bg-slate-800">
+                  <TableHeader className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800">
                     <TableRow>
                       <TableHead className="text-[11px] font-bold">Date</TableHead>
                       <TableHead className="text-[11px] font-bold">Project</TableHead>

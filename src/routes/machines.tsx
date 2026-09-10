@@ -455,9 +455,8 @@ function MachinesPageComponent() {
       {/* Main View: List or Grid */}
       {viewMode === "list" ? (
         <Card className="rounded-xl border border-border/80 bg-white dark:bg-card shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
+          <Table containerClassName="max-h-[calc(100vh-280px)] min-h-[350px]">
+            <TableHeader className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 shadow-2xs">
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="text-xs font-bold text-muted-foreground w-28">ID</TableHead>
                   <TableHead className="text-xs font-bold text-muted-foreground min-w-[220px]">TOOL NAME</TableHead>
@@ -626,7 +625,6 @@ function MachinesPageComponent() {
                 )}
               </TableBody>
             </Table>
-          </div>
         </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1055,7 +1053,7 @@ function MachinesPageComponent() {
               {/* History Table */}
               <div className="max-h-[350px] overflow-y-auto border rounded-xl">
                 <Table>
-                  <TableHeader className="bg-slate-100 dark:bg-slate-800">
+                  <TableHeader className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800">
                     <TableRow>
                       <TableHead className="text-[11px] font-bold">Project & Customer</TableHead>
                       <TableHead className="text-[11px] font-bold">Qty</TableHead>
@@ -1136,7 +1134,7 @@ function MachinesPageComponent() {
 
           <div className="max-h-[420px] overflow-y-auto border rounded-xl py-1">
             <Table>
-              <TableHeader className="bg-slate-100 dark:bg-slate-800">
+              <TableHeader className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800">
                 <TableRow>
                   <TableHead className="text-[11px] font-bold">Timestamp</TableHead>
                   <TableHead className="text-[11px] font-bold">Type</TableHead>

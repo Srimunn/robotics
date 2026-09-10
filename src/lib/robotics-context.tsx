@@ -91,6 +91,7 @@ import {
 
 import {
   addPayment as addPaymentFn,
+  updatePayment as updatePaymentFn,
   deletePayment as deletePaymentFn,
   addPaymentStage as addPaymentStageFn,
   updatePaymentStage as updatePaymentStageFn,
@@ -254,6 +255,7 @@ type RoboticsContextType = {
 
 
   addPayment: (pay: Omit<Payment, "id" | "createdAt">) => Promise<Payment | undefined>;
+  updatePayment: (id: string, updates: Partial<Payment>) => Promise<void>;
   deletePayment: (id: string) => Promise<void>;
   addPaymentStage: (projectId: string, stage: Omit<PaymentStageItem, "id" | "status">) => Promise<void>;
   updatePaymentStage: (projectId: string, stageId: string, updates: Partial<PaymentStageItem>) => Promise<void>;
@@ -848,6 +850,26 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
     onSuccess: (pay) => { invalidate("payments", "projects"); toast.success(`Payment ${pay.id} of ₹${pay.amount.toLocaleString("en-IN")} recorded`); },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
+  const updatePaymentM = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Payment> }) =>
+      updatePaymentFn({
+        data: {
+          id,
+          paymentDate: updates.paymentDate ? new Date(updates.paymentDate) : undefined,
+          amount: updates.amount,
+          mode: updates.mode,
+          referenceNumber: updates.referenceNumber,
+          remarks: updates.remarks,
+          receivedBy: updates.receivedBy,
+          proofUrl: updates.proofUrl,
+          proofName: updates.proofName,
+          requestedByRole: currentUser?.role,
+          requestedBySubRole: currentUser?.subRole,
+        },
+      }),
+    onSuccess: () => { invalidate("payments", "projects"); toast.success("Payment updated"); },
+    onError: (err) => toast.error(`${(err as Error).message}`),
+  });
   const deletePaymentM = useMutation({
     mutationFn: async (id: string) => deletePaymentFn({ data: { id, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
     onSuccess: () => { invalidate("payments", "projects"); toast.success("Payment removed"); },
@@ -1116,6 +1138,7 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
 
 
         addPayment: (pay) => addPaymentM.mutateAsync(pay),
+        updatePayment: async (id, updates) => { await updatePaymentM.mutateAsync({ id, updates }); },
         deletePayment: async (id) => { await deletePaymentM.mutateAsync(id); },
         addPaymentStage: async (projectId, stage) => { await addPaymentStageM.mutateAsync({ projectId, stage }); },
         updatePaymentStage: async (projectId, stageId, updates) => { await updatePaymentStageM.mutateAsync({ projectId, stageId, updates }); },

@@ -965,7 +965,7 @@ function LaboursComponent() {
                           </h4>
                           <div className="border rounded-xl overflow-hidden bg-white dark:bg-card">
                             <table className="w-full text-left text-xs">
-                              <thead className="bg-muted/40 text-muted-foreground border-b font-medium">
+                              <thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800 text-muted-foreground border-b font-medium">
                                 <tr>
                                   <th className="p-2.5 pl-3">Project ID & Customer</th>
                                   <th className="p-2.5">Nature of Work & Location</th>
@@ -1027,9 +1027,9 @@ function LaboursComponent() {
                               <Clock className="h-4 w-4 text-emerald-600" /> Recent Site Check-In & Work Logs
                             </span>
                           </h4>
-                          <div className="border rounded-xl overflow-hidden bg-white dark:bg-card">
-                            <table className="w-full text-left text-xs">
-                              <thead className="bg-muted/40 text-muted-foreground border-b font-medium">
+                          <div className="border rounded-xl overflow-auto max-h-72 bg-white dark:bg-card">
+                            <table className="w-full text-left text-xs border-separate border-spacing-0">
+                              <thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800 text-muted-foreground text-[11px] font-bold uppercase tracking-wider [&_th]:sticky [&_th]:top-0 [&_th]:bg-slate-100 [&_th]:dark:bg-slate-800 [&_th]:z-10 [&_th]:border-b [&_th]:border-slate-200 [&_th]:dark:border-slate-700 shadow-2xs">
                                 <tr>
                                   <th className="p-2.5 pl-3">Date</th>
                                   <th className="p-2.5">Project / Site</th>
@@ -1040,7 +1040,7 @@ function LaboursComponent() {
                                   <th className="p-2.5 pr-3">Work Notes</th>
                                 </tr>
                               </thead>
-                              <tbody className="divide-y">
+                              <tbody className="divide-y [&_td]:border-b [&_td]:border-slate-100 dark:[&_td]:border-slate-800">
                                 {(() => {
                                   const workerLogs = globalAttendanceList.filter((r) => r.labourId === activeLabour.id);
                                   if (workerLogs.length === 0) {
@@ -1181,9 +1181,9 @@ function LaboursComponent() {
             </Badge>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-muted/40 text-muted-foreground border-b font-medium">
+            <div className="overflow-auto max-h-[calc(100vh-280px)] min-h-[350px]">
+              <table className="w-full text-left text-xs border-separate border-spacing-0">
+                <thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800 text-muted-foreground text-[11px] font-bold uppercase tracking-wider [&_th]:sticky [&_th]:top-0 [&_th]:bg-slate-100 [&_th]:dark:bg-slate-800 [&_th]:z-10 [&_th]:border-b [&_th]:border-slate-200 [&_th]:dark:border-slate-700 shadow-2xs">
                   <tr>
                     <th className="p-3 pl-4">Date</th>
                     <th className="p-3">Labour Name</th>
@@ -1196,7 +1196,7 @@ function LaboursComponent() {
                     <th className="p-3">Work Notes</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y [&_td]:border-b [&_td]:border-slate-100 dark:[&_td]:border-slate-800">
                   {globalAttendanceList.map((rec) => {
                     const lab = labours.find((l) => l.id === rec.labourId);
                     const wage = rec.dailyWage ?? (rec.weeklyWage ? Math.round(rec.weeklyWage / 6) : (lab?.dailyWage ?? Math.round((lab?.defaultWeeklyWage || 1400) / 6)));
@@ -1280,9 +1280,9 @@ function LaboursComponent() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-muted/40 text-muted-foreground border-b font-medium">
+            <div className="overflow-auto max-h-[calc(100vh-280px)] min-h-[350px]">
+              <table className="w-full text-left text-xs border-separate border-spacing-0">
+                <thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800 text-muted-foreground text-[11px] font-bold uppercase tracking-wider [&_th]:sticky [&_th]:top-0 [&_th]:bg-slate-100 [&_th]:dark:bg-slate-800 [&_th]:z-10 [&_th]:border-b [&_th]:border-slate-200 [&_th]:dark:border-slate-700 shadow-2xs">
                   <tr>
                     <th className="p-3 pl-4">Labour ID</th>
                     <th className="p-3">Full Name</th>
@@ -1293,7 +1293,7 @@ function LaboursComponent() {
                     <th className="p-3 text-right pr-4">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y [&_td]:border-b [&_td]:border-slate-100 dark:[&_td]:border-slate-800">
                   {filteredLabours.map((l) => (
                     <tr key={l.id} className={`hover:bg-accent/40 ${l.isActive === false ? "opacity-60 bg-amber-50/40 dark:bg-amber-950/20" : ""}`}>
                       <td className="p-3 pl-4 font-bold text-blue-600">{l.id}</td>

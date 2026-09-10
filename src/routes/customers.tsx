@@ -219,9 +219,9 @@ function CustomersComponent() {
                     <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       Projects History ({custProjects.length})
                     </h4>
-                    <div className="border rounded-lg overflow-hidden">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-muted/40 text-muted-foreground border-b">
+                    <div className="border rounded-lg overflow-auto max-h-64">
+                      <table className="w-full text-left text-xs border-separate border-spacing-0">
+                        <thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800 text-muted-foreground text-[11px] font-bold uppercase tracking-wider [&_th]:sticky [&_th]:top-0 [&_th]:bg-slate-100 [&_th]:dark:bg-slate-800 [&_th]:z-10 [&_th]:border-b [&_th]:border-slate-200 [&_th]:dark:border-slate-700 shadow-2xs">
                           <tr>
                             <th className="p-2.5 pl-3">Project ID</th>
                             <th className="p-2.5">Nature of Work</th>
@@ -230,7 +230,7 @@ function CustomersComponent() {
                             <th className="p-2.5">Status</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y">
+                        <tbody className="divide-y [&_td]:border-b [&_td]:border-slate-100 dark:[&_td]:border-slate-800">
                           {custProjects.length === 0 ? (
                             <tr>
                               <td colSpan={5} className="p-4 text-center text-muted-foreground">
@@ -270,9 +270,9 @@ function CustomersComponent() {
                     <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       Enquiries & Quotations History ({custEnquiries.length})
                     </h4>
-                    <div className="border rounded-lg overflow-hidden">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-muted/40 text-muted-foreground border-b">
+                    <div className="border rounded-lg overflow-auto max-h-64">
+                      <table className="w-full text-left text-xs border-separate border-spacing-0">
+                        <thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800 text-muted-foreground text-[11px] font-bold uppercase tracking-wider [&_th]:sticky [&_th]:top-0 [&_th]:bg-slate-100 [&_th]:dark:bg-slate-800 [&_th]:z-10 [&_th]:border-b [&_th]:border-slate-200 [&_th]:dark:border-slate-700 shadow-2xs">
                           <tr>
                             <th className="p-2.5 pl-3">Enquiry ID</th>
                             <th className="p-2.5">Service / Leakage Type</th>
@@ -280,7 +280,7 @@ function CustomersComponent() {
                             <th className="p-2.5">Decision</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y">
+                        <tbody className="divide-y [&_td]:border-b [&_td]:border-slate-100 dark:[&_td]:border-slate-800">
                           {custEnquiries.length === 0 ? (
                             <tr>
                               <td colSpan={4} className="p-4 text-center text-muted-foreground">
@@ -311,9 +311,9 @@ function CustomersComponent() {
                     <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       Payment Transactions Ledger ({custPayments.length})
                     </h4>
-                    <div className="border rounded-lg overflow-hidden">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-muted/40 text-muted-foreground border-b">
+                    <div className="border rounded-lg overflow-auto max-h-64">
+                      <table className="w-full text-left text-xs border-separate border-spacing-0">
+                        <thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800 text-muted-foreground text-[11px] font-bold uppercase tracking-wider [&_th]:sticky [&_th]:top-0 [&_th]:bg-slate-100 [&_th]:dark:bg-slate-800 [&_th]:z-10 [&_th]:border-b [&_th]:border-slate-200 [&_th]:dark:border-slate-700 shadow-2xs">
                           <tr>
                             <th className="p-2.5 pl-3">Date</th>
                             <th className="p-2.5">Project ID</th>
@@ -322,7 +322,7 @@ function CustomersComponent() {
                             <th className="p-2.5 text-right pr-3">Amount</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y">
+                        <tbody className="divide-y [&_td]:border-b [&_td]:border-slate-100 dark:[&_td]:border-slate-800">
                           {custPayments.length === 0 ? (
                             <tr>
                               <td colSpan={5} className="p-4 text-center text-muted-foreground">

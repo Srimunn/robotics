@@ -449,12 +449,12 @@ function PaymentsComponent() {
       {/* TAB 1: ACCOUNTS RECEIVABLE READ-ONLY COCKPIT */}
       {activeTab === "RECEIVABLES" && (
         <Card className="rounded-xl border border-border/80 bg-white dark:bg-card shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
+          <Table containerClassName="max-h-[calc(100vh-280px)] min-h-[350px]">
+            <TableHeader className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 shadow-2xs">
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="text-xs font-bold text-muted-foreground whitespace-nowrap min-w-[150px]">CUSTOMER</TableHead>
                   <TableHead className="text-xs font-bold text-muted-foreground whitespace-nowrap min-w-[180px]">PROJECT</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground whitespace-nowrap text-center">PROJECT STATUS</TableHead>
                   <TableHead className="text-xs font-bold text-muted-foreground text-right whitespace-nowrap">VALUE</TableHead>
                   <TableHead className="text-xs font-bold text-muted-foreground text-right whitespace-nowrap">RECEIVED</TableHead>
                   <TableHead className="text-xs font-bold text-muted-foreground text-right whitespace-nowrap">BALANCE</TableHead>
@@ -467,7 +467,7 @@ function PaymentsComponent() {
               <TableBody>
                 {paginatedReceivables.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-12">
+                    <TableCell colSpan={10} className="text-center py-12">
                       <div className="flex flex-col items-center justify-center space-y-3">
                         <div className="grid h-12 w-12 place-items-center rounded-full bg-emerald-50 text-emerald-600">
                           <Wallet className="h-6 w-6 stroke-[1.5]" />
@@ -547,6 +547,22 @@ function PaymentsComponent() {
                           <div className="text-[11px] text-muted-foreground truncate" title={proj.natureOfWork}>{proj.natureOfWork}</div>
                         </TableCell>
 
+                        <TableCell className="text-center whitespace-nowrap">
+                          <Badge
+                            className={`text-[10px] font-bold ${
+                              proj.status === "Ongoing"
+                                ? "bg-emerald-600 text-white"
+                                : proj.status === "Completed"
+                                ? "bg-emerald-700 text-white"
+                                : proj.status === "Closed"
+                                ? "bg-slate-600 text-white"
+                                : "bg-blue-600 text-white"
+                            }`}
+                          >
+                            {proj.status}
+                          </Badge>
+                        </TableCell>
+
                         <TableCell className="text-right font-mono text-xs font-semibold text-foreground whitespace-nowrap">
                           ₹{proj.projectValue.toLocaleString("en-IN")}
                         </TableCell>
@@ -613,7 +629,6 @@ function PaymentsComponent() {
                 )}
               </TableBody>
             </Table>
-          </div>
 
           <DataPagination
             currentPage={currentPageReceivables}
@@ -632,9 +647,8 @@ function PaymentsComponent() {
       {/* TAB 2: IMMUTABLE PAYMENT HISTORY LEDGER */}
       {activeTab === "HISTORY" && (
         <Card className="rounded-xl border border-border/80 bg-white dark:bg-card shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
+          <Table containerClassName="max-h-[calc(100vh-280px)] min-h-[350px]">
+            <TableHeader className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 shadow-2xs">
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="text-xs font-bold text-muted-foreground w-28">Payment ID</TableHead>
                   <TableHead className="text-xs font-bold text-muted-foreground">Date & Timestamp</TableHead>
@@ -723,7 +737,6 @@ function PaymentsComponent() {
                 )}
               </TableBody>
             </Table>
-          </div>
 
           <DataPagination
             currentPage={currentPageHistory}
@@ -742,9 +755,8 @@ function PaymentsComponent() {
       {/* TAB 3: CUSTOMER ACCOUNT LEDGER */}
       {activeTab === "CUSTOMER" && (
         <Card className="rounded-xl border border-border/80 bg-white dark:bg-card shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
+          <Table containerClassName="max-h-[calc(100vh-280px)] min-h-[350px]">
+            <TableHeader className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 shadow-2xs">
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="text-xs font-bold text-muted-foreground min-w-[200px]">Customer Name</TableHead>
                   <TableHead className="text-xs font-bold text-muted-foreground text-center">Active Projects</TableHead>
@@ -828,7 +840,6 @@ function PaymentsComponent() {
                 )}
               </TableBody>
             </Table>
-          </div>
         </Card>
       )}
 

@@ -534,9 +534,8 @@ function MachineDetailPage() {
               <p className="max-w-md">All available units are currently resting in company storage or undergoing maintenance.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-slate-50/80 dark:bg-slate-900/50">
+            <Table containerClassName="max-h-[calc(100vh-280px)] min-h-[300px]">
+              <TableHeader className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 shadow-2xs">
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="text-xs font-bold text-muted-foreground w-36">PROJECT ID</TableHead>
                     <TableHead className="text-xs font-bold text-muted-foreground min-w-[200px]">CUSTOMER NAME</TableHead>
@@ -596,7 +595,6 @@ function MachineDetailPage() {
                   })}
                 </TableBody>
               </Table>
-            </div>
           )}
         </CardContent>
       </Card>
@@ -628,9 +626,8 @@ function MachineDetailPage() {
               <p>This equipment has not been issued to any project site yet.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-slate-50/80 dark:bg-slate-900/50">
+            <Table containerClassName="max-h-[calc(100vh-280px)] min-h-[300px]">
+              <TableHeader className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 shadow-2xs">
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="text-xs font-bold text-muted-foreground w-28">STATUS</TableHead>
                     <TableHead className="text-xs font-bold text-muted-foreground w-36">PROJECT ID</TableHead>
@@ -729,7 +726,6 @@ function MachineDetailPage() {
                   })}
                 </TableBody>
               </Table>
-            </div>
           )}
         </CardContent>
       </Card>
@@ -761,9 +757,8 @@ function MachineDetailPage() {
               <p>Stock adjustments and dispatch events for this machine will appear here.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-slate-50/80 dark:bg-slate-900/50">
+            <Table containerClassName="max-h-[calc(100vh-280px)] min-h-[300px]">
+              <TableHeader className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 shadow-2xs">
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="text-xs font-bold text-muted-foreground min-w-[160px]">TIMESTAMP</TableHead>
                     <TableHead className="text-xs font-bold text-muted-foreground">ACTION TYPE</TableHead>
@@ -807,7 +802,6 @@ function MachineDetailPage() {
                   })}
                 </TableBody>
               </Table>
-            </div>
           )}
         </CardContent>
       </Card>

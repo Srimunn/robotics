@@ -282,9 +282,8 @@ function EngineersPageComponent() {
 
       {/* Engineers Table */}
       <Card className="rounded-xl border border-border/80 bg-white dark:bg-card shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
+        <Table containerClassName="max-h-[calc(100vh-280px)] min-h-[350px]">
+          <TableHeader className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 shadow-2xs">
               <TableRow className="hover:bg-transparent">
                 <TableHead className="text-xs font-bold text-muted-foreground w-28">ID</TableHead>
                 <TableHead className="text-xs font-bold text-muted-foreground min-w-[200px]">NAME</TableHead>
@@ -388,7 +387,6 @@ function EngineersPageComponent() {
               )}
             </TableBody>
           </Table>
-        </div>
       </Card>
 
       {/* ADD / EDIT ENGINEER MODAL */}

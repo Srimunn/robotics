@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { uploadImage } from "~/server/upload";
 import { useRobotics, calculateHoursFromTimes, calculateEarnedWage } from "@/lib/robotics-context";
 import { canEdit } from "@/lib/permissions";
-import type { Project, ProjectStatus, ProjectLabourLog, LabourType, MachineCondition, MachineIssueRecord, MaterialIssueRecord, PaymentStageItem, PaymentStatus, ProjectLabourAssignment } from "@/lib/robotics-types";
+import type { Project, ProjectStatus, ProjectLabourLog, LabourType, MachineCondition, MachineIssueRecord, MaterialIssueRecord, PaymentStageItem, PaymentStatus, ProjectLabourAssignment, Payment } from "@/lib/robotics-types";
 import { SmartComboBox } from "@/components/ui/SmartComboBox";
 import { DataPagination } from "@/components/ui/DataPagination";
 import { DeleteConfirm } from "@/components/delete-confirm";
@@ -125,6 +125,8 @@ function ProjectsComponent() {
     unassignLabourFromProject,
     updateProjectLabourLog,
     addPayment,
+    updatePayment,
+    deletePayment,
     issueMachineToProject,
     returnMachineFromProject,
     issueMaterialToProject,
@@ -235,11 +237,23 @@ function ProjectsComponent() {
     toast.success("Location updated");
   };
 
+  // Attendance Work Log Date state
+  const getTodayDateStr = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+  const [selectedLogDate, setSelectedLogDate] = useState<string>(getTodayDateStr);
+
   // Collapsible Payment & Credit section state
   const [isPaymentCreditOpen, setIsPaymentCreditOpen] = useState(true);
 
   // Quick Payment Dialog state
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+  const [deletingPaymentTarget, setDeletingPaymentTarget] = useState<Payment | null>(null);
   const [payAmount, setPayAmount] = useState<number>(0);
   const [payMode, setPayMode] = useState<string>("Bank Transfer");
   const [payRef, setPayRef] = useState("");
@@ -527,48 +541,49 @@ function ProjectsComponent() {
     if (updated) setActiveProject(updated);
   };
 
-  const handleRecordPaymentSubmit = (e: React.FormEvent) => {
+  const handleRecordPaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeProject) return;
     if (payAmount <= 0) {
       toast.error("Please enter a valid payment amount greater than zero");
       return;
     }
-    if (payAmount > activeProject.balanceAmount) {
-      toast.error(`Payment amount cannot exceed project balance (₹${activeProject.balanceAmount.toLocaleString("en-IN")})`);
+    const existingPay = editingPaymentId ? payments.find((p) => p.id === editingPaymentId) : null;
+    const maxAllowed = existingPay
+      ? activeProject.balanceAmount + existingPay.amount
+      : activeProject.balanceAmount;
+
+    if (payAmount > maxAllowed) {
+      toast.error(`Payment amount cannot exceed allowable balance (₹${maxAllowed.toLocaleString("en-IN")})`);
       return;
     }
 
-    let computedRef = `PAY-REF-${Math.floor(Math.random() * 1000000)}`;
-
-    const newReceived = (activeProject.receivedAmount || 0) + payAmount;
-    const newBalance = Math.max(0, activeProject.projectValue - newReceived);
-    let newStatus: PaymentStatus = "Pending";
-    if (newReceived >= activeProject.projectValue && activeProject.projectValue > 0) {
-      newStatus = "Paid";
-    } else if (newReceived > 0) {
-      newStatus = "Partial";
+    if (editingPaymentId) {
+      await updatePayment(editingPaymentId, {
+        paymentDate: payDateInput || getTodayDateStr(),
+        amount: payAmount,
+        mode: payMode as any,
+        referenceNumber: payRef || existingPay?.referenceNumber || undefined,
+        remarks: payRemarksInput || existingPay?.remarks || undefined,
+        receivedBy: payReceivedByInput || "Accounts & Credit Desk",
+        proofName: payProofName || undefined,
+      });
+    } else {
+      let computedRef = payRef || `PAY-REF-${Math.floor(Math.random() * 1000000)}`;
+      await addPayment({
+        projectId: activeProject.id,
+        paymentDate: payDateInput || getTodayDateStr(),
+        amount: payAmount,
+        mode: payMode as any,
+        referenceNumber: computedRef,
+        remarks: payRemarksInput || `Collection received for project ${activeProject.id}`,
+        receivedBy: payReceivedByInput || "Accounts & Credit Desk",
+        proofName: payProofName,
+      });
     }
 
-    addPayment({
-      projectId: activeProject.id,
-      paymentDate: payDateInput || new Date().toISOString().slice(0, 10),
-      amount: payAmount,
-      mode: payMode as any,
-      referenceNumber: computedRef,
-      remarks: payRemarksInput || `Collection received for project ${activeProject.id}`,
-      receivedBy: payReceivedByInput || "Accounts & Credit Desk",
-      proofName: payProofName,
-    });
-
-    setActiveProject({
-      ...activeProject,
-      receivedAmount: newReceived,
-      balanceAmount: newBalance,
-      paymentStatus: newStatus,
-    });
-
     setPaymentOpen(false);
+    setEditingPaymentId(null);
     setPayAmount(0);
     setPayRef("");
     setPayProofName("");
@@ -686,9 +701,9 @@ function ProjectsComponent() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50/80 dark:bg-slate-900/50 text-muted-foreground border-b text-[11px] font-bold uppercase tracking-wider">
+          <div className="overflow-auto max-h-[calc(100vh-280px)] min-h-[350px]">
+            <table className="w-full text-left text-xs border-separate border-spacing-0">
+              <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 text-muted-foreground text-[11px] font-bold uppercase tracking-wider [&_th]:sticky [&_th]:top-0 [&_th]:bg-slate-50 [&_th]:dark:bg-slate-900 [&_th]:z-10 [&_th]:border-b [&_th]:border-slate-200 [&_th]:dark:border-slate-800 shadow-2xs">
                 <tr>
                   <th className="p-3 pl-4 whitespace-nowrap">ID</th>
                   <th className="p-3 whitespace-nowrap min-w-[160px]">CUSTOMER</th>
@@ -701,7 +716,7 @@ function ProjectsComponent() {
                   <th className="p-3 text-right pr-4 whitespace-nowrap">ACTION</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y [&_td]:border-b [&_td]:border-slate-100 dark:[&_td]:border-slate-800">
                 {paginatedProjects.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="p-12 text-center">
@@ -1378,11 +1393,21 @@ function ProjectsComponent() {
 
               {/* SECTION 5: LABOUR WORK LOG & ATTENDANCE (AUTO ATTENDANCE ENGINE) */}
               <Card className="rounded-xl border border-border shadow-xs">
-                <CardHeader className="p-3 border-b bg-muted/20 flex flex-row items-center justify-between">
+                <CardHeader className="p-3 border-b bg-muted/20 flex flex-row items-center justify-between gap-2 flex-wrap">
                   <div>
                     <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
                       <Clock className="h-3.5 w-3.5 text-blue-600" /> Daily Log
                     </CardTitle>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap">Date:</Label>
+                    <Input
+                      type="date"
+                      value={selectedLogDate}
+                      max={getTodayDateStr()}
+                      onChange={(e) => setSelectedLogDate(e.target.value || getTodayDateStr())}
+                      className="h-7 text-xs w-36 rounded-md font-mono bg-white dark:bg-card"
+                    />
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -1415,7 +1440,9 @@ function ProjectsComponent() {
                             const assignment = (activeProject.labourAssignments || []).find((a) => a.labourId === lId);
                             const dailyWageVal = assignment?.dailyWage ?? (assignment?.weeklyWage ? Math.round(assignment.weeklyWage / 6) : (lab?.dailyWage ?? Math.round((lab?.defaultWeeklyWage || 1400) / 6)));
 
-                            const existingLog = (activeProject.labourLogs || []).find((lg) => lg.labourId === lId);
+                            const existingLog = (activeProject.labourLogs || []).find(
+                              (lg) => lg.labourId === lId && lg.date && lg.date.slice(0, 10) === selectedLogDate
+                            );
                             const inTime = existingLog?.inTime || "";
                             const outTime = existingLog?.outTime || "";
                             const isPresent = Boolean(inTime && inTime.trim().length > 0);
@@ -1463,7 +1490,7 @@ function ProjectsComponent() {
                                           labourType: lab?.type || "Permanent",
                                           dailyWage: dailyWageVal,
                                           weeklyWage: dailyWageVal * 6,
-                                          date: new Date().toISOString().slice(0, 10),
+                                          date: selectedLogDate,
                                           inTime: inTime || "09:00 AM",
                                           outTime: outTime || "06:00 PM",
                                           attendance: attendanceStatus as any,
@@ -1534,12 +1561,13 @@ function ProjectsComponent() {
                         <th className="p-2.5">Reference #</th>
                         <th className="p-2.5">Remarks</th>
                         <th className="p-2.5 text-right pr-3">Amount</th>
+                        {canFullEdit && <th className="p-2.5 text-right pr-3 w-20">Actions</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y">
                       {payments.filter((pay) => pay.projectId === activeProject.id).length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="p-4 text-center text-muted-foreground">
+                          <td colSpan={canFullEdit ? 6 : 5} className="p-4 text-center text-muted-foreground">
                             No payments recorded yet.
                           </td>
                         </tr>
@@ -1559,6 +1587,40 @@ function ProjectsComponent() {
                               <td className="p-2.5 text-right pr-3 font-bold text-emerald-600">
                                 ₹{pay.amount.toLocaleString("en-IN")}
                               </td>
+                              {canFullEdit && (
+                                <td className="p-2.5 text-right pr-3 whitespace-nowrap">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-6 w-6 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
+                                      title="Edit Payment"
+                                      onClick={() => {
+                                        setEditingPaymentId(pay.id);
+                                        setPayAmount(pay.amount);
+                                        setPayDateInput(pay.paymentDate ? String(pay.paymentDate).slice(0, 10) : getTodayDateStr());
+                                        setPayMode(pay.mode || "Cash");
+                                        setPayReceivedByInput(pay.receivedBy || "Accounts & Credit Desk");
+                                        setPayRef(pay.referenceNumber || "");
+                                        setPayRemarksInput(pay.remarks || "");
+                                        setPayProofName(pay.proofName || "");
+                                        setPaymentOpen(true);
+                                      }}
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-6 w-6 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950"
+                                      title="Delete Payment"
+                                      onClick={() => setDeletingPaymentTarget(pay)}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              )}
                             </tr>
                           ))
                       )}
@@ -2113,6 +2175,18 @@ function ProjectsComponent() {
                 </p>
               </div>
 
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">Attendance Date *</Label>
+                <Input
+                  type="date"
+                  required
+                  value={editingLogData.date}
+                  max={getTodayDateStr()}
+                  onChange={(e) => setEditingLogData({ ...editingLogData, date: e.target.value })}
+                  className="h-9 rounded-lg font-mono text-xs"
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">Start Time / In Time (e.g. 09:00 AM)</Label>
@@ -2283,15 +2357,25 @@ function ProjectsComponent() {
         </DialogContent>
       </Dialog>
 
-      {/* RECEIVE PAYMENT POPUP DIALOG WITH REAL-TIME PREVIEW */}
-      <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}>
+      {/* RECEIVE / EDIT PAYMENT POPUP DIALOG WITH REAL-TIME PREVIEW */}
+      <Dialog open={paymentOpen} onOpenChange={(open) => { setPaymentOpen(open); if (!open) setEditingPaymentId(null); }}>
         <DialogContent className="max-w-md rounded-2xl border shadow-xl bg-white dark:bg-card">
           <DialogHeader>
             <DialogTitle className="text-base font-bold flex items-center gap-2 text-foreground">
-              <DollarSign className="h-5 w-5 text-emerald-600" /> Receive Payment Cockpit
+              {editingPaymentId ? (
+                <>
+                  <Pencil className="h-5 w-5 text-blue-600" /> Edit Payment Record
+                </>
+              ) : (
+                <>
+                  <DollarSign className="h-5 w-5 text-emerald-600" /> Receive Payment Cockpit
+                </>
+              )}
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Record collection receipt. Automatically updates Collected, Outstanding Balance, %, Payment Status, & Stage Allocations.
+              {editingPaymentId
+                ? "Update recorded payment details and recalculate project balance."
+                : "Record collection receipt. Automatically updates Collected, Outstanding Balance, %, Payment Status, & Stage Allocations."}
             </DialogDescription>
           </DialogHeader>
 
@@ -2379,7 +2463,8 @@ function ProjectsComponent() {
               {/* Live Preview Panel */}
               {(() => {
                 const totalVal = activeProject.projectValue || 0;
-                const newColl = (activeProject.receivedAmount || 0) + (payAmount || 0);
+                const prevPay = editingPaymentId ? (payments.find((p) => p.id === editingPaymentId)?.amount || 0) : 0;
+                const newColl = (activeProject.receivedAmount || 0) - prevPay + (payAmount || 0);
                 const newBal = Math.max(0, totalVal - newColl);
                 const newPct = totalVal > 0 ? Math.min(100, Math.round((newColl / totalVal) * 100)) : 0;
                 let predictedStatus = "Pending";
@@ -2410,17 +2495,32 @@ function ProjectsComponent() {
               })()}
 
               <DialogFooter>
-                <Button type="button" variant="outline" size="sm" onClick={() => setPaymentOpen(false)}>
+                <Button type="button" variant="outline" size="sm" onClick={() => { setPaymentOpen(false); setEditingPaymentId(null); }}>
                   Cancel
                 </Button>
                 <Button type="submit" size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg gap-1">
-                  <CheckCircle2 className="h-4 w-4" /> Save Collection Receipt
+                  <CheckCircle2 className="h-4 w-4" /> {editingPaymentId ? "Update Payment Record" : "Save Collection Receipt"}
                 </Button>
               </DialogFooter>
             </form>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* DELETE PAYMENT CONFIRMATION DIALOG */}
+      <DeleteConfirm
+        open={!!deletingPaymentTarget}
+        onOpenChange={(open) => !open && setDeletingPaymentTarget(null)}
+        onConfirm={async () => {
+          if (!deletingPaymentTarget) return;
+          try {
+            await deletePayment(deletingPaymentTarget.id);
+            setDeletingPaymentTarget(null);
+          } catch {}
+        }}
+        title="Delete Payment Record"
+        description="This will remove this payment and recalculate the project balance. Continue?"
+      />
 
       {/* ADD PAYMENT STAGE MODAL */}
       <Dialog open={addStageOpen} onOpenChange={setAddStageOpen}>
