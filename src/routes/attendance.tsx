@@ -57,6 +57,11 @@ export const Route = createFileRoute("/attendance")({
   component: AttendancePageComponent,
 });
 
+// Daily wage for a labour: the stored daily wage, else the weekly wage spread over a 6-day week.
+function dailyWageOf(lab?: { dailyWage?: number | null; defaultWeeklyWage?: number | null }): number {
+  return lab?.dailyWage ?? Math.round((lab?.defaultWeeklyWage || 1400) / 6);
+}
+
 function AttendancePageComponent() {
   const { labours, attendance, projects, updateProjectLabourLog, verifyAttendanceRecord, currentUser } = useRobotics();
 
@@ -101,7 +106,7 @@ function AttendancePageComponent() {
         outPhotoUrl: attOutPhotoUrl || undefined,
         attendance: "Present",
         hoursWorked: calculateHoursFromTimes(attInTime, attOutTime),
-        earnedMoney: calculateEarnedWage(weeklyWage, calculateHoursFromTimes(attInTime, attOutTime)),
+        earnedMoney: calculateEarnedWage(dailyWageOf(lab), calculateHoursFromTimes(attInTime, attOutTime)),
         workDescription: attWorkDesc,
       });
     }
@@ -198,7 +203,7 @@ function AttendancePageComponent() {
 
       const totalEarnedFromLogs = labLogs.reduce((acc, l) => {
         if (l.earnedMoney) return acc + l.earnedMoney;
-        return acc + calculateEarnedWage(defaultWage, l.hoursWorked || 0);
+        return acc + calculateEarnedWage(dailyWageOf(lab), l.hoursWorked || 0);
       }, 0);
 
       const periodEarnings = totalEarnedFromLogs > 0
@@ -774,7 +779,7 @@ function AttendancePageComponent() {
             {/* REALTIME HOURS & EARNED MONEY BOX */}
             {(() => {
               const selectedL = labours.find((l) => l.id === attLabourId);
-              const wage = selectedL ? selectedL.defaultWeeklyWage || 1400 : 1400;
+              const wage = dailyWageOf(selectedL);
               const hours = calculateHoursFromTimes(attInTime, attOutTime);
               const money = calculateEarnedWage(wage, hours);
               return (

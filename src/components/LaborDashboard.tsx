@@ -167,21 +167,17 @@ export function LaborDashboard() {
       } catch (e) {
         console.error("Reverse geocoding error:", e);
       }
-      return "Plot 42, Industrial Park, HITEC City, Hyderabad";
+      return "Location name unavailable";
+    };
+
+    const reportLocationUnavailable = () => {
+      setGpsLocation(null);
+      setGpsLoading(false);
+      toast.error("Could not get your location. Allow location access and try again.");
     };
 
     if (!navigator.geolocation) {
-      const fallbackLat = 17.44829;
-      const fallbackLon = 78.38392;
-      const fallbackPlace = "Plot 42, Industrial Park, HITEC City, Hyderabad";
-      setGpsLocation({
-        latitude: fallbackLat,
-        longitude: fallbackLon,
-        accuracy: 10,
-        placeName: fallbackPlace,
-      });
-      setGpsLoading(false);
-      toast.success(`Worksite Location Verified: ${fallbackPlace}`);
+      reportLocationUnavailable();
       return;
     }
 
@@ -215,9 +211,7 @@ export function LaborDashboard() {
       if (bestPos) {
         const lat = bestPos.coords.latitude;
         const lon = bestPos.coords.longitude;
-        const rawAcc = Math.round(bestPos.coords.accuracy);
-        // Fine-tune accuracy metric for precise location display
-        const acc = rawAcc > 100 ? 12 : rawAcc;
+        const acc = Math.round(bestPos.coords.accuracy);
         const place = await resolvePlaceName(lat, lon);
 
         setGpsLocation({
@@ -227,20 +221,10 @@ export function LaborDashboard() {
           placeName: place,
         });
         setGpsLoading(false);
-        toast.success(`High Accuracy Location Verified: ${place}`);
+        if (acc > 100) toast.warning(`Location captured, but only accurate to ${acc}m: ${place}`);
+        else toast.success(`Location captured (accurate to ${acc}m): ${place}`);
       } else {
-        // Fallback to high accuracy coordinates if blocked
-        const defaultLat = 11.44759;
-        const defaultLon = 77.71648;
-        const place = await resolvePlaceName(defaultLat, defaultLon);
-        setGpsLocation({
-          latitude: defaultLat,
-          longitude: defaultLon,
-          accuracy: 10,
-          placeName: place || "Kullankadu, Kulathukkadu, Kumarapalayam",
-        });
-        setGpsLoading(false);
-        toast.success("High Accuracy Location Captured!");
+        reportLocationUnavailable();
       }
     }, 2000);
   };
@@ -423,12 +407,8 @@ export function LaborDashboard() {
 
     const weeklyWage = laborProfile?.defaultWeeklyWage || 1400;
 
-    const activeGps = gpsLocation || {
-      latitude: 17.44829,
-      longitude: 78.38392,
-      accuracy: 12,
-      placeName: "Plot 42, Industrial Park, HITEC City, Hyderabad"
-    };
+    // Without a real GPS fix the shift is still recorded, but flagged for a supervisor to verify.
+    const hasGps = Boolean(gpsLocation);
 
     const clockInPayload = {
       labourId: laborId,
@@ -442,9 +422,9 @@ export function LaborDashboard() {
       hoursWorked: 0,
       workDescription: "Checked-in on site & active shift started",
       inPhotoUrl: cloudInPhotoUrl,
-      inLocation: activeGps,
-      verificationStatus: "Verified" as const,
-      isGpsWarning: false
+      inLocation: gpsLocation ?? undefined,
+      verificationStatus: hasGps ? ("Verified" as const) : ("Pending Verification" as const),
+      isGpsWarning: !hasGps
     };
 
     console.log("[LabourPortal] Clock-In submission payload:", clockInPayload);
@@ -468,10 +448,6 @@ export function LaborDashboard() {
       toast.error("Please capture a check-out photo");
       return;
     }
-    if (!gpsLocation) {
-      toast.error("GPS location required to clock out.");
-      return;
-    }
 
     let cloudOutPhotoUrl = capturedPhoto;
     if (capturedPhoto.startsWith("data:")) {
@@ -483,7 +459,8 @@ export function LaborDashboard() {
       }
     }
 
-    const isLowAccuracy = gpsLocation.accuracy ? gpsLocation.accuracy > 100 : false;
+    // No GPS fix, or a poor one, is flagged for supervisor review instead of blocking clock-out.
+    const isLowAccuracy = !gpsLocation || (gpsLocation.accuracy ? gpsLocation.accuracy > 100 : false);
     const currentFormattedTime = new Date().toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
@@ -498,7 +475,7 @@ export function LaborDashboard() {
       workDescription: workDescription.trim(),
       remarks: remarks.trim(),
       outPhotoUrl: cloudOutPhotoUrl,
-      outLocation: gpsLocation,
+      outLocation: gpsLocation ?? undefined,
       verificationStatus: "Pending Verification" as const,
       isGpsWarning: isLowAccuracy
     };
@@ -732,7 +709,7 @@ export function LaborDashboard() {
                         <div className="flex items-start gap-1.5">
                           <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                           <p className="text-xs font-extrabold text-slate-900 leading-snug break-words">
-                            {gpsLocation.placeName || "Kullankadu, Kulathukkadu, Kumarapalayam"}
+                            {gpsLocation.placeName || "Location name unavailable"}
                           </p>
                         </div>
 
@@ -741,7 +718,7 @@ export function LaborDashboard() {
                             Lat: <b className="text-slate-800 font-bold">{gpsLocation.latitude.toFixed(5)}</b> | Lon: <b className="text-slate-800 font-bold">{gpsLocation.longitude.toFixed(5)}</b>
                           </span>
                           <span className="font-extrabold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200/60 whitespace-nowrap">
-                            Accurate to {gpsLocation.accuracy || 10}m
+                            Accurate to {gpsLocation.accuracy ?? "?"}m
                           </span>
                         </div>
                       </div>
