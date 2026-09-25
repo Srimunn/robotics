@@ -15,7 +15,8 @@
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
     "db:seed": "prisma db seed",
-    "smoke-test": "tsx scripts/smoke-test.ts"
+    "smoke-test": "tsx scripts/smoke-test.ts",
+    "test:e2e": "playwright test"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -62,7 +63,6 @@
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.575.0",
-    "mongodb": "^7.5.0",
     "pdfkit": "^0.19.1",
     "react": "^19.2.0",
     "react-day-picker": "^9.14.0",
@@ -83,6 +83,7 @@
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@lovable.dev/vite-tanstack-config": "^2.7.7",
+    "@playwright/test": "1.56.1",
     "@prisma/client": "^6.19.3",
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",

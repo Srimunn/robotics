@@ -4,7 +4,7 @@ export * from "./materials-basic";
 
 import { createServerFn } from "@tanstack/react-start";
 import { db } from "~/lib/db";
-import { toNullableNumber, generateSafeId } from "./utils";
+import { toNullableNumber, generateSafeId, assertPositiveWholeQuantity, lockRowForUpdate } from "./utils";
 import type { StockItemType } from "@prisma/client";
 import { assertCanEdit } from "./permissions";
 
@@ -32,7 +32,9 @@ export const issueMaterialToProject = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     assertCanEdit(data);
+    assertPositiveWholeQuantity(data.quantity);
     return db.$transaction(async (tx) => {
+      await lockRowForUpdate(tx, "Material", data.materialId);
       const mat = await tx.material.findUnique({ where: { id: data.materialId } });
       if (!mat) throw new Error("Material not found");
       if (mat.currentStock < data.quantity) throw new Error(`Insufficient stock: ${mat.currentStock} ${mat.unit}`);
@@ -101,14 +103,21 @@ export const adjustStock = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     assertCanEdit(data);
+    if (!Number.isInteger(Number(data.newQuantity)) || Number(data.newQuantity) < 0) {
+      throw new Error("New quantity must be a whole number of 0 or more");
+    }
     return db.$transaction(async (tx) => {
       if (data.itemType === "Machine") {
+        await lockRowForUpdate(tx, "Machine", data.itemId);
         const m = await tx.machine.findUnique({ where: { id: data.itemId } });
         if (!m) throw new Error("Machine not found");
         const prev = m.availableQuantity;
         await tx.machine.update({
           where: { id: m.id },
-          data: { availableQuantity: data.newQuantity, currentStock: data.newQuantity + m.issuedQuantity },
+          data: {
+            availableQuantity: data.newQuantity,
+            currentStock: data.newQuantity + m.issuedQuantity + m.repairQuantity + m.lostQuantity,
+          },
         });
         await tx.stockAuditLog.create({
           data: {
@@ -125,6 +134,7 @@ export const adjustStock = createServerFn({ method: "POST" })
           },
         });
       } else {
+        await lockRowForUpdate(tx, "Material", data.itemId);
         const mat = await tx.material.findUnique({ where: { id: data.itemId } });
         if (!mat) throw new Error("Material not found");
         const prev = mat.currentStock;

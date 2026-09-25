@@ -7,6 +7,7 @@
 export { calculateHoursFromTimes, calculateEarnedWage } from "~/server/calculations";
 export { canEdit, canEditEnquiries, canConvertEnquiry } from "~/lib/permissions";
 
+import { verifyRolePin } from "~/server/auth";
 import {
   getSettings,
   updateSettings as updateSettingsFn,
@@ -195,7 +196,7 @@ const defaultSettings: SystemSettings = {
 
 type RoboticsContextType = {
   currentUser: CurrentUser | null;
-  login: (role: "CEO" | "Worker" | "Labor" | "RS" | "CS" | "BS" | "DRS", loginIdOrId?: string, pin?: string) => boolean;
+  login: (role: "CEO" | "Worker" | "Labor" | "RS" | "CS" | "BS" | "DRS", loginIdOrId?: string, pin?: string) => Promise<boolean>;
   logout: (isAutoTimeout?: boolean) => void;
   isLoading: boolean;
 
@@ -560,37 +561,29 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   };
 
   // ---------- Login / Logout ----------
-  const login = (role: "CEO" | "Worker" | "Labor" | "RS" | "CS" | "BS" | "DRS", loginIdOrId?: string, pin?: string): boolean => {
+  const login = async (role: "CEO" | "Worker" | "Labor" | "RS" | "CS" | "BS" | "DRS", loginIdOrId?: string, pin?: string): Promise<boolean> => {
     if (!pin || !pin.trim()) { toast.error("Security PIN is required"); return false; }
     const trimmedPin = pin.trim();
-    if (role === "CEO") {
-      if (trimmedPin !== "1234") { toast.error("Incorrect Executive PIN"); return false; }
-      setCurrentUser({ role: "CEO", name: "CEO Executive" });
-      toast.success("Welcome back, CEO!");
-      return true;
-    }
-    if (role === "RS" || (role === "Worker" && !loginIdOrId)) {
-      if (trimmedPin !== "5678") { toast.error("Incorrect Robotics Service PIN"); return false; }
-      setCurrentUser({ role: "Worker", subRole: "RS", name: "Robotics Service" });
-      toast.success("Robotics Service session initiated");
-      return true;
-    }
-    if (role === "DRS") {
-      if (trimmedPin !== "9753") { toast.error("Incorrect Deepak Robotics PIN"); return false; }
-      setCurrentUser({ role: "Worker", subRole: "DRS", name: "Deepak Robotics" });
-      toast.success("Deepak Robotics session initiated");
-      return true;
-    }
-    if (role === "CS") {
-      if (trimmedPin !== "2468") { toast.error("Incorrect Construction Solutions PIN"); return false; }
-      setCurrentUser({ role: "Worker", subRole: "CS", name: "Construction Solutions" });
-      toast.success("Construction Solutions session initiated");
-      return true;
-    }
-    if (role === "BS") {
-      if (trimmedPin !== "8642") { toast.error("Incorrect Builder Supply PIN"); return false; }
-      setCurrentUser({ role: "Worker", subRole: "BS", name: "Builder Supply" });
-      toast.success("Builder Supply session initiated");
+    const staffRole = role === "Worker" && !loginIdOrId ? "RS" : role;
+    const staffSessions = {
+      CEO: { user: { role: "CEO", name: "CEO Executive" }, error: "Incorrect Executive PIN", welcome: "Welcome back, CEO!" },
+      RS: { user: { role: "Worker", subRole: "RS", name: "Robotics Service" }, error: "Incorrect Robotics Service PIN", welcome: "Robotics Service session initiated" },
+      DRS: { user: { role: "Worker", subRole: "DRS", name: "Deepak Robotics" }, error: "Incorrect Deepak Robotics PIN", welcome: "Deepak Robotics session initiated" },
+      CS: { user: { role: "Worker", subRole: "CS", name: "Construction Solutions" }, error: "Incorrect Construction Solutions PIN", welcome: "Construction Solutions session initiated" },
+      BS: { user: { role: "Worker", subRole: "BS", name: "Builder Supply" }, error: "Incorrect Builder Supply PIN", welcome: "Builder Supply session initiated" },
+    } as const;
+    if (staffRole in staffSessions) {
+      const session = staffSessions[staffRole as keyof typeof staffSessions];
+      let ok = false;
+      try {
+        ok = (await verifyRolePin({ data: { role: staffRole as keyof typeof staffSessions, pin: trimmedPin } })).ok;
+      } catch {
+        toast.error("Could not verify PIN. Please try again.");
+        return false;
+      }
+      if (!ok) { toast.error(session.error); return false; }
+      setCurrentUser(session.user as CurrentUser);
+      toast.success(session.welcome);
       return true;
     }
     if (role === "Labor") {
@@ -798,7 +791,10 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   });
   const deleteLabourM = useMutation({
     mutationFn: async (id: string) => deleteLabourFn({ data: { id, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } }),
-    onSuccess: () => { invalidate("labours"); toast.success("Labour deleted"); },
+    onSuccess: (res) => {
+      invalidate("labours");
+      toast.success(res?.deactivated ? "Labour has history, so they were deactivated and their records kept" : "Labour deleted");
+    },
     onError: (err) => toast.error(`${(err as Error).message}`),
   });
   const deactivateLabourM = useMutation({
@@ -955,9 +951,11 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
   });
   const updateMachineM = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Machine> }) => {
-      const payload: any = { ...updates, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole };
+      const payload: any = { ...updates };
       if (updates.condition) payload.condition = toDb.machineCondition(updates.condition);
-      return updateMachineFn({ data: { id, updates: payload } });
+      return updateMachineFn({
+        data: { id, updates: payload, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole },
+      });
     },
     onSuccess: () => { invalidate("machines"); toast.success("Machine updated"); },
     onError: (err) => toast.error(`${(err as Error).message}`),

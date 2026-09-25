@@ -82,24 +82,27 @@ export const deleteLabour = createServerFn({ method: "POST" })
   .validator((input: { id: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
   .handler(async ({ data }) => {
     assertCanEdit(data);
-    try {
-      await db.attendanceRecord.deleteMany({ where: { labourId: data.id } });
-      await db.projectLabourLog.deleteMany({ where: { labourId: data.id } });
-      await db.projectLabourAssignment.deleteMany({ where: { labourId: data.id } });
-      await db.labourWageHistory.deleteMany({ where: { labourId: data.id } });
-      await db.labour.delete({ where: { id: data.id } });
-    } catch {
-      await db.attendanceRecord.deleteMany({ where: { labourId: data.id } }).catch(() => {});
-      await db.projectLabourAssignment.updateMany({
-        where: { labourId: data.id, isActive: true },
-        data: { isActive: false },
-      });
-      await db.labour.update({
-        where: { id: data.id },
-        data: { isActive: false } as any,
-      });
-    }
-    return { ok: true };
+    return db.$transaction(async (tx) => {
+      const [attCount, logCount, wageCount] = await Promise.all([
+        tx.attendanceRecord.count({ where: { labourId: data.id } }),
+        tx.projectLabourLog.count({ where: { labourId: data.id } }),
+        tx.labourWageHistory.count({ where: { labourId: data.id } }),
+      ]);
+
+      // A labour with attendance or wage history is deactivated, never deleted, so payroll history survives.
+      if (attCount > 0 || logCount > 0 || wageCount > 0) {
+        await tx.projectLabourAssignment.updateMany({
+          where: { labourId: data.id, isActive: true },
+          data: { isActive: false },
+        });
+        await tx.labour.update({ where: { id: data.id }, data: { isActive: false } as any });
+        return { ok: true, deactivated: true };
+      }
+
+      await tx.projectLabourAssignment.deleteMany({ where: { labourId: data.id } });
+      await tx.labour.delete({ where: { id: data.id } });
+      return { ok: true, deactivated: false };
+    });
   });
 
 export const deactivateLabour = createServerFn({ method: "POST" })

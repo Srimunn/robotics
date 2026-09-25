@@ -155,6 +155,21 @@ export const updateProjectGSTStatus = createServerFn({ method: "POST" })
   });
 
 export async function deleteProjectWithStockReversal(tx: any, projectId: string) {
+  // Deleting a project cascades to its payments and labour logs, so refuse while that history exists.
+  const [paymentCount, labourLogCount] = await Promise.all([
+    tx.payment.count({ where: { projectId } }),
+    tx.projectLabourLog.count({ where: { projectId } }),
+  ]);
+  if (paymentCount > 0 || labourLogCount > 0) {
+    const parts = [
+      paymentCount > 0 ? `${paymentCount} payment(s)` : null,
+      labourLogCount > 0 ? `${labourLogCount} labour attendance log(s)` : null,
+    ].filter(Boolean);
+    throw new Error(
+      `Cannot delete project ${projectId}: it has ${parts.join(" and ")}. Close the project instead so its financial and wage history is kept.`
+    );
+  }
+
   // 1. Fetch all machine issue records for this project
   const machineIssues = await tx.machineIssueRecord.findMany({
     where: { projectId },
@@ -206,10 +221,7 @@ export async function deleteProjectWithStockReversal(tx: any, projectId: string)
     }
   }
 
-  // 3. Delete all stock audit logs related to this project
-  await tx.stockAuditLog.deleteMany({
-    where: { projectId },
-  });
+  // 3. Stock audit logs are kept: they are the permanent record of stock movements.
 
   // 4. Unlink any enquiry pointing to this project
   await tx.enquiry.updateMany({

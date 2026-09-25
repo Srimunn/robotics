@@ -201,11 +201,25 @@ function AttendancePageComponent() {
         return acc + calculateEarnedWage(defaultWage, l.hoursWorked || 0);
       }, 0);
 
-      const calculatedWeeklyWage = totalEarnedFromLogs > 0
+      const periodEarnings = totalEarnedFromLogs > 0
         ? totalEarnedFromLogs
         : Math.round((presentCount / 6) * defaultWage);
 
-      const calculatedMonthlyWage = Math.round(calculatedWeeklyWage * 4.33);
+      // Earnings already cover the whole filtered period, so average them per month and per week
+      // actually worked instead of scaling a period total up again.
+      const monthsCovered = Math.max(1, new Set(labLogs.map((l) => l.date.slice(0, 7))).size);
+      const weeksCovered = Math.max(
+        1,
+        new Set(
+          labLogs.map((l) => {
+            const d = new Date(`${l.date.slice(0, 10)}T00:00:00Z`);
+            d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+            return d.toISOString().slice(0, 10);
+          })
+        ).size
+      );
+      const calculatedMonthlyWage = Math.round(periodEarnings / monthsCovered);
+      const calculatedWeeklyWage = Math.round(periodEarnings / weeksCovered);
 
       return {
         labour: lab,
