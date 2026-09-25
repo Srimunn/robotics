@@ -4,7 +4,7 @@ export * from "./machines-basic";
 
 import { createServerFn } from "@tanstack/react-start";
 import { db } from "~/lib/db";
-import { generateSafeId } from "./utils";
+import { generateSafeId, assertPositiveWholeQuantity, lockRowForUpdate } from "./utils";
 import type { MachineCondition, StockActionType } from "@prisma/client";
 import { assertCanEdit } from "./permissions";
 
@@ -24,7 +24,9 @@ export const issueMachineToProject = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     assertCanEdit(data);
+    assertPositiveWholeQuantity(data.quantity);
     return db.$transaction(async (tx) => {
+      await lockRowForUpdate(tx, "Machine", data.machineId);
       const machine = await tx.machine.findUnique({ where: { id: data.machineId } });
       if (!machine) throw new Error("Machine not found");
       if (machine.availableQuantity < data.quantity) throw new Error("Insufficient available quantity");
@@ -107,9 +109,12 @@ export const returnMachineFromProject = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     assertCanEdit(data);
+    assertPositiveWholeQuantity(data.returnQty, "Return quantity");
     return db.$transaction(async (tx) => {
+      await lockRowForUpdate(tx, "MachineIssueRecord", data.issueRecordId);
       const rec = await tx.machineIssueRecord.findUnique({ where: { id: data.issueRecordId } });
       if (!rec) throw new Error("Issue record not found");
+      await lockRowForUpdate(tx, "Machine", rec.machineId);
       const remaining = rec.quantity - rec.returnedQuantity;
       if (data.returnQty > remaining) throw new Error(`Cannot return ${data.returnQty}. Remaining: ${remaining}`);
 

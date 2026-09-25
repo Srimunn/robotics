@@ -37,7 +37,7 @@ export function LoginPage() {
     }
   };
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!pin.trim()) {
@@ -49,22 +49,22 @@ export function LoginPage() {
 
     let success = false;
     if (selectedRole === "Admin") {
-      success = login("CEO", undefined, pin);
+      success = await login("CEO", undefined, pin);
     } else if (selectedRole === "RS") {
-      success = login("RS", undefined, pin);
+      success = await login("RS", undefined, pin);
     } else if (selectedRole === "DRS") {
-      success = login("DRS", undefined, pin);
+      success = await login("DRS", undefined, pin);
     } else if (selectedRole === "CS") {
-      success = login("CS", undefined, pin);
+      success = await login("CS", undefined, pin);
     } else if (selectedRole === "BS") {
-      success = login("BS", undefined, pin);
+      success = await login("BS", undefined, pin);
     } else if (selectedRole === "Labour") {
       if (!laborLoginId.trim()) {
         toast.error("Please select or enter your Name / Login ID");
         setIsSubmitting(false);
         return;
       }
-      success = login("Labor", laborLoginId, pin);
+      success = await login("Labor", laborLoginId, pin);
     }
 
     setIsSubmitting(false);
