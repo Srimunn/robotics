@@ -368,7 +368,9 @@ function LaboursComponent() {
     );
 
     const map = new Map<string, any>();
-    const list: any[] = [];
+    // The central attendance record and the project labour log describe the same day, so list each
+    // labour/day/project once, preferring the project log (it is processed last).
+    const byDayAndProject = new Map<string, any>();
 
     [...centralLogs, ...projLogs].forEach((item) => {
       if (!item || !item.labourId || !item.date) return;
@@ -377,8 +379,15 @@ function LaboursComponent() {
       if (!existing || item.status === "Present" || (item.hoursWorked && item.hoursWorked > 0)) {
         map.set(key, item);
       }
-      list.push(item);
+      byDayAndProject.set(`${key}_${item.projectId ?? ""}`, item);
     });
+
+    const daysWithProjectLog = new Set(
+      [...byDayAndProject.values()].filter((r) => r.projectId).map((r) => `${r.labourId}_${r.date}`)
+    );
+    const list: any[] = [...byDayAndProject.values()].filter(
+      (r) => r.projectId || !daysWithProjectLog.has(`${r.labourId}_${r.date}`)
+    );
 
     list.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 

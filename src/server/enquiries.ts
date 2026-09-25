@@ -152,7 +152,8 @@ export const updateEnquiry = createServerFn({ method: "POST" })
         const newValue =
           parsed.quotationAmount !== undefined ? parsed.quotationAmount : Number(linkedProject.projectValue);
         const received = Number(linkedProject.receivedAmount);
-        const balance = Math.max(0, Number(newValue) - received);
+        const discount = linkedProject.discountAmount ? Number(linkedProject.discountAmount) : 0;
+        const balance = Math.max(0, Number(newValue) - discount - received);
 
         let newStatus = linkedProject.status;
         if (parsed.workCommittedDate && linkedProject.status === "Waiting") {
@@ -224,6 +225,8 @@ export const approveAndConvertEnquiryToProject = createServerFn({ method: "POST"
   .handler(async ({ data }) => {
     assertCanConvertEnquiry(data);
     return db.$transaction(async (tx) => {
+      // Lock the enquiry so a double-click waits for the first conversion and then returns that project.
+      await tx.$queryRaw`SELECT id FROM "Enquiry" WHERE id = ${data.enquiryId} FOR UPDATE`;
       const enq = await tx.enquiry.findUnique({ where: { id: data.enquiryId } });
       if (!enq) throw new Error("Enquiry not found");
       if (enq.customerDecision !== "Approved") throw new Error("Customer decision must be Approved");
