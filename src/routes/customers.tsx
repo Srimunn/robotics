@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useRobotics } from "@/lib/robotics-context";
 import type { Customer, Enquiry, Project } from "@/lib/robotics-types";
 import { ExportButtons } from "@/components/export-buttons";
-import { CustomerTypeBadge } from "@/components/customer-type-toggle";
+import { CustomerTypeBadge, GstBadge, typeLabel, gstLabel } from "@/components/customer-type-toggle";
 import { DataPagination } from "@/components/ui/DataPagination";
 import {
   Users,
@@ -44,6 +44,7 @@ type SortKey = "name" | "enquiries" | "projects" | "value" | "collected" | "pend
 interface CustomerRow {
   customer: Customer;
   type?: "B2B" | "B2C";
+  gst?: boolean;
   enquiryCount: number;
   projectCount: number;
   ongoingCount: number;
@@ -58,7 +59,7 @@ function CustomersComponent() {
   const { customers, projects, enquiries, payments } = useRobotics();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [quickFilter, setQuickFilter] = useState<"ALL" | "PENDING" | "B2B" | "B2C">("ALL");
+  const [quickFilter, setQuickFilter] = useState<"ALL" | "PENDING" | "B2B" | "B2C" | "GST" | "NON_GST">("ALL");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -88,15 +89,21 @@ function CustomersComponent() {
         ...custEnquiries.map((e) => e.enquiryDate || ""),
         ...custProjects.map((p) => (p.createdAt || p.scheduledDate || "").slice(0, 10)),
       ].filter(Boolean);
-      // Type: latest enquiry that has one, else latest project's GST flag.
-      const typedEnquiry = [...custEnquiries]
-        .filter((e) => e.customerType)
-        .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))[0];
-      const latestProject = [...custProjects].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))[0];
-      const type = typedEnquiry?.customerType ?? (latestProject ? (latestProject.isGST ? "B2B" : "B2C") : undefined);
+      // B2B/B2C and GST are independent. Each comes from the most recent record that has it set
+      // (projects first, since a project's values are the ones being billed).
+      const byNewest = <T extends { createdAt?: string }>(list: T[]) =>
+        [...list].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+      const type =
+        byNewest(custProjects).find((p) => p.customerType)?.customerType ??
+        byNewest(custEnquiries).find((e) => e.customerType)?.customerType;
+      const latestProject = byNewest(custProjects)[0];
+      const gst = latestProject
+        ? Boolean(latestProject.isGST)
+        : byNewest(custEnquiries).find((e) => e.isGST !== undefined)?.isGST;
       return {
         customer: c,
         type,
+        gst,
         enquiryCount: custEnquiries.length,
         projectCount: custProjects.length,
         ongoingCount: custProjects.filter((p) => p.status === "Ongoing").length,
@@ -117,7 +124,13 @@ function CustomersComponent() {
         !q || c.name.toLowerCase().includes(q) || c.phone.includes(searchQuery) || c.location.toLowerCase().includes(q);
       const matchesQuick =
         quickFilter === "ALL" ||
-        (quickFilter === "PENDING" ? r.pending > 0 : r.type === quickFilter);
+        (quickFilter === "PENDING"
+          ? r.pending > 0
+          : quickFilter === "GST"
+            ? r.gst === true
+            : quickFilter === "NON_GST"
+              ? r.gst === false
+              : r.type === quickFilter);
       return matchesSearch && matchesQuick;
     });
     const dir = sortDir === "asc" ? 1 : -1;
@@ -166,7 +179,8 @@ function CustomersComponent() {
       "Customer Name": r.customer.name,
       Phone: r.customer.phone,
       Location: r.customer.location,
-      Type: r.type ? `${r.type} (${r.type === "B2B" ? "GST" : "Non-GST"})` : "Not set",
+      Type: typeLabel(r.type),
+      GST: gstLabel(r.gst),
       Enquiries: r.enquiryCount,
       Projects: r.projectCount,
       Ongoing: r.ongoingCount,
@@ -180,8 +194,10 @@ function CustomersComponent() {
   const quickLabels: Record<typeof quickFilter, string> = {
     ALL: "All",
     PENDING: "Has pending amount",
-    B2B: "B2B (GST)",
-    B2C: "B2C (Non-GST)",
+    B2B: "B2B",
+    B2C: "B2C",
+    GST: "GST",
+    NON_GST: "Non-GST",
   };
 
   return (
@@ -247,6 +263,7 @@ function CustomersComponent() {
                   <th className="p-3 whitespace-nowrap">PHONE</th>
                   <th className="p-3 whitespace-nowrap">LOCATION</th>
                   <th className="p-3 whitespace-nowrap">TYPE</th>
+                  <th className="p-3 whitespace-nowrap">GST</th>
                   <SortHeader k="enquiries" label="Enquiries" />
                   <SortHeader k="projects" label="Projects" />
                   <SortHeader k="value" label="Contract Value" className="text-right" />
@@ -258,7 +275,7 @@ function CustomersComponent() {
               <tbody className="[&_td]:border-b [&_td]:border-slate-100 dark:[&_td]:border-slate-800">
                 {pageRows.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="p-12 text-center">
+                    <td colSpan={12} className="p-12 text-center">
                       <div className="flex flex-col items-center justify-center space-y-3">
                         <div className="grid h-12 w-12 place-items-center rounded-full bg-blue-50 text-blue-600">
                           <Users className="h-6 w-6 stroke-[1.5]" />
@@ -284,6 +301,7 @@ function CustomersComponent() {
                       <td className="p-3 whitespace-nowrap font-mono">{r.customer.phone}</td>
                       <td className="p-3 whitespace-nowrap truncate max-w-[160px]" title={r.customer.location}>{r.customer.location}</td>
                       <td className="p-3 whitespace-nowrap"><CustomerTypeBadge value={r.type} /></td>
+                      <td className="p-3 whitespace-nowrap"><GstBadge value={r.gst} /></td>
                       <td className="p-3 whitespace-nowrap text-center">{r.enquiryCount}</td>
                       <td className="p-3 whitespace-nowrap">
                         <span className="font-semibold">{r.projectCount}</span>

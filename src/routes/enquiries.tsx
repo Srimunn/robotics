@@ -10,7 +10,14 @@ import { DataPagination } from "@/components/ui/DataPagination";
 import { DeleteConfirm } from "@/components/delete-confirm";
 import { CreatedByBadge } from "@/components/created-by-badge";
 import { ExportButtons } from "@/components/export-buttons";
-import { CustomerTypeToggle, CustomerTypeBadge } from "@/components/customer-type-toggle";
+import {
+  CustomerTypeToggle,
+  CustomerTypeBadge,
+  GstToggle,
+  GstBadge,
+  typeLabel,
+  gstLabel,
+} from "@/components/customer-type-toggle";
 import { localToday, isOpenForFollowUp } from "@/lib/reminders";
 import {
   PhoneCall,
@@ -95,6 +102,7 @@ function EnquiriesComponent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [decisionFilter, setDecisionFilter] = useState<string>(initialDecisionFilter);
   const [typeFilter, setTypeFilter] = useState<"ALL" | "B2B" | "B2C" | "NOT_SET">("ALL");
+  const [gstFilter, setGstFilter] = useState<"ALL" | "GST" | "NON_GST" | "NOT_SET">("ALL");
 
   useEffect(() => {
     if (filter === "todayVisits") {
@@ -128,6 +136,7 @@ function EnquiriesComponent() {
     quotationAmount: 0 as number | string,
     remarks: "",
     customerType: "" as CustomerType | "",
+    isGST: "" as boolean | "",
     nextFollowUpDate: "",
     followUpNote: "",
   });
@@ -215,6 +224,9 @@ function EnquiriesComponent() {
     const matchesType =
       typeFilter === "ALL" ||
       (typeFilter === "NOT_SET" ? !e.customerType : e.customerType === typeFilter);
+    const matchesGst =
+      gstFilter === "ALL" ||
+      (gstFilter === "NOT_SET" ? e.isGST === undefined : e.isGST === (gstFilter === "GST"));
 
     const matchesDecision =
       decisionFilter === "ALL"
@@ -227,7 +239,7 @@ function EnquiriesComponent() {
         ? e.customerDecision === "Follow Up" || e.customerDecision === "Follow-up" || (e.customerDecision as string) === "FollowUp"
         : e.customerDecision === decisionFilter;
 
-    return matchesSearch && matchesDecision && matchesType;
+    return matchesSearch && matchesDecision && matchesType && matchesGst;
   });
 
   const exportEnquiryRows = () =>
@@ -235,7 +247,8 @@ function EnquiriesComponent() {
       "Enquiry ID": e.id,
       "Enquiry Date": e.enquiryDate,
       "Customer Name": e.customerName,
-      Type: e.customerType ? `${e.customerType} (${e.customerType === "B2B" ? "GST" : "Non-GST"})` : "Not set",
+      Type: typeLabel(e.customerType),
+      GST: gstLabel(e.isGST),
       "Phone 1": e.phone,
       "Phone 2": e.phone2 || "",
       Location: e.location,
@@ -257,6 +270,7 @@ function EnquiriesComponent() {
   const exportSubtitle = [
     decisionFilter !== "ALL" ? `Filter: ${decisionFilter}` : "",
     typeFilter !== "ALL" ? `Type: ${typeFilter === "NOT_SET" ? "Not set" : typeFilter}` : "",
+    gstFilter !== "ALL" ? `Tax: ${gstFilter === "NOT_SET" ? "Not set" : gstFilter === "GST" ? "GST" : "Non-GST"}` : "",
     searchQuery ? `Search: "${searchQuery}"` : "",
   ]
     .filter(Boolean)
@@ -298,7 +312,11 @@ function EnquiriesComponent() {
       return;
     }
     if (!createData.customerType) {
-      toast.error("Please choose B2B (GST) or B2C (Non-GST)");
+      toast.error("Please choose B2B or B2C");
+      return;
+    }
+    if (createData.isGST === "") {
+      toast.error("Please choose GST or Non-GST");
       return;
     }
 
@@ -316,6 +334,7 @@ function EnquiriesComponent() {
         quotationAmount: (createData.quotationAmount as any) === "" || createData.quotationAmount === null || createData.quotationAmount === undefined ? undefined : Number(createData.quotationAmount),
         remarks: createData.remarks,
         customerType: createData.customerType || undefined,
+        isGST: createData.isGST === "" ? undefined : createData.isGST,
         nextFollowUpDate: createData.nextFollowUpDate || undefined,
         followUpNote: createData.followUpNote.trim() || undefined,
       });
@@ -336,6 +355,7 @@ function EnquiriesComponent() {
           quotationAmount: 0,
           remarks: "",
           customerType: "",
+          isGST: "",
           nextFollowUpDate: "",
           followUpNote: "",
         });
@@ -461,9 +481,26 @@ function EnquiriesComponent() {
               </SelectTrigger>
               <SelectContent className="rounded-xl">
                 <SelectItem value="ALL">All types</SelectItem>
-                <SelectItem value="B2B">B2B (GST)</SelectItem>
-                <SelectItem value="B2C">B2C (Non-GST)</SelectItem>
-                <SelectItem value="NOT_SET">Not set</SelectItem>
+                <SelectItem value="B2B">B2B</SelectItem>
+                <SelectItem value="B2C">B2C</SelectItem>
+                <SelectItem value="NOT_SET">Type not set</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={gstFilter}
+              onValueChange={(v) => {
+                setGstFilter(v as typeof gstFilter);
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="h-8 w-36 text-xs rounded-lg" aria-label="GST filter">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="ALL">GST + Non-GST</SelectItem>
+                <SelectItem value="GST">GST</SelectItem>
+                <SelectItem value="NON_GST">Non-GST</SelectItem>
+                <SelectItem value="NOT_SET">GST not set</SelectItem>
               </SelectContent>
             </Select>
             <ExportButtons rows={exportEnquiryRows} filename="Enquiries" title="Enquiries" subtitle={exportSubtitle} />
@@ -477,6 +514,7 @@ function EnquiriesComponent() {
                   <th className="p-3 pl-4 whitespace-nowrap">ID</th>
                   <th className="p-3 whitespace-nowrap min-w-[160px]">CUSTOMER</th>
                   <th className="p-3 whitespace-nowrap">TYPE</th>
+                  <th className="p-3 whitespace-nowrap">GST</th>
                   <th className="p-3 whitespace-nowrap min-w-[200px]">WORK TYPE</th>
                   <th className="p-3 whitespace-nowrap">REFERRED BY</th>
                   <th className="p-3 whitespace-nowrap">ENGINEER</th>
@@ -491,7 +529,7 @@ function EnquiriesComponent() {
               <tbody className="divide-y [&_td]:border-b [&_td]:border-slate-100 dark:[&_td]:border-slate-800">
                 {paginatedEnquiries.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="p-12 text-center">
+                    <td colSpan={13} className="p-12 text-center">
                       <div className="flex flex-col items-center justify-center space-y-3">
                         <div className="grid h-12 w-12 place-items-center rounded-full bg-blue-50 text-blue-600">
                           <PhoneCall className="h-6 w-6 stroke-[1.5]" />
@@ -569,6 +607,9 @@ function EnquiriesComponent() {
                         </td>
                         <td className="p-3 whitespace-nowrap">
                           <CustomerTypeBadge value={enq.customerType} />
+                        </td>
+                        <td className="p-3 whitespace-nowrap">
+                          <GstBadge value={enq.isGST} />
                         </td>
                         <td className="p-3">
                           <div className="font-semibold text-xs text-foreground truncate max-w-[210px]" title={enq.leakageType}>
@@ -789,7 +830,7 @@ function EnquiriesComponent() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1 sm:col-span-2">
+                  <div className="space-y-1">
                     <Label className="text-xs font-semibold">Customer Type</Label>
                     <div className="flex flex-wrap items-center gap-2">
                       <CustomerTypeToggle
@@ -800,6 +841,21 @@ function EnquiriesComponent() {
                         }}
                       />
                       {!activeEnquiry.customerType && (
+                        <span className="text-[11px] text-amber-600 font-medium">Not set yet</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">GST</Label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <GstToggle
+                        value={activeEnquiry.isGST}
+                        onChange={(val) => {
+                          updateEnquiry(activeEnquiry.id, { isGST: val });
+                          setActiveEnquiry({ ...activeEnquiry, isGST: val });
+                        }}
+                      />
+                      {activeEnquiry.isGST === undefined && (
                         <span className="text-[11px] text-amber-600 font-medium">Not set yet</span>
                       )}
                     </div>
@@ -1315,13 +1371,24 @@ function EnquiriesComponent() {
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Customer Type *</Label>
-                  <div>
-                    <CustomerTypeToggle
-                      value={createData.customerType}
-                      onChange={(val) => setCreateData({ ...createData, customerType: val })}
-                    />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Customer Type *</Label>
+                    <div>
+                      <CustomerTypeToggle
+                        value={createData.customerType}
+                        onChange={(val) => setCreateData({ ...createData, customerType: val })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">GST *</Label>
+                    <div>
+                      <GstToggle
+                        value={createData.isGST}
+                        onChange={(val) => setCreateData({ ...createData, isGST: val })}
+                      />
+                    </div>
                   </div>
                 </div>
 

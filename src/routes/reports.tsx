@@ -228,16 +228,28 @@ function ReportsComponent() {
   // View Customer Ledger Statement Modal state
   const [selectedCustomerLedger, setSelectedCustomerLedger] = useState<any | null>(null);
 
-  // B2B (GST) / B2C (Non-GST) filter shared by the Revenue, Projects, Pending, Enquiries and Ledger reports.
-  // Projects use their GST flag; enquiries use their B2B/B2C type ("NOT_SET" applies to enquiries only).
-  const [customerTypeFilter, setCustomerTypeFilter] = useState<"ALL" | "GST" | "NON_GST" | "NOT_SET">("ALL");
-  const projectGstFilter = customerTypeFilter === "NOT_SET" ? "ALL" : customerTypeFilter;
-  const matchesProjectType = (p: { isGST?: boolean }) =>
-    projectGstFilter === "ALL" || (projectGstFilter === "GST" ? Boolean(p.isGST) : !p.isGST);
+  // Two independent filters shared by the Revenue, Projects, Pending, Enquiries and Ledger reports:
+  // customer type (B2B / B2C) and tax (GST / Non-GST). Any combination is possible.
+  // "NOT_SET" matches records saved before these fields existed.
+  const [customerTypeFilter, setCustomerTypeFilter] = useState<"ALL" | "B2B" | "B2C" | "NOT_SET">("ALL");
+  const [taxFilter, setTaxFilter] = useState<"ALL" | "GST" | "NON_GST" | "NOT_SET">("ALL");
+  // Projects always have a GST setting, so "not set" only applies to enquiries.
+  const projectGstFilter = taxFilter === "NOT_SET" ? "ALL" : taxFilter;
+  const matchesType = (t: string | undefined) =>
+    customerTypeFilter === "ALL" || (customerTypeFilter === "NOT_SET" ? !t : t === customerTypeFilter);
+  const matchesProjectType = (p: { isGST?: boolean; customerType?: string }) =>
+    matchesType(p.customerType) &&
+    (projectGstFilter === "ALL" || (projectGstFilter === "GST" ? Boolean(p.isGST) : !p.isGST));
+  const typeFilterLabel = customerTypeFilter === "NOT_SET" ? "Type-NotSet" : customerTypeFilter;
+  const taxFilterLabel = taxFilter === "NON_GST" ? "NonGST" : taxFilter === "NOT_SET" ? "GST-NotSet" : taxFilter;
+  const effectiveTaxLabel = activeReport === "ENQUIRIES" ? taxFilterLabel : projectGstFilter === "NON_GST" ? "NonGST" : projectGstFilter;
   const typeFileLabel =
-    customerTypeFilter === "GST" ? "_B2B-GST" : customerTypeFilter === "NON_GST" ? "_B2C-NonGST" : customerTypeFilter === "NOT_SET" ? "_Type-NotSet" : "";
-  const typeTitleLabel =
-    customerTypeFilter === "GST" ? " [B2B GST customers]" : customerTypeFilter === "NON_GST" ? " [B2C Non-GST customers]" : customerTypeFilter === "NOT_SET" ? " [Type not set]" : "";
+    (customerTypeFilter !== "ALL" ? `_${typeFilterLabel}` : "") + (effectiveTaxLabel !== "ALL" ? `_${effectiveTaxLabel}` : "");
+  const typeTitleParts = [
+    customerTypeFilter !== "ALL" ? (customerTypeFilter === "NOT_SET" ? "Type not set" : customerTypeFilter) : "",
+    effectiveTaxLabel !== "ALL" ? (effectiveTaxLabel === "NonGST" ? "Non-GST" : effectiveTaxLabel === "GST-NotSet" ? "GST not set" : "GST") : "",
+  ].filter(Boolean);
+  const typeTitleLabel = typeTitleParts.length ? ` [${typeTitleParts.join(", ")}]` : "";
 
   // Customer Account Ledger Custom Filtering States
   const [custLedgerStatusFilter, setCustLedgerStatusFilter] = useState<string>("ALL");
@@ -273,8 +285,8 @@ function ReportsComponent() {
       };
     })
     .filter((item) => {
-      // 0. B2B / B2C filter: only customers that have projects of that type
-      if (projectGstFilter !== "ALL" && item.projectCount === 0) return false;
+      // 0. B2B/B2C + GST filters: only customers that have projects matching them
+      if ((projectGstFilter !== "ALL" || customerTypeFilter !== "ALL") && item.projectCount === 0) return false;
 
       // 1. Status Filter
       if (custLedgerStatusFilter === "DUE" && item.balanceDue === 0) return false;
@@ -523,8 +535,7 @@ function ReportsComponent() {
   const waitingCount = projects.filter((p) => p.status === "Waiting").length;
   const completedCount = projects.filter((p) => p.status === "Completed").length;
   const closedCount = projects.filter((p) => p.status === "Closed").length;
-  const gstCount = projects.filter((p) => p.isGST).length;
-  const nonGstCount = projects.filter((p) => !p.isGST).length;
+
 
   // Enquiries Report Custom Filtering States
   const [enquiryDecisionFilter, setEnquiryDecisionFilter] = useState<string>("ALL");
@@ -535,9 +546,10 @@ function ReportsComponent() {
   // Enquiries Filtered Array
   const filteredEnquiriesReport = enquiries.filter((e) => {
     // 0. B2B / B2C Filter
-    if (customerTypeFilter === "GST" && e.customerType !== "B2B") return false;
-    if (customerTypeFilter === "NON_GST" && e.customerType !== "B2C") return false;
-    if (customerTypeFilter === "NOT_SET" && e.customerType) return false;
+    if (!matchesType(e.customerType)) return false;
+    if (taxFilter === "GST" && e.isGST !== true) return false;
+    if (taxFilter === "NON_GST" && e.isGST !== false) return false;
+    if (taxFilter === "NOT_SET" && e.isGST !== undefined) return false;
 
     // 1. Decision / Status Filter
     if (enquiryDecisionFilter !== "ALL") {
@@ -647,6 +659,7 @@ function ReportsComponent() {
           startDate: startDateFilter || undefined,
           endDate: endDateFilter || undefined,
           gstFilter: projectGstFilter !== "ALL" ? projectGstFilter : undefined,
+          customerTypeFilter: customerTypeFilter !== "ALL" ? customerTypeFilter : undefined,
         },
       });
       if (res?.base64) {
@@ -859,44 +872,50 @@ function ReportsComponent() {
         ))}
       </div>
 
-      {/* B2B / B2C customer filter (customer & money reports only) */}
-      {["REVENUE", "PROJECTS", "PENDING", "ENQUIRIES", "CUSTOMER"].includes(activeReport) && (
-        <div className="flex flex-wrap items-center gap-1.5 bg-white dark:bg-card px-4 py-3 rounded-xl border border-border shadow-xs" data-testid="customer-type-filter">
-          <span className="text-[11px] font-bold text-muted-foreground mr-1">Customer Type:</span>
-          {(activeReport === "ENQUIRIES"
-            ? [
-                { id: "ALL", label: `All (${enquiries.length})` },
-                { id: "GST", label: `B2B GST (${enquiries.filter((e) => e.customerType === "B2B").length})` },
-                { id: "NON_GST", label: `B2C Non-GST (${enquiries.filter((e) => e.customerType === "B2C").length})` },
-                { id: "NOT_SET", label: `Not set (${enquiries.filter((e) => !e.customerType).length})` },
-              ]
-            : [
-                { id: "ALL", label: `All (${projects.length})` },
-                { id: "GST", label: `B2B GST (${gstCount})` },
-                { id: "NON_GST", label: `B2C Non-GST (${nonGstCount})` },
-              ]
-          ).map((tab) => {
-            const selected = activeReport === "ENQUIRIES" ? customerTypeFilter === tab.id : projectGstFilter === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setCustomerTypeFilter(tab.id as typeof customerTypeFilter)}
-                className={`text-[11px] font-bold px-2.5 py-1 rounded-full border transition-all duration-150 cursor-pointer ${
-                  selected
-                    ? "bg-purple-600 text-white border-purple-600 shadow-xs"
-                    : "bg-background text-foreground border-border hover:bg-accent"
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-          {activeReport !== "ENQUIRIES" && (
-            <span className="text-[10px] text-muted-foreground ml-1">Based on each project's GST setting.</span>
-          )}
-        </div>
-      )}
+      {/* B2B/B2C and GST/Non-GST filters (customer & money reports only) */}
+      {["REVENUE", "PROJECTS", "PENDING", "ENQUIRIES", "CUSTOMER"].includes(activeReport) && (() => {
+        const isEnq = activeReport === "ENQUIRIES";
+        const list: { customerType?: string; isGST?: boolean }[] = isEnq ? enquiries : projects;
+        const chip = (selected: boolean) =>
+          `text-[11px] font-bold px-2.5 py-1 rounded-full border transition-all duration-150 cursor-pointer ${
+            selected
+              ? "bg-purple-600 text-white border-purple-600 shadow-xs"
+              : "bg-background text-foreground border-border hover:bg-accent"
+          }`;
+        const typeChips = [
+          { id: "ALL", label: `All (${list.length})` },
+          { id: "B2B", label: `B2B (${list.filter((x) => x.customerType === "B2B").length})` },
+          { id: "B2C", label: `B2C (${list.filter((x) => x.customerType === "B2C").length})` },
+          { id: "NOT_SET", label: `Not set (${list.filter((x) => !x.customerType).length})` },
+        ] as const;
+        const taxChips = [
+          { id: "ALL", label: `All (${list.length})` },
+          { id: "GST", label: `GST (${list.filter((x) => x.isGST === true).length})` },
+          { id: "NON_GST", label: `Non-GST (${list.filter((x) => (isEnq ? x.isGST === false : !x.isGST)).length})` },
+          ...(isEnq ? [{ id: "NOT_SET", label: `Not set (${list.filter((x) => x.isGST === undefined).length})` }] : []),
+        ] as { id: typeof taxFilter; label: string }[];
+        const selectedTax = isEnq ? taxFilter : projectGstFilter;
+        return (
+          <div className="flex flex-col gap-2 bg-white dark:bg-card px-4 py-3 rounded-xl border border-border shadow-xs" data-testid="customer-type-filter">
+            <div className="flex flex-wrap items-center gap-1.5" data-testid="type-filter">
+              <span className="text-[11px] font-bold text-muted-foreground mr-1 w-24">Customer Type:</span>
+              {typeChips.map((c) => (
+                <button key={c.id} type="button" onClick={() => setCustomerTypeFilter(c.id)} className={chip(customerTypeFilter === c.id)}>
+                  {c.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5" data-testid="tax-filter">
+              <span className="text-[11px] font-bold text-muted-foreground mr-1 w-24">Tax:</span>
+              {taxChips.map((c) => (
+                <button key={c.id} type="button" onClick={() => setTaxFilter(c.id)} className={chip(selectedTax === c.id)}>
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 1. REVENUE REPORT WITH DATE-TO-DATE CUSTOMIZATION & DOWNLOAD */}
       {activeReport === "REVENUE" && (
@@ -1172,10 +1191,11 @@ function ReportsComponent() {
                     const dateLabel = startDateFilter || endDateFilter ? `_${startDateFilter}_to_${endDateFilter}` : "";
                     handleExportCSV(
                       `Custom_Projects_Report_${statusLabel}${gstLabel}${dateLabel}`,
-                      ["Project ID", "Customer Name", "GST Status", "Work Description", "Lead Engineer", "Scheduled Date", "Location", "Contract Value (INR)", "Discount (INR)", "Net Payable (INR)", "Payment Status", "Project Status"],
+                      ["Project ID", "Customer Name", "Customer Type", "GST Status", "Work Description", "Lead Engineer", "Scheduled Date", "Location", "Contract Value (INR)", "Discount (INR)", "Net Payable (INR)", "Payment Status", "Project Status"],
                       filteredProjectsReport.map((p) => [
                         p.id,
                         p.customerName,
+                        p.customerType || "Not set",
                         p.isGST ? "GST" : "Non-GST",
                         p.natureOfWork,
                         p.assignedEngineerName || "Unassigned",
@@ -1281,6 +1301,7 @@ function ReportsComponent() {
                   onClick={() => {
                     setProjectStatusFilter("ALL");
                     setCustomerTypeFilter("ALL");
+                    setTaxFilter("ALL");
                     setStartDateFilter("");
                     setEndDateFilter("");
                     setProjectSearchQuery("");
@@ -1298,7 +1319,8 @@ function ReportsComponent() {
               <span className="font-semibold text-muted-foreground">
                 Showing <b className="text-foreground">{filteredProjectsReport.length}</b> of {projects.length} Projects
                 {projectStatusFilter !== "ALL" && ` (Status: ${projectStatusFilter})`}
-                {projectGstFilter !== "ALL" && ` (${projectGstFilter === "GST" ? "B2B GST" : "B2C Non-GST"})`}
+                {customerTypeFilter !== "ALL" && ` (${customerTypeFilter === "NOT_SET" ? "Type not set" : customerTypeFilter})`}
+                {projectGstFilter !== "ALL" && ` (${projectGstFilter === "GST" ? "GST" : "Non-GST"})`}
                 {startDateFilter && ` (From: ${startDateFilter})`}
                 {endDateFilter && ` (To: ${endDateFilter})`}
               </span>
@@ -1675,6 +1697,7 @@ function ReportsComponent() {
                         "Enquiry ID",
                         "Customer Name",
                         "Customer Type",
+                        "GST",
                         "Phone",
                         "Location",
                         "Leakage / Service Need",
@@ -1690,7 +1713,8 @@ function ReportsComponent() {
                       filteredEnquiriesReport.map((e) => [
                         e.id,
                         e.customerName,
-                        e.customerType ? `${e.customerType} (${e.customerType === "B2B" ? "GST" : "Non-GST"})` : "Not set",
+                        e.customerType || "Not set",
+                        e.isGST === undefined ? "Not set" : e.isGST ? "GST" : "Non-GST",
                         e.phone || "N/A",
                         e.location || "N/A",
                         e.leakageType || "N/A",
@@ -1721,6 +1745,7 @@ function ReportsComponent() {
                         "Enquiry ID",
                         "Customer Name",
                         "Type",
+                        "GST",
                         "Phone",
                         "Location",
                         "Leakage / Need",
@@ -1736,7 +1761,8 @@ function ReportsComponent() {
                       filteredEnquiriesReport.map((e) => [
                         e.id,
                         e.customerName,
-                        e.customerType ? `${e.customerType} (${e.customerType === "B2B" ? "GST" : "Non-GST"})` : "Not set",
+                        e.customerType || "Not set",
+                        e.isGST === undefined ? "Not set" : e.isGST ? "GST" : "Non-GST",
                         e.phone || "N/A",
                         e.location || "N/A",
                         e.leakageType || "N/A",

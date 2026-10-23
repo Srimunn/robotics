@@ -268,9 +268,9 @@ async function drawWorkPhotoThumbRows(doc: any, before: WorkPhoto[], after: Work
 
 /** Server function to generate Projects Report PDF with embedded before/after photos */
 export const generateProjectsReport = createServerFn({ method: "POST" })
-  .validator((input: { status?: string; startDate?: string; endDate?: string; gstFilter?: string }) => input)
+  .validator((input: { status?: string; startDate?: string; endDate?: string; gstFilter?: string; customerTypeFilter?: string }) => input)
   .handler(async ({ data }) => {
-    const { status, startDate, endDate, gstFilter } = data;
+    const { status, startDate, endDate, gstFilter, customerTypeFilter } = data;
 
     const where: any = {};
     if (status && status.toUpperCase() !== "ALL") {
@@ -280,6 +280,11 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
       where.isGST = true;
     } else if (gstFilter === "NON_GST") {
       where.isGST = false;
+    }
+    if (customerTypeFilter === "B2B" || customerTypeFilter === "B2C") {
+      where.customerType = customerTypeFilter;
+    } else if (customerTypeFilter === "NOT_SET") {
+      where.customerType = null;
     }
 
     const projects = await db.project.findMany({
@@ -345,7 +350,7 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
 
         // 1. Project Title Banner
         doc.rect(30, startY, 535, 24).fillAndStroke("#1e293b", "#0f172a");
-        doc.fillColor("#ffffff").fontSize(10).font("Helvetica-Bold").text(`${p.id} — ${p.customerName} [${p.isGST ? "GST" : "Non-GST"}]`, 38, startY + 6);
+        doc.fillColor("#ffffff").fontSize(10).font("Helvetica-Bold").text(`${p.id} — ${p.customerName} [${p.customerType ? p.customerType + ", " : ""}${p.isGST ? "GST" : "Non-GST"}]`, 38, startY + 6);
         doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#38bdf8").text(`Status: ${p.status} | Pay Status: ${p.paymentStatus || "Pending"}`, 340, startY + 6, { align: "right" });
 
         doc.y = startY + 30;

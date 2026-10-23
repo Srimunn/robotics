@@ -150,8 +150,9 @@ export interface Enquiry {
   createdByRole?: string;
   createdAt: string;
 
-  // B2B = GST customer, B2C = non-GST customer. Undefined on older enquiries ("Not set").
+  // B2B/B2C and GST/Non-GST are independent. Undefined on older enquiries ("Not set").
   customerType?: CustomerType;
+  isGST?: boolean;
   // Follow-up reminder
   nextFollowUpDate?: string; // YYYY-MM-DD
   followUpNote?: string;
@@ -268,6 +269,7 @@ export interface Project {
   balanceAmount: number;
   paymentStatus: PaymentStatus;
   isGST?: boolean;
+  customerType?: CustomerType; // undefined on older projects ("Not set")
   discountAmount?: number | null;
   discountedBy?: string | null;
   discountNote?: string | null;

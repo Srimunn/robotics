@@ -42,7 +42,7 @@ const ROUTES = [
 const BUTTON_TABS: Record<string, string[]> = {
   "/": ["All Activity", "Shifts & Attendance", "Project Status", "Payments", "Equipment"],
   "/enquiries": ["Today's Visits", "Follow-up", "Follow-ups Due", "Approved", "Cancelled", "ALL"],
-  "/customers": ["Has pending amount", "B2B (GST)", "B2C (Non-GST)", "All"],
+  "/customers": ["Has pending amount", "B2B", "B2C", "GST", "Non-GST", "All"],
   "/notifications": ["Follow-ups", "Collections"],
   "/projects": ["Scheduled", "Ongoing", "Completed", "Closed", "ALL"],
   "/payments": ["History", "Ledger", "Receivables"],

@@ -57,6 +57,7 @@ const enquiryCreate = z.object({
   customerStatus: z.string().optional().nullable(),
   createdByRole: z.string().optional().nullable(),
   customerType: z.enum(["B2B", "B2C"]).optional().nullable(),
+  isGST: z.boolean().optional().nullable(),
   nextFollowUpDate: z.preprocess(preprocessDate, z.coerce.date().optional().nullable()),
   followUpNote: z.string().optional().nullable(),
 });
@@ -98,6 +99,7 @@ export const addEnquiry = createServerFn({ method: "POST" })
         customerStatus: data.customerStatus ?? "Prospective",
         createdByRole: data.createdByRole ?? undefined,
         customerType: data.customerType ?? undefined,
+        isGST: data.isGST ?? undefined,
         nextFollowUpDate: data.nextFollowUpDate ?? undefined,
         followUpNote: data.followUpNote ?? undefined,
       } as any,
@@ -189,6 +191,8 @@ export const updateEnquiry = createServerFn({ method: "POST" })
 
         if (parsed.assignedEngineerId !== undefined || engId !== undefined) projectUpdateData.assignedEngineerId = engId;
         if (parsed.assignedEngineerName !== undefined || engName !== undefined) projectUpdateData.assignedEngineerName = engName;
+        if (parsed.customerType) projectUpdateData.customerType = parsed.customerType;
+        if (typeof parsed.isGST === "boolean") projectUpdateData.isGST = parsed.isGST;
 
         await tx.project.update({
           where: { id: linkedProject.id },
@@ -274,8 +278,9 @@ export const approveAndConvertEnquiryToProject = createServerFn({ method: "POST"
           paymentStatus: "Pending",
           internalNotes: `Auto-inherited from Approved Enquiry ${enq.id}.`,
           createdByRole: (enq as any).createdByRole ?? undefined,
-          // B2B customers are GST customers; B2C (or not set) stays Non-GST, as before.
-          isGST: enq.customerType === "B2B",
+          // B2B/B2C and GST/Non-GST are independent; both are copied as entered (GST defaults to off, as before).
+          customerType: enq.customerType ?? undefined,
+          isGST: enq.isGST ?? false,
         } as any,
       });
 

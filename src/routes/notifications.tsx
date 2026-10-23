@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ExportButtons } from "@/components/export-buttons";
-import { CustomerTypeBadge } from "@/components/customer-type-toggle";
+import { CustomerTypeBadge, GstBadge, typeLabel, gstLabel } from "@/components/customer-type-toggle";
 import { cn } from "@/lib/utils";
 
 interface NotificationsSearch {
@@ -160,7 +160,8 @@ function CollectionsList({ items }: { items: PaymentReminder[] }) {
       "Project ID": r.projectId,
       "Customer Name": r.customerName,
       Phone: r.phone,
-      "GST Status": r.isGST ? "B2B (GST)" : "B2C (Non-GST)",
+      "Customer Type": r.customerType || "Not set",
+      GST: r.isGST ? "GST" : "Non-GST",
       Stage: r.stageName,
       "Amount Due (INR)": r.amountDue,
       "Project Balance (INR)": r.projectBalance,
@@ -223,7 +224,8 @@ function CollectionsList({ items }: { items: PaymentReminder[] }) {
                     <td className="p-3 whitespace-nowrap">
                       <div className="font-bold text-foreground">{r.customerName}</div>
                       <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
-                        {r.phone} <CustomerTypeBadge value={r.isGST ? "B2B" : "B2C"} />
+                        {r.phone} {r.customerType && <CustomerTypeBadge value={r.customerType} />}
+                        <GstBadge value={r.isGST} />
                       </div>
                     </td>
                     <td className="p-3 whitespace-nowrap">
@@ -272,7 +274,8 @@ function FollowUpsList({ items }: { items: FollowUpReminder[] }) {
       "Enquiry ID": r.enquiry.id,
       "Customer Name": r.enquiry.customerName,
       Phone: r.enquiry.phone,
-      Type: r.enquiry.customerType || "Not set",
+      Type: typeLabel(r.enquiry.customerType),
+      GST: gstLabel(r.enquiry.isGST),
       "Work Type": r.enquiry.leakageType,
       Decision: r.enquiry.customerDecision,
       "Follow-up Note": r.enquiry.followUpNote || "",
@@ -359,6 +362,7 @@ function FollowUpsList({ items }: { items: FollowUpReminder[] }) {
                           {r.enquiry.phone}
                         </a>
                         <CustomerTypeBadge value={r.enquiry.customerType} />
+                        <GstBadge value={r.enquiry.isGST} />
                       </div>
                     </td>
                     <td className="p-3 whitespace-nowrap">

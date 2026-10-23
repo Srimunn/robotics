@@ -10,6 +10,7 @@ import { DeleteConfirm } from "@/components/delete-confirm";
 import { ProjectWorkPhotos } from "@/components/ProjectWorkPhotos";
 import { CreatedByBadge } from "@/components/created-by-badge";
 import { ExportButtons } from "@/components/export-buttons";
+import { CustomerTypeBadge, typeLabel } from "@/components/customer-type-toggle";
 
 import {
   FolderKanban,
@@ -553,7 +554,8 @@ function ProjectsComponent() {
       "Customer Name": p.customerName,
       Phone: p.phone,
       Location: p.location,
-      "GST Status": p.isGST ? "B2B (GST)" : "B2C (Non-GST)",
+      "Customer Type": typeLabel(p.customerType),
+      GST: p.isGST ? "GST" : "Non-GST",
       "Work Type": p.natureOfWork,
       Engineer: p.assignedEngineerName || "",
       "Scheduled Date": p.scheduledDate || "",
@@ -970,6 +972,7 @@ function ProjectsComponent() {
                           >
                             {p.isGST ? "GST" : "Non-GST"}
                           </Badge>
+                          {p.customerType && <CustomerTypeBadge value={p.customerType} />}
                         </div>
                       </td>
                       <td className="p-3 text-right pr-4 whitespace-nowrap">
@@ -1064,6 +1067,47 @@ function ProjectsComponent() {
                           }}
                         />
                       </div>
+                    )}
+                    {canFullEdit ? (
+                      <div
+                        className="flex items-center gap-0.5 ml-1 bg-white dark:bg-slate-800 p-0.5 rounded-md border border-border shadow-2xs"
+                        role="radiogroup"
+                        aria-label="Customer type"
+                        title="B2B / B2C (independent of GST)"
+                      >
+                        {(["B2B", "B2C"] as const).map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            role="radio"
+                            aria-checked={activeProject.customerType === t}
+                            onClick={async () => {
+                              if (activeProject.customerType === t) return;
+                              try {
+                                await updateProject(activeProject.id, { customerType: t });
+                                setActiveProject({ ...activeProject, customerType: t });
+                                toast.success(`Project marked as ${t}`);
+                              } catch (err: any) {
+                                toast.error("Failed to update customer type: " + (err?.message || err));
+                              }
+                            }}
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                              activeProject.customerType === t
+                                ? t === "B2B"
+                                  ? "bg-indigo-600 text-white"
+                                  : "bg-teal-600 text-white"
+                                : "text-muted-foreground hover:bg-accent"
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                        {!activeProject.customerType && (
+                          <span className="text-[10px] text-amber-600 font-medium px-1">Not set</span>
+                        )}
+                      </div>
+                    ) : (
+                      <CustomerTypeBadge value={activeProject.customerType} />
                     )}
                     {activeProject.enquiryId && (
                       <Badge variant="outline" className="text-[10px] bg-blue-100/80 text-blue-800 border-blue-300">

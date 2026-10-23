@@ -1,4 +1,4 @@
-import type { Enquiry, Project } from "./robotics-types";
+import type { CustomerType, Enquiry, Project } from "./robotics-types";
 
 /** How many days ahead a payment counts as "due soon". */
 export const DUE_SOON_DAYS = 3;
@@ -33,6 +33,7 @@ export interface PaymentReminder {
   customerName: string;
   phone: string;
   isGST: boolean;
+  customerType?: CustomerType;
   stageName: string;
   dueDate: string;
   amountDue: number;
@@ -82,6 +83,7 @@ export function getPaymentReminders(projects: Project[], today = localToday()): 
         customerName: p.customerName,
         phone: p.phone,
         isGST: Boolean(p.isGST),
+        customerType: p.customerType,
         projectBalance: balance,
         bucket: bucketFor(it.dueDate, today),
         daysOverdue: daysBetween(it.dueDate, today),

@@ -1,6 +1,6 @@
 /**
- * Checks for: customers table, Excel/PDF downloads on every list page, B2B/B2C on enquiries,
- * the B2B/B2C report filter, and payment / follow-up reminders.
+ * Checks for: customers table, Excel/PDF downloads on every list page, B2B/B2C and GST on enquiries,
+ * the report filters, and payment / follow-up reminders.
  *
  * !!! Creates and edits enquiries and projects. Run ONLY against a local / throwaway database
  * (see e2e/README.md). Expected values are computed straight from the database with Prisma, so
@@ -68,7 +68,7 @@ async function createEnquiry(
   page: Page,
   customer: string,
   amount: number,
-  type?: "B2B" | "B2C",
+  kind: { type?: "B2B" | "B2C"; gst?: "GST" | "Non-GST" } = {},
   followUp?: string,
 ) {
   await navTo(page, "/enquiries");
@@ -78,7 +78,8 @@ async function createEnquiry(
   await fieldInput(dialog, "Phone 1 *").fill(`8${String(Date.now()).slice(-9)}`);
   await fieldInput(dialog, "Location").fill("Salem");
   await fieldInput(dialog, "Amount (₹)").fill(String(amount));
-  if (type) await dialog.getByRole("radio", { name: new RegExp(`^${type}`) }).click();
+  if (kind.type) await dialog.getByRole("radio", { name: kind.type, exact: true }).click();
+  if (kind.gst) await dialog.getByRole("radio", { name: kind.gst, exact: true }).click();
   if (followUp) {
     await fieldInput(dialog, "Next Follow-up Date").fill(followUp);
     await fieldInput(dialog, "Follow-up Note").fill("Ask about the second building");
@@ -144,7 +145,7 @@ test("customers: one table row per customer and the Excel totals match the datab
 
   // Sorting by Pending puts the largest pending amount first.
   await table.getByRole("button", { name: /^Pending/ }).click();
-  const firstPending = await table.locator("tbody tr").first().locator("td").nth(9).innerText();
+  const firstPending = await table.locator("tbody tr").first().locator("td").nth(10).innerText();
   const maxPending = Math.max(...rows.map((r) => r["Pending (INR)"]));
   expect(Number(firstPending.replace(/[^\d.]/g, ""))).toBe(Math.round(maxPending));
 
@@ -229,44 +230,58 @@ test("downloads: CS (view-only) can download, numbers stay numbers", async ({ pa
 // 3. B2B / B2C on enquiries
 // ---------------------------------------------------------------------------
 
-test("B2B/B2C: required on new enquiries, saved, shown, and B2B converts to a GST project", async ({
+test("B2B/B2C and GST: both required, independent, saved, filtered, and copied to the project", async ({
   page,
   errors,
 }) => {
-  test.setTimeout(180_000);
-  errors.allow.push(/Please choose B2B/);
-  const b2b = `${RUN} B2B Builders`;
-  const b2c = `${RUN} B2C Home`;
+  test.setTimeout(240_000);
+  errors.allow.push(/Please choose B2B or B2C/, /Please choose GST or Non-GST/);
+  const b2bNon = `${RUN} B2B NonGST Builders`;
+  const b2cGst = `${RUN} B2C GST Home`;
 
-  // Without a type the form refuses to save.
-  const dialog = await createEnquiry(page, `${RUN} NoType`, 1000);
-  await expectToast(page, "Please choose B2B (GST) or B2C (Non-GST)");
+  // Without a type the form refuses to save; without GST too.
+  let dialog = await createEnquiry(page, `${RUN} NoType`, 1000, { gst: "GST" });
+  await expectToast(page, "Please choose B2B or B2C");
   await expect(dialog).toBeVisible();
-  expect(await enquiryRow(`${RUN} NoType`)).toBeNull();
   await page.keyboard.press("Escape");
+  dialog = await createEnquiry(page, `${RUN} NoType`, 1000, { type: "B2B" });
+  await expectToast(page, "Please choose GST or Non-GST");
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  expect(await enquiryRow(`${RUN} NoType`)).toBeNull();
 
-  await createEnquiry(page, b2b, 40_000, "B2B");
+  // The "unusual" combinations must both be possible.
+  await createEnquiry(page, b2bNon, 40_000, { type: "B2B", gst: "Non-GST" });
   await expect(page.getByRole("dialog")).toBeHidden({ timeout: 20_000 });
-  await createEnquiry(page, b2c, 30_000, "B2C");
+  await createEnquiry(page, b2cGst, 30_000, { type: "B2C", gst: "GST" });
   await expect(page.getByRole("dialog")).toBeHidden({ timeout: 20_000 });
-  expect((await enquiryRow(b2b))!.customerType).toBe("B2B");
-  expect((await enquiryRow(b2c))!.customerType).toBe("B2C");
+  expect(await enquiryRow(b2bNon)).toMatchObject({ customerType: "B2B", isGST: false });
+  expect(await enquiryRow(b2cGst)).toMatchObject({ customerType: "B2C", isGST: true });
 
-  // List shows the type, and the type filter works.
+  // List shows both columns; the two filters work on their own and together.
   await main(page).getByPlaceholder("Search...").fill(RUN);
-  await expect(main(page).locator("tbody tr").filter({ hasText: b2b })).toContainText("B2B");
-  await main(page).getByRole("combobox", { name: "Customer type filter" }).click();
-  await page.getByRole("option", { name: "B2C (Non-GST)" }).click();
-  await expect(main(page).locator("tbody tr").filter({ hasText: b2b })).toHaveCount(0);
-  await expect(main(page).locator("tbody tr").filter({ hasText: b2c })).toHaveCount(1);
-  await main(page).getByRole("combobox", { name: "Customer type filter" }).click();
-  await page.getByRole("option", { name: "All types" }).click();
+  const rowOf = (n: string) => main(page).locator("tbody tr").filter({ hasText: n });
+  await expect(rowOf(b2bNon)).toContainText("B2B");
+  await expect(rowOf(b2bNon)).toContainText("Non-GST");
+  const choose = async (filter: string, option: string) => {
+    await main(page).getByRole("combobox", { name: filter }).click();
+    await page.getByRole("option", { name: option, exact: true }).click();
+  };
+  await choose("GST filter", "GST");
+  await expect(rowOf(b2bNon)).toHaveCount(0);
+  await expect(rowOf(b2cGst)).toHaveCount(1);
+  await choose("Customer type filter", "B2B");
+  await expect(rowOf(b2cGst)).toHaveCount(0);
+  await choose("GST filter", "Non-GST");
+  await expect(rowOf(b2bNon)).toHaveCount(1);
+  await choose("Customer type filter", "All types");
+  await choose("GST filter", "GST + Non-GST");
 
-  // Approve + convert both: B2B -> GST project, B2C -> Non-GST project.
-  for (const name of [b2b, b2c]) {
+  // Approve + convert both: the project gets the same type and the same GST setting.
+  for (const name of [b2bNon, b2cGst]) {
     await navTo(page, "/enquiries");
     await main(page).getByPlaceholder("Search...").fill(name);
-    const row = main(page).locator("tbody tr").filter({ hasText: name });
+    const row = rowOf(name);
     await row.getByRole("combobox").click();
     await page.getByRole("option", { name: "Approved", exact: true }).click();
     await row.getByRole("button", { name: /Convert to Project/i }).click();
@@ -275,42 +290,68 @@ test("B2B/B2C: required on new enquiries, saved, shown, and B2B converts to a GS
       .poll(async () => (await enquiryRow(name))?.projectId, { timeout: 20_000 })
       .toBeTruthy();
   }
-  const pB2B = await db.project.findFirst({ where: { customerName: b2b } });
-  const pB2C = await db.project.findFirst({ where: { customerName: b2c } });
-  expect(pB2B!.isGST).toBe(true);
-  expect(pB2C!.isGST).toBe(false);
+  expect(await db.project.findFirst({ where: { customerName: b2bNon } })).toMatchObject({
+    customerType: "B2B",
+    isGST: false,
+  });
+  expect(await db.project.findFirst({ where: { customerName: b2cGst } })).toMatchObject({
+    customerType: "B2C",
+    isGST: true,
+  });
 
-  // Changing the enquiry's type later does not silently flip the project's GST setting.
-  const enq = await enquiryRow(b2c);
+  // Changing the enquiry later updates its project too (same as other synced fields).
+  const enq = await enquiryRow(b2cGst);
   await navTo(page, "/enquiries");
-  await main(page).getByPlaceholder("Search...").fill(b2c);
-  await main(page).locator("tbody tr").filter({ hasText: b2c }).locator("td").nth(1).click();
+  await main(page).getByPlaceholder("Search...").fill(b2cGst);
+  await rowOf(b2cGst).locator("td").nth(1).click();
   const d = page.getByRole("dialog");
-  await d.getByRole("radio", { name: /^B2B/ }).click();
-  await expect.poll(async () => (await enquiryRow(b2c))!.customerType).toBe("B2B");
+  await d.getByRole("radio", { name: "Non-GST", exact: true }).click();
+  await expect
+    .poll(async () => (await db.project.findUnique({ where: { id: enq!.projectId! } }))!.isGST)
+    .toBe(false);
+  expect((await db.project.findUnique({ where: { id: enq!.projectId! } }))!.customerType).toBe("B2C");
+  await page.keyboard.press("Escape");
+
+  // And the B2B/B2C switch in the project window updates the enquiry, without touching GST.
+  await navTo(page, `/projects?openId=${enq!.projectId}`);
+  const pw = page.getByRole("dialog");
+  await pw.getByRole("radiogroup", { name: "Customer type" }).getByRole("radio", { name: "B2B" }).click();
+  await expect
+    .poll(async () => (await db.project.findUnique({ where: { id: enq!.projectId! } }))!.customerType)
+    .toBe("B2B");
+  await expect.poll(async () => (await enquiryRow(b2cGst))!.customerType).toBe("B2B");
+  expect((await enquiryRow(b2cGst))!.isGST).toBe(false);
   expect((await db.project.findUnique({ where: { id: enq!.projectId! } }))!.isGST).toBe(false);
   expect(errors.unexpected()).toEqual([]);
 });
 
-test("B2B/B2C: older enquiries without a type show 'Not set' and can be set", async ({ page }) => {
+test("B2B/B2C and GST: older enquiries show 'Not set' for both and each can be set alone", async ({
+  page,
+}) => {
   const old = await db.enquiry.findFirst({
-    where: { customerType: null, projectId: null },
+    where: { customerType: null, isGST: null, projectId: null },
     orderBy: { id: "asc" },
   });
-  test.skip(!old, "no untyped enquiries in this database");
+  test.skip(!old, "no older enquiries in this database");
   const before = await db.enquiry.findUnique({ where: { id: old!.id } });
   await navTo(page, "/enquiries");
   await main(page).getByPlaceholder("Search...").fill(old!.id);
   const row = main(page).locator("tbody tr").filter({ hasText: old!.id });
-  await expect(row).toContainText("Not set");
+  await expect(row.getByText("Not set", { exact: true })).toHaveCount(2);
   await row.locator("td").nth(1).click();
-  await page.getByRole("dialog").getByRole("radio", { name: /^B2C/ }).click();
+  const d = page.getByRole("dialog");
+  await d.getByRole("radio", { name: "B2C", exact: true }).click();
   await expect
     .poll(async () => (await db.enquiry.findUnique({ where: { id: old!.id } }))!.customerType)
     .toBe("B2C");
-  // Only that one field changed.
+  expect((await db.enquiry.findUnique({ where: { id: old!.id } }))!.isGST).toBeNull();
+  await d.getByRole("radio", { name: "GST", exact: true }).click();
+  await expect
+    .poll(async () => (await db.enquiry.findUnique({ where: { id: old!.id } }))!.isGST)
+    .toBe(true);
+  // Only those two fields changed.
   const after = await db.enquiry.findUnique({ where: { id: old!.id } });
-  expect({ ...after, customerType: null }).toEqual({ ...before, customerType: null });
+  expect({ ...after, customerType: null, isGST: null }).toEqual({ ...before, customerType: null, isGST: null });
 });
 
 // ---------------------------------------------------------------------------
@@ -326,47 +367,80 @@ const REPORTS: { tab: string; excel: RegExp; file: RegExp }[] = [
 ];
 
 for (const r of REPORTS) {
-  test(`reports: ${r.tab} B2B + B2C adds up to All, and files carry the filter`, async ({
+  test(`reports: ${r.tab} type and GST filters split All correctly, alone and combined`, async ({
     page,
     errors,
   }) => {
+    test.setTimeout(120_000);
     await navTo(page, "/reports");
     await main(page)
       .getByRole("button", { name: new RegExp(`^${r.tab}$`) })
       .click();
-    const bar = main(page).getByTestId("customer-type-filter");
+    const typeBar = main(page).getByTestId("type-filter");
+    const taxBar = main(page).getByTestId("tax-filter");
     const excel = main(page)
       .getByRole("button", { name: /Excel/i })
       .filter({ hasNotText: /All Logs/ })
       .first();
-    const pick = async (label: RegExp) => {
-      await bar.getByRole("button", { name: label }).click();
+    const pick = async (type: RegExp, tax: RegExp) => {
+      await typeBar.getByRole("button", { name: type }).click();
+      await taxBar.getByRole("button", { name: tax }).click();
       return downloadExcel(page, excel);
     };
-    const all = await pick(/^All/);
-    const b2b = await pick(/^B2B GST/);
-    const b2c = await pick(/^B2C Non-GST/);
-    expect(b2b.name).toContain("_B2B-GST");
-    expect(b2c.name).toContain("_B2C-NonGST");
-    expect(all.name).not.toMatch(/B2B|B2C/);
-    if (r.tab === "Enquiries") {
-      const notSet = await pick(/^Not set/);
-      expect(b2b.rows.length + b2c.rows.length + notSet.rows.length).toBe(all.rows.length);
-      expect(b2b.rows.every((x) => String(x["Customer Type"]).startsWith("B2B"))).toBe(true);
-      expect(b2b.rows.length).toBe(await db.enquiry.count({ where: { customerType: "B2B" } }));
-    } else if (r.tab === "Ledger") {
-      // A customer with both kinds of projects appears in both lists, so check money instead.
+    const isEnq = r.tab === "Enquiries";
+    const types = [/^B2B/, /^B2C/, /^Not set/];
+    const taxes = isEnq ? [/^GST/, /^Non-GST/, /^Not set/] : [/^GST/, /^Non-GST/];
+    const all = await pick(/^All/, /^All/);
+    expect(all.name).not.toMatch(/B2B|B2C|GST|NotSet/);
+
+    const b2bNon = await pick(/^B2B/, /^Non-GST/);
+    expect(b2bNon.name).toContain("_B2B_NonGST");
+    const b2cGst = await pick(/^B2C/, /^GST/);
+    expect(b2cGst.name).toContain("_B2C_GST");
+    const b2bOnly = await pick(/^B2B/, /^All/);
+    expect(b2bOnly.name).toContain("_B2B");
+    expect(b2bOnly.name).not.toContain("GST");
+    const gstOnly = await pick(/^All/, /^GST/);
+    expect(gstOnly.name).toContain("_GST");
+    expect(gstOnly.name).not.toMatch(/B2B|B2C/);
+
+    if (r.tab === "Ledger") {
+      // A customer with several kinds of projects appears in several lists, so check money instead.
       const sum = (rows: any[]) =>
         rows.reduce((s, x) => s + Number(x["Total Lifetime Value (INR)"]), 0);
-      expect(sum(b2b.rows) + sum(b2c.rows)).toBeCloseTo(sum(all.rows), 2);
+      let typeSum = 0;
+      for (const t of types) typeSum += sum((await pick(t, /^All/)).rows);
+      expect(typeSum).toBeCloseTo(sum(all.rows), 2);
+      let taxSum = 0;
+      for (const t of taxes) taxSum += sum((await pick(/^All/, t)).rows);
+      expect(taxSum).toBeCloseTo(sum(all.rows), 2);
     } else {
-      expect(b2b.rows.length + b2c.rows.length).toBe(all.rows.length);
-      const ids = b2b.rows.map((x) => x["Project ID"]);
-      const gst = await db.project.findMany({
-        where: { id: { in: ids } },
-        select: { isGST: true },
-      });
-      expect(gst.every((g) => g.isGST)).toBe(true);
+      // Each split adds up to All, and the 2-way grid adds up too.
+      let typeTotal = 0;
+      for (const t of types) typeTotal += (await pick(t, /^All/)).rows.length;
+      expect(typeTotal).toBe(all.rows.length);
+      let taxTotal = 0;
+      for (const t of taxes) taxTotal += (await pick(/^All/, t)).rows.length;
+      expect(taxTotal).toBe(all.rows.length);
+      let grid = 0;
+      for (const t of types) for (const g of taxes) grid += (await pick(t, g)).rows.length;
+      expect(grid).toBe(all.rows.length);
+
+      // Check one combination row-by-row against the database.
+      if (isEnq) {
+        expect(b2bNon.rows.every((x) => x["Customer Type"] === "B2B" && x.GST === "Non-GST")).toBe(true);
+        expect(b2bNon.rows.length).toBe(
+          await db.enquiry.count({ where: { customerType: "B2B", isGST: false } }),
+        );
+      } else {
+        const ids = b2cGst.rows.map((x) => x["Project ID"]);
+        const rows = await db.project.findMany({
+          where: { id: { in: ids } },
+          select: { isGST: true, customerType: true },
+        });
+        expect(rows.length).toBe(ids.length);
+        expect(rows.every((g) => g.isGST && g.customerType === "B2C")).toBe(true);
+      }
     }
     expect(errors.unexpected()).toEqual([]);
   });
@@ -438,7 +512,7 @@ test("reminders: follow-up date set on an enquiry shows in the bell and the page
 }) => {
   test.setTimeout(180_000);
   const name = `${RUN} FollowUp Co`;
-  await createEnquiry(page, name, 25_000, "B2C", localToday(-1));
+  await createEnquiry(page, name, 25_000, { type: "B2C", gst: "Non-GST" }, localToday(-1));
   await expect(page.getByRole("dialog")).toBeHidden({ timeout: 20_000 });
   const saved = await enquiryRow(name);
   expect(saved!.nextFollowUpDate!.toISOString().slice(0, 10)).toBe(localToday(-1));
@@ -511,7 +585,7 @@ test("reminders: follow-up date set on an enquiry shows in the bell and the page
 
 test("reminders: approved or cancelled enquiries drop off the follow-up list", async ({ page }) => {
   const name = `${RUN} Cancel FollowUp`;
-  await createEnquiry(page, name, 10_000, "B2B", localToday());
+  await createEnquiry(page, name, 10_000, { type: "B2B", gst: "GST" }, localToday());
   await expect(page.getByRole("dialog")).toBeHidden({ timeout: 20_000 });
   const e = await enquiryRow(name);
   await navTo(page, "/notifications?tab=followups");
