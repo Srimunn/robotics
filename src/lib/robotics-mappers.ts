@@ -259,6 +259,9 @@ export function mapEnquiryFromDb(e: DbEnquiry): Enquiry {
     projectId: e.projectId ?? undefined,
     createdByRole: (e as any).createdByRole ?? undefined,
     createdAt: isoDateTime(e.createdAt)!,
+    customerType: e.customerType === "B2B" || e.customerType === "B2C" ? e.customerType : undefined,
+    nextFollowUpDate: isoDate(e.nextFollowUpDate),
+    followUpNote: e.followUpNote ?? undefined,
   };
 }
 

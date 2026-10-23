@@ -34,6 +34,7 @@ import {
   List,
   ChevronsUpDown,
 } from "lucide-react";
+import { ExportButtons } from "@/components/export-buttons";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -170,6 +171,23 @@ function MachinesPageComponent() {
     });
   }, [machines, searchQuery, categoryFilter, brandFilter, statusFilter]);
 
+  const exportMachineRows = () =>
+    filteredMachines.map((m) => ({
+      "Tool ID": m.id,
+      "Tool Name": m.toolName,
+      Category: m.category,
+      Attachment: m.attachment || "",
+      Brand: m.brand,
+      "Total Stock": m.currentStock,
+      Available: m.availableQuantity,
+      Issued: m.issuedQuantity,
+      "Under Repair": m.repairQuantity,
+      Lost: m.lostQuantity,
+      Unit: m.unit,
+      Condition: m.condition,
+      Remarks: m.remarks || "",
+    }));
+
   const handleOpenAddModal = () => {
     setEditingMachine(null);
     setFormToolName("");
@@ -302,6 +320,17 @@ function MachinesPageComponent() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <ExportButtons
+            rows={exportMachineRows}
+            filename="Tools"
+            title="Tools"
+            subtitle={[
+              categoryFilter !== "all" ? `Category: ${categoryFilter}` : "",
+              brandFilter !== "all" ? `Brand: ${brandFilter}` : "",
+              statusFilter !== "all" ? `Status: ${statusFilter}` : "",
+              searchQuery ? `Search: "${searchQuery}"` : "",
+            ].filter(Boolean).join(" • ")}
+          />
           <Button
             variant="outline"
             onClick={() => setIsAuditLogOpen(true)}

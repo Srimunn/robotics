@@ -22,6 +22,7 @@ import {
   MapPin,
   ExternalLink,
 } from "lucide-react";
+import { ExportButtons } from "@/components/export-buttons";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -272,6 +273,20 @@ function AttendancePageComponent() {
     return aggregatedPayroll.find((a) => a.labour.id === selectedLabourId);
   }, [aggregatedPayroll, selectedLabourId]);
 
+  const exportAttendanceRows = () =>
+    filteredPayroll.map((a) => ({
+      "Labour ID": a.labour.id,
+      Name: a.labour.name,
+      Phone: a.labour.phone,
+      Type: a.labour.type,
+      Present: a.presentCount,
+      "Half Day": a.halfDayCount,
+      Absent: a.absentCount,
+      "Overtime (hrs)": a.overtimeHours,
+      "Weekly Wage (INR)": a.calculatedWeeklyWage,
+      "Monthly Wage (INR)": a.calculatedMonthlyWage,
+    }));
+
   return (
     <div className="space-y-6 w-full min-h-screen">
       {/* Header */}
@@ -287,6 +302,17 @@ function AttendancePageComponent() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <ExportButtons
+            rows={exportAttendanceRows}
+            filename="Attendance"
+            title="Attendance & Wages"
+            subtitle={[
+              selectedMonth && selectedMonth !== "all" ? `Month: ${selectedMonth}` : "All months",
+              projectFilter !== "all" ? `Project: ${projectFilter}` : "",
+              typeFilter !== "all" ? `Type: ${typeFilter}` : "",
+              searchQuery ? `Search: "${searchQuery}"` : "",
+            ].filter(Boolean).join(" • ")}
+          />
           {canFullEdit && (
             <Button
               onClick={() => {
@@ -356,7 +382,7 @@ function AttendancePageComponent() {
             className="text-xs font-semibold h-9 rounded-xl gap-1.5"
           >
             <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
-            Export Summary
+            All Logs (Excel)
           </Button>
         </div>
       </div>

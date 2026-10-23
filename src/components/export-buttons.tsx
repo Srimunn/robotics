@@ -1,64 +1,72 @@
 import { Button } from "@/components/ui/button";
-import { FileSpreadsheet, FileText, Printer } from "lucide-react";
+import { FileSpreadsheet, FileText } from "lucide-react";
 import { toast } from "sonner";
+import { useRobotics } from "@/lib/robotics-context";
+import { exportRowsToExcel, exportRowsToPdf, type ExportRow } from "@/lib/table-export";
 
-type Row = Record<string, string | number>;
+/**
+ * Excel + PDF download for a list page. Pass the whole filtered list (not just the visible page).
+ * `rows` may be a function so the export rows are only built when a button is clicked.
+ */
+export function ExportButtons({
+  rows,
+  filename,
+  title,
+  subtitle,
+}: {
+  rows: ExportRow[] | (() => ExportRow[]);
+  filename: string;
+  title?: string;
+  subtitle?: string;
+}) {
+  const { settings, currentUser } = useRobotics();
 
-function downloadFile(name: string, content: string, mime: string) {
-  const blob = new Blob([content], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+  // Labour logins never get bulk downloads.
+  if (currentUser?.role === "Labor") return null;
 
-export function ExportButtons({ rows, filename }: { rows: Row[]; filename: string }) {
-  const exportCsv = () => {
-    if (rows.length === 0) return toast.error("Nothing to export");
-    const headers = Object.keys(rows[0]);
-    const csv = [
-      headers.join(","),
-      ...rows.map((r) =>
-        headers.map((h) => `"${String(r[h] ?? "").replace(/"/g, '""')}"`).join(","),
-      ),
-    ].join("\n");
-    downloadFile(`${filename}.csv`, csv, "text/csv");
-    toast.success("Excel exported");
-  };
+  const getRows = () => (typeof rows === "function" ? rows() : rows);
 
-  const exportPdf = () => {
-    if (rows.length === 0) return toast.error("Nothing to export");
-    const headers = Object.keys(rows[0]);
-    const html = `<!doctype html><html><head><title>${filename}</title>
-      <style>@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');body{font-family:'Plus Jakarta Sans', system-ui, sans-serif;padding:24px}table{width:100%;border-collapse:collapse}
-      th,td{border:1px solid #ddd;padding:8px;font-size:12px;text-align:left}
-      th{background:#f5f5f5}</style></head><body>
-      <h2>${filename}</h2>
-      <table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
-      <tbody>${rows
-        .map((r) => `<tr>${headers.map((h) => `<td>${String(r[h] ?? "")}</td>`).join("")}</tr>`)
-        .join("")}</tbody></table>
-      <script>window.onload=()=>window.print()</script></body></html>`;
-    const w = window.open("", "_blank");
-    if (w) {
-      w.document.write(html);
-      w.document.close();
-      toast.success("PDF ready to save");
+  const exportExcel = () => {
+    const data = getRows();
+    if (data.length === 0) return toast.error("Nothing to export");
+    try {
+      exportRowsToExcel(filename, data, title || filename);
+      toast.success(`Excel downloaded (${data.length} rows)`);
+    } catch (err: any) {
+      toast.error("Export failed: " + (err?.message || err));
     }
   };
 
+  const exportPdf = () => {
+    const data = getRows();
+    if (data.length === 0) return toast.error("Nothing to export");
+    const ok = exportRowsToPdf(title || filename, data, {
+      subtitle,
+      companyName: settings?.companyName,
+    });
+    if (ok) toast.success('PDF ready: choose "Save as PDF" in the print window');
+    else toast.error("Please allow popups to download the PDF");
+  };
+
   return (
-    <div className="flex flex-wrap gap-2">
-      <Button variant="outline" size="sm" onClick={exportCsv}>
-        <FileSpreadsheet className="mr-1.5 h-4 w-4" /> Excel
+    <div className="flex flex-wrap gap-2 print:hidden">
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 text-xs rounded-lg"
+        onClick={exportExcel}
+        data-testid="export-excel"
+      >
+        <FileSpreadsheet className="mr-1.5 h-4 w-4 text-emerald-600" /> Excel
       </Button>
-      <Button variant="outline" size="sm" onClick={exportPdf}>
-        <FileText className="mr-1.5 h-4 w-4" /> PDF
-      </Button>
-      <Button variant="outline" size="sm" onClick={() => window.print()}>
-        <Printer className="mr-1.5 h-4 w-4" /> Print
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 text-xs rounded-lg"
+        onClick={exportPdf}
+        data-testid="export-pdf"
+      >
+        <FileText className="mr-1.5 h-4 w-4 text-rose-600" /> PDF
       </Button>
     </div>
   );

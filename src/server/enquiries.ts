@@ -56,6 +56,9 @@ const enquiryCreate = z.object({
   actualWorkStartedDate: z.preprocess(preprocessDate, z.coerce.date().optional().nullable()),
   customerStatus: z.string().optional().nullable(),
   createdByRole: z.string().optional().nullable(),
+  customerType: z.enum(["B2B", "B2C"]).optional().nullable(),
+  nextFollowUpDate: z.preprocess(preprocessDate, z.coerce.date().optional().nullable()),
+  followUpNote: z.string().optional().nullable(),
 });
 
 export const addEnquiry = createServerFn({ method: "POST" })
@@ -94,6 +97,9 @@ export const addEnquiry = createServerFn({ method: "POST" })
         customerDecision: "FollowUp",
         customerStatus: data.customerStatus ?? "Prospective",
         createdByRole: data.createdByRole ?? undefined,
+        customerType: data.customerType ?? undefined,
+        nextFollowUpDate: data.nextFollowUpDate ?? undefined,
+        followUpNote: data.followUpNote ?? undefined,
       } as any,
     });
     return formatEnquiry(created);
@@ -268,6 +274,8 @@ export const approveAndConvertEnquiryToProject = createServerFn({ method: "POST"
           paymentStatus: "Pending",
           internalNotes: `Auto-inherited from Approved Enquiry ${enq.id}.`,
           createdByRole: (enq as any).createdByRole ?? undefined,
+          // B2B customers are GST customers; B2C (or not set) stays Non-GST, as before.
+          isGST: enq.customerType === "B2B",
         } as any,
       });
 

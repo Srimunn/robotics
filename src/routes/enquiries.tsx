@@ -4,11 +4,14 @@ import { uploadImage } from "~/server/upload";
 import { cn } from "@/lib/utils";
 import { useRobotics } from "@/lib/robotics-context";
 import { canEdit, canConvertEnquiry } from "@/lib/permissions";
-import type { Enquiry, CustomerDecision, SiteVisitStatus } from "@/lib/robotics-types";
+import type { Enquiry, CustomerDecision, SiteVisitStatus, CustomerType } from "@/lib/robotics-types";
 import { SmartComboBox } from "@/components/ui/SmartComboBox";
 import { DataPagination } from "@/components/ui/DataPagination";
 import { DeleteConfirm } from "@/components/delete-confirm";
 import { CreatedByBadge } from "@/components/created-by-badge";
+import { ExportButtons } from "@/components/export-buttons";
+import { CustomerTypeToggle, CustomerTypeBadge } from "@/components/customer-type-toggle";
+import { localToday, isOpenForFollowUp } from "@/lib/reminders";
 import {
   PhoneCall,
   Plus,
@@ -87,13 +90,18 @@ function EnquiriesComponent() {
 
   const navigate = useNavigate();
   const { filter } = Route.useSearch();
-  const initialDecisionFilter = filter === "todayVisits" ? "Today's Visits" : "ALL";
+  const initialDecisionFilter =
+    filter === "todayVisits" ? "Today's Visits" : filter === "followUpsDue" ? "Follow-ups Due" : "ALL";
   const [searchQuery, setSearchQuery] = useState("");
   const [decisionFilter, setDecisionFilter] = useState<string>(initialDecisionFilter);
+  const [typeFilter, setTypeFilter] = useState<"ALL" | "B2B" | "B2C" | "NOT_SET">("ALL");
 
   useEffect(() => {
     if (filter === "todayVisits") {
       setDecisionFilter("Today's Visits");
+      setCurrentPage(1);
+    } else if (filter === "followUpsDue") {
+      setDecisionFilter("Follow-ups Due");
       setCurrentPage(1);
     }
   }, [filter]);
@@ -119,6 +127,9 @@ function EnquiriesComponent() {
     leakageType: "Robotic Arm Oil Leakage & Joint Seal",
     quotationAmount: 0 as number | string,
     remarks: "",
+    customerType: "" as CustomerType | "",
+    nextFollowUpDate: "",
+    followUpNote: "",
   });
 
   // Active Enquiry Cockpit Modal
@@ -201,17 +212,55 @@ function EnquiriesComponent() {
     const todayStr = new Date().toISOString().slice(0, 10);
     const visitDateStr = e.siteVisitDate ? String(e.siteVisitDate).slice(0, 10) : "";
 
+    const matchesType =
+      typeFilter === "ALL" ||
+      (typeFilter === "NOT_SET" ? !e.customerType : e.customerType === typeFilter);
+
     const matchesDecision =
       decisionFilter === "ALL"
         ? true
         : decisionFilter === "Today's Visits" || decisionFilter === "todayVisits"
         ? visitDateStr === todayStr
+        : decisionFilter === "Follow-ups Due"
+        ? Boolean(e.nextFollowUpDate && e.nextFollowUpDate <= localToday() && isOpenForFollowUp(e))
         : decisionFilter === "Follow-up" || decisionFilter === "Follow Up"
         ? e.customerDecision === "Follow Up" || e.customerDecision === "Follow-up" || (e.customerDecision as string) === "FollowUp"
         : e.customerDecision === decisionFilter;
 
-    return matchesSearch && matchesDecision;
+    return matchesSearch && matchesDecision && matchesType;
   });
+
+  const exportEnquiryRows = () =>
+    filteredEnquiries.map((e) => ({
+      "Enquiry ID": e.id,
+      "Enquiry Date": e.enquiryDate,
+      "Customer Name": e.customerName,
+      Type: e.customerType ? `${e.customerType} (${e.customerType === "B2B" ? "GST" : "Non-GST"})` : "Not set",
+      "Phone 1": e.phone,
+      "Phone 2": e.phone2 || "",
+      Location: e.location,
+      "Work Type": e.leakageType,
+      "Lead Source": e.leadSource,
+      "Referred By": e.referredBy || "",
+      Engineer: e.assignedEngineerName || "",
+      "Site Visit Date": e.siteVisitDate || "",
+      "Quotation Amount (INR)": e.quotationAmount ?? "",
+      "Start Date": e.workCommittedDate || "",
+      Started: e.actualWorkStartedDate || "",
+      Decision: e.customerDecision,
+      "Next Follow-up": e.nextFollowUpDate || "",
+      "Follow-up Note": e.followUpNote || "",
+      "Project ID": e.projectId || "",
+      Remarks: e.remarks || "",
+    }));
+
+  const exportSubtitle = [
+    decisionFilter !== "ALL" ? `Filter: ${decisionFilter}` : "",
+    typeFilter !== "ALL" ? `Type: ${typeFilter === "NOT_SET" ? "Not set" : typeFilter}` : "",
+    searchQuery ? `Search: "${searchQuery}"` : "",
+  ]
+    .filter(Boolean)
+    .join(" • ");
 
   // Paginated List
   const totalItems = filteredEnquiries.length;
@@ -248,6 +297,10 @@ function EnquiriesComponent() {
       toast.error("Location is required");
       return;
     }
+    if (!createData.customerType) {
+      toast.error("Please choose B2B (GST) or B2C (Non-GST)");
+      return;
+    }
 
     setIsSaving(true);
     setTimeout(async () => {
@@ -262,6 +315,9 @@ function EnquiriesComponent() {
         leakageType: createData.leakageType,
         quotationAmount: (createData.quotationAmount as any) === "" || createData.quotationAmount === null || createData.quotationAmount === undefined ? undefined : Number(createData.quotationAmount),
         remarks: createData.remarks,
+        customerType: createData.customerType || undefined,
+        nextFollowUpDate: createData.nextFollowUpDate || undefined,
+        followUpNote: createData.followUpNote.trim() || undefined,
       });
 
       setIsSaving(false);
@@ -279,6 +335,9 @@ function EnquiriesComponent() {
           leakageType: "Robotic Arm Oil Leakage & Joint Seal",
           quotationAmount: 0,
           remarks: "",
+          customerType: "",
+          nextFollowUpDate: "",
+          followUpNote: "",
         });
       } else {
         setCreateOpen(false);
@@ -356,7 +415,7 @@ function EnquiriesComponent() {
 
         <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
           <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Filter:</span>
-          {["ALL", "Today's Visits", "Follow-up", "Approved", "Cancelled"].map((dec) => (
+          {["ALL", "Today's Visits", "Follow-up", "Follow-ups Due", "Approved", "Cancelled"].map((dec) => (
             <Button
               key={dec}
               variant={decisionFilter === dec ? "default" : "outline"}
@@ -371,7 +430,7 @@ function EnquiriesComponent() {
                     ? "bg-emerald-600 hover:bg-emerald-700 text-white"
                     : dec === "Cancelled"
                     ? "bg-rose-600 hover:bg-rose-700 text-white"
-                    : dec === "Today's Visits"
+                    : dec === "Today's Visits" || dec === "Follow-ups Due"
                     ? "bg-amber-600 hover:bg-amber-700 text-white"
                     : "bg-blue-600 hover:bg-blue-700 text-white"
                   : ""
@@ -385,9 +444,29 @@ function EnquiriesComponent() {
 
       {/* Enquiries Master Table */}
       <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card overflow-hidden">
-        <CardHeader className="p-4 border-b flex flex-row items-center justify-between">
+        <CardHeader className="p-4 border-b flex flex-row flex-wrap items-center justify-between gap-2">
           <div>
             <CardTitle className="text-sm font-semibold">Enquiries ({filteredEnquiries.length})</CardTitle>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              value={typeFilter}
+              onValueChange={(v) => {
+                setTypeFilter(v as typeof typeFilter);
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="h-8 w-36 text-xs rounded-lg" aria-label="Customer type filter">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="ALL">All types</SelectItem>
+                <SelectItem value="B2B">B2B (GST)</SelectItem>
+                <SelectItem value="B2C">B2C (Non-GST)</SelectItem>
+                <SelectItem value="NOT_SET">Not set</SelectItem>
+              </SelectContent>
+            </Select>
+            <ExportButtons rows={exportEnquiryRows} filename="Enquiries" title="Enquiries" subtitle={exportSubtitle} />
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -397,6 +476,7 @@ function EnquiriesComponent() {
                 <tr>
                   <th className="p-3 pl-4 whitespace-nowrap">ID</th>
                   <th className="p-3 whitespace-nowrap min-w-[160px]">CUSTOMER</th>
+                  <th className="p-3 whitespace-nowrap">TYPE</th>
                   <th className="p-3 whitespace-nowrap min-w-[200px]">WORK TYPE</th>
                   <th className="p-3 whitespace-nowrap">REFERRED BY</th>
                   <th className="p-3 whitespace-nowrap">ENGINEER</th>
@@ -404,13 +484,14 @@ function EnquiriesComponent() {
                   <th className="p-3 whitespace-nowrap">START DATE</th>
                   <th className="p-3 whitespace-nowrap">STARTED</th>
                   <th className="p-3 whitespace-nowrap">STATUS</th>
+                  <th className="p-3 whitespace-nowrap">NEXT FOLLOW-UP</th>
                   <th className="p-3 text-right pr-4 whitespace-nowrap">ACTION</th>
                 </tr>
               </thead>
               <tbody className="divide-y [&_td]:border-b [&_td]:border-slate-100 dark:[&_td]:border-slate-800">
                 {paginatedEnquiries.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="p-12 text-center">
+                    <td colSpan={12} className="p-12 text-center">
                       <div className="flex flex-col items-center justify-center space-y-3">
                         <div className="grid h-12 w-12 place-items-center rounded-full bg-blue-50 text-blue-600">
                           <PhoneCall className="h-6 w-6 stroke-[1.5]" />
@@ -486,6 +567,9 @@ function EnquiriesComponent() {
                             {enq.phone} {enq.location ? `• ${enq.location}` : ""}
                           </div>
                         </td>
+                        <td className="p-3 whitespace-nowrap">
+                          <CustomerTypeBadge value={enq.customerType} />
+                        </td>
                         <td className="p-3">
                           <div className="font-semibold text-xs text-foreground truncate max-w-[210px]" title={enq.leakageType}>
                             {enq.leakageType}
@@ -546,6 +630,25 @@ function EnquiriesComponent() {
                               <SelectItem value="Cancelled">Cancelled</SelectItem>
                             </SelectContent>
                           </Select>
+                        </td>
+                        <td className="p-3 whitespace-nowrap font-mono text-xs">
+                          {enq.nextFollowUpDate && isOpenForFollowUp(enq) ? (
+                            <span
+                              title={enq.followUpNote || undefined}
+                              className={cn(
+                                "font-semibold",
+                                enq.nextFollowUpDate < localToday()
+                                  ? "text-rose-600"
+                                  : enq.nextFollowUpDate === localToday()
+                                  ? "text-amber-600"
+                                  : "text-slate-700",
+                              )}
+                            >
+                              {enq.nextFollowUpDate}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
                         <td className="p-3 text-right pr-4">
                           <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
@@ -686,6 +789,21 @@ function EnquiriesComponent() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label className="text-xs font-semibold">Customer Type</Label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <CustomerTypeToggle
+                        value={activeEnquiry.customerType}
+                        onChange={(val) => {
+                          updateEnquiry(activeEnquiry.id, { customerType: val });
+                          setActiveEnquiry({ ...activeEnquiry, customerType: val });
+                        }}
+                      />
+                      {!activeEnquiry.customerType && (
+                        <span className="text-[11px] text-amber-600 font-medium">Not set yet</span>
+                      )}
+                    </div>
+                  </div>
                   <div className="space-y-1">
                     <Label className="text-xs font-semibold">Client Name</Label>
                     <Input
@@ -1017,6 +1135,56 @@ function EnquiriesComponent() {
                     )}
                   </div>
 
+                  {isOpenForFollowUp(activeEnquiry) && (
+                    <div className="space-y-2 p-3 bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-xl" data-testid="followup-section">
+                      <Label className="text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5" /> Follow-up Reminder
+                      </Label>
+                      <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-[11px] font-semibold">Next follow-up date</Label>
+                          <Input
+                            type="date"
+                            value={activeEnquiry.nextFollowUpDate || ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              updateEnquiry(activeEnquiry.id, { nextFollowUpDate: (val || null) as any });
+                              setActiveEnquiry({ ...activeEnquiry, nextFollowUpDate: val || undefined });
+                            }}
+                            className="h-9 text-xs rounded-lg bg-background"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[11px] font-semibold">Follow-up note</Label>
+                          <Input
+                            placeholder="e.g. Call after budget approval"
+                            value={activeEnquiry.followUpNote || ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              updateEnquiry(activeEnquiry.id, { followUpNote: (val || null) as any });
+                              setActiveEnquiry({ ...activeEnquiry, followUpNote: val || undefined });
+                            }}
+                            className="h-9 text-xs rounded-lg bg-background"
+                          />
+                        </div>
+                      </div>
+                      {activeEnquiry.nextFollowUpDate && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            updateEnquiry(activeEnquiry.id, { nextFollowUpDate: null as any, followUpNote: null as any });
+                            setActiveEnquiry({ ...activeEnquiry, nextFollowUpDate: undefined, followUpNote: undefined });
+                          }}
+                          className="h-7 text-xs rounded-lg gap-1"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Mark follow-up done
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
                   <div className="space-y-1">
                     <Label className="text-xs font-semibold">Remarks & Special Notes</Label>
                     <Textarea
@@ -1147,6 +1315,16 @@ function EnquiriesComponent() {
                   />
                 </div>
 
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Customer Type *</Label>
+                  <div>
+                    <CustomerTypeToggle
+                      value={createData.customerType}
+                      onChange={(val) => setCreateData({ ...createData, customerType: val })}
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs font-semibold">Phone 1 *</Label>
@@ -1245,6 +1423,28 @@ function EnquiriesComponent() {
                   onChange={(e) => setCreateData({ ...createData, remarks: e.target.value })}
                   className="text-xs rounded-xl bg-background min-h-[80px] resize-y"
                 />
+              </div>
+
+              {/* FOLLOW-UP REMINDER (optional) */}
+              <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Next Follow-up Date</Label>
+                  <Input
+                    type="date"
+                    value={createData.nextFollowUpDate}
+                    onChange={(e) => setCreateData({ ...createData, nextFollowUpDate: e.target.value })}
+                    className="h-9 text-xs rounded-xl bg-background"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Follow-up Note</Label>
+                  <Input
+                    placeholder="e.g. Call after budget approval"
+                    value={createData.followUpNote}
+                    onChange={(e) => setCreateData({ ...createData, followUpNote: e.target.value })}
+                    className="h-9 text-xs rounded-xl bg-background"
+                  />
+                </div>
               </div>
 
               {/* SECTION 4: AMOUNT (₹) */}

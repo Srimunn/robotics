@@ -9,6 +9,7 @@ import { DataPagination } from "@/components/ui/DataPagination";
 import { DeleteConfirm } from "@/components/delete-confirm";
 import { ProjectWorkPhotos } from "@/components/ProjectWorkPhotos";
 import { CreatedByBadge } from "@/components/created-by-badge";
+import { ExportButtons } from "@/components/export-buttons";
 
 import {
   FolderKanban,
@@ -546,6 +547,26 @@ function ProjectsComponent() {
     return matchesSearch && matchesStatus;
   });
 
+  const exportProjectRows = () =>
+    filteredProjects.map((p) => ({
+      "Project ID": p.id,
+      "Customer Name": p.customerName,
+      Phone: p.phone,
+      Location: p.location,
+      "GST Status": p.isGST ? "B2B (GST)" : "B2C (Non-GST)",
+      "Work Type": p.natureOfWork,
+      Engineer: p.assignedEngineerName || "",
+      "Scheduled Date": p.scheduledDate || "",
+      "Start Date": p.workCommittedDate || "",
+      Started: p.actualWorkStartedDate || "",
+      "Contract Value (INR)": Number(p.projectValue) || 0,
+      "Discount (INR)": Number(p.discountAmount) || 0,
+      "Received (INR)": Number(p.receivedAmount) || 0,
+      "Balance (INR)": Number(p.balanceAmount) || 0,
+      "Payment Status": p.paymentStatus,
+      Status: p.status,
+    }));
+
   const totalProjectsItems = filteredProjects.length;
   const totalProjectsPages = Math.ceil(totalProjectsItems / pageSize);
   const paginatedProjects = filteredProjects.slice(
@@ -779,10 +800,16 @@ function ProjectsComponent() {
 
       {/* Projects Master Table */}
       <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
-        <CardHeader className="p-4 border-b flex flex-row items-center justify-between">
+        <CardHeader className="p-4 border-b flex flex-row flex-wrap items-center justify-between gap-2">
           <div>
             <CardTitle className="text-sm font-semibold">Projects ({filteredProjects.length})</CardTitle>
           </div>
+          <ExportButtons
+            rows={exportProjectRows}
+            filename="Projects"
+            title="Projects"
+            subtitle={[statusFilter !== "ALL" ? `Status: ${statusFilter}` : "", searchQuery ? `Search: "${searchQuery}"` : ""].filter(Boolean).join(" • ")}
+          />
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-auto max-h-[calc(100vh-280px)] min-h-[350px]">

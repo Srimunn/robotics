@@ -18,6 +18,7 @@ import { Route as ImportRouteImport } from './routes/import'
 import { Route as LaboursRouteImport } from './routes/labours'
 import { Route as MachinesRouteImport } from './routes/machines'
 import { Route as MaterialsRouteImport } from './routes/materials'
+import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as ReportsRouteImport } from './routes/reports'
@@ -69,6 +70,11 @@ const MaterialsRoute = MaterialsRouteImport.update({
   path: '/materials',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NotificationsRoute = NotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PaymentsRoute = PaymentsRouteImport.update({
   id: '/payments',
   path: '/payments',
@@ -105,6 +111,7 @@ export interface FileRoutesByFullPath {
   '/labours': typeof LaboursRoute
   '/machines': typeof MachinesRoute
   '/materials': typeof MaterialsRoute
+  '/notifications': typeof NotificationsRoute
   '/payments': typeof PaymentsRoute
   '/projects': typeof ProjectsRoute
   '/reports': typeof ReportsRoute
@@ -121,6 +128,7 @@ export interface FileRoutesByTo {
   '/labours': typeof LaboursRoute
   '/machines': typeof MachinesRoute
   '/materials': typeof MaterialsRoute
+  '/notifications': typeof NotificationsRoute
   '/payments': typeof PaymentsRoute
   '/projects': typeof ProjectsRoute
   '/reports': typeof ReportsRoute
@@ -138,6 +146,7 @@ export interface FileRoutesById {
   '/labours': typeof LaboursRoute
   '/machines': typeof MachinesRoute
   '/materials': typeof MaterialsRoute
+  '/notifications': typeof NotificationsRoute
   '/payments': typeof PaymentsRoute
   '/projects': typeof ProjectsRoute
   '/reports': typeof ReportsRoute
@@ -156,6 +165,7 @@ export interface FileRouteTypes {
     | '/labours'
     | '/machines'
     | '/materials'
+    | '/notifications'
     | '/payments'
     | '/projects'
     | '/reports'
@@ -172,6 +182,7 @@ export interface FileRouteTypes {
     | '/labours'
     | '/machines'
     | '/materials'
+    | '/notifications'
     | '/payments'
     | '/projects'
     | '/reports'
@@ -188,6 +199,7 @@ export interface FileRouteTypes {
     | '/labours'
     | '/machines'
     | '/materials'
+    | '/notifications'
     | '/payments'
     | '/projects'
     | '/reports'
@@ -205,6 +217,7 @@ export interface RootRouteChildren {
   LaboursRoute: typeof LaboursRoute
   MachinesRoute: typeof MachinesRoute
   MaterialsRoute: typeof MaterialsRoute
+  NotificationsRoute: typeof NotificationsRoute
   PaymentsRoute: typeof PaymentsRoute
   ProjectsRoute: typeof ProjectsRoute
   ReportsRoute: typeof ReportsRoute
@@ -277,6 +290,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MaterialsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/notifications': {
+      id: '/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof NotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/payments': {
       id: '/payments'
       path: '/payments'
@@ -325,6 +345,7 @@ const rootRouteChildren: RootRouteChildren = {
   LaboursRoute: LaboursRoute,
   MachinesRoute: MachinesRoute,
   MaterialsRoute: MaterialsRoute,
+  NotificationsRoute: NotificationsRoute,
   PaymentsRoute: PaymentsRoute,
   ProjectsRoute: ProjectsRoute,
   ReportsRoute: ReportsRoute,

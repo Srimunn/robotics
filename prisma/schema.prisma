@@ -250,10 +250,16 @@ model Enquiry {
   projectId                String?            @unique
   project                  Project?           @relation("EnquiryProject", fields: [projectId], references: [id], onDelete: SetNull)
   createdByRole            String?
+  /// "B2B" (GST customer) or "B2C" (non-GST customer). Null on enquiries created before this field existed.
+  customerType             String?
+  /// Next follow-up reminder date; cleared when the follow-up is marked done.
+  nextFollowUpDate         DateTime?
+  followUpNote             String?
   createdAt                DateTime           @default(now())
 
   @@index([customerName])
   @@index([assignedEngineerId])
+  @@index([nextFollowUpDate])
 }
 
 model Project {

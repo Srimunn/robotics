@@ -22,6 +22,7 @@ import {
   PackageCheck,
   PlusCircle,
 } from "lucide-react";
+import { ExportButtons } from "@/components/export-buttons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -137,6 +138,21 @@ function MaterialsPageComponent() {
       return matchesSearch && matchesCategory && matchesLowStock;
     });
   }, [materials, searchQuery, categoryFilter, lowStockOnly]);
+
+  const exportMaterialRows = () =>
+    filteredMaterials.map((m) => ({
+      "Material ID": m.id,
+      Name: m.name,
+      Category: m.category,
+      Unit: m.unit,
+      "Current Stock": m.currentStock,
+      "Minimum Stock": m.minimumStock,
+      "Low Stock": m.currentStock <= m.minimumStock ? "Yes" : "No",
+      Supplier: m.supplier,
+      "Cost per Unit (INR)": Number(m.purchaseCost) || 0,
+      "Stock Value (INR)": (Number(m.purchaseCost) || 0) * m.currentStock,
+      Remarks: m.remarks || "",
+    }));
 
   const handleOpenAddModal = () => {
     setEditingMaterial(null);
@@ -264,6 +280,16 @@ function MaterialsPageComponent() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <ExportButtons
+            rows={exportMaterialRows}
+            filename="Materials"
+            title="Materials"
+            subtitle={[
+              categoryFilter !== "all" ? `Category: ${categoryFilter}` : "",
+              lowStockOnly ? "Low stock only" : "",
+              searchQuery ? `Search: "${searchQuery}"` : "",
+            ].filter(Boolean).join(" • ")}
+          />
           <Button
             variant="outline"
             onClick={() => setIsAuditLogOpen(true)}

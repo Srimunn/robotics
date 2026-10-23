@@ -149,7 +149,15 @@ export interface Enquiry {
   projectId?: string;
   createdByRole?: string;
   createdAt: string;
+
+  // B2B = GST customer, B2C = non-GST customer. Undefined on older enquiries ("Not set").
+  customerType?: CustomerType;
+  // Follow-up reminder
+  nextFollowUpDate?: string; // YYYY-MM-DD
+  followUpNote?: string;
 }
+
+export type CustomerType = "B2B" | "B2C";
 
 export interface ProjectActivity {
   id: string;

@@ -23,6 +23,7 @@ import {
   ArrowUpRight,
   DollarSign,
 } from "lucide-react";
+import { ExportButtons } from "@/components/export-buttons";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -183,6 +184,66 @@ function PaymentsComponent() {
       return matchesSearch && matchesCustomer;
     });
   }, [payments, searchQuery, selectedCustomerFilter, projects]);
+
+  const exportPaymentRows = () => {
+    if (activeTab === "RECEIVABLES") {
+      return filteredReceivables.map((p) => {
+        const nextDue = getProjectNextDue(p);
+        return {
+          "Project ID": p.id,
+          "Customer Name": p.customerName,
+          Phone: p.phone,
+          "GST Status": p.isGST ? "B2B (GST)" : "B2C (Non-GST)",
+          "Project Status": p.status,
+          "Value (INR)": Number(p.projectValue) || 0,
+          "Received (INR)": Number(p.receivedAmount) || 0,
+          "Balance (INR)": Number(p.balanceAmount) || 0,
+          "Next Due Stage": nextDue.stageName,
+          "Due Date": nextDue.dueDate,
+          "Days Overdue": getDaysOverdue(nextDue.dueDate, p.balanceAmount),
+          "Payment Status": p.paymentStatus,
+          "Follow-up Tag": p.followUpTag || "",
+        };
+      });
+    }
+    if (activeTab === "HISTORY") {
+      return filteredPaymentHistory.map((pay) => {
+        const proj = projects.find((p) => p.id === pay.projectId);
+        return {
+          "Payment ID": pay.id,
+          Date: pay.paymentDate,
+          "Amount (INR)": Number(pay.amount) || 0,
+          Mode: pay.mode,
+          "Reference #": pay.referenceNumber,
+          "Project ID": pay.projectId,
+          "Customer Name": proj?.customerName || "",
+          Stage: pay.stageName || "",
+          "Received By": pay.receivedBy || "",
+          Remarks: pay.remarks || "",
+        };
+      });
+    }
+    return customers.map((c) => {
+        const cProjs = projects.filter((p) => p.customerName.toLowerCase().trim() === c.name.toLowerCase().trim());
+        const totalVal = cProjs.reduce((s, p) => s + p.projectValue, 0);
+        const totalRec = cProjs.reduce((s, p) => s + p.receivedAmount, 0);
+        const lastPay = payments
+          .filter((pay) => cProjs.some((p) => p.id === pay.projectId))
+          .sort((a, b) => (b.paymentDate > a.paymentDate ? 1 : -1))[0];
+        return {
+          "Customer Name": c.name,
+          Phone: c.phone,
+          Location: c.location,
+          Projects: cProjs.length,
+          "Contract Value (INR)": totalVal,
+          "Collected (INR)": totalRec,
+          "Outstanding (INR)": Math.max(0, totalVal - totalRec),
+          "Last Payment Date": lastPay ? lastPay.paymentDate : "",
+        };
+      });
+  };
+
+  const exportTabLabel = activeTab === "RECEIVABLES" ? "Receivables" : activeTab === "HISTORY" ? "Payment History" : "Customer Ledger";
 
   const totalReceivables = filteredReceivables.length;
   const totalReceivablesPages = Math.ceil(totalReceivables / pageSizeReceivables);
@@ -364,6 +425,17 @@ function PaymentsComponent() {
             </div>
 
             <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full lg:w-auto justify-start sm:justify-end">
+              <ExportButtons
+                rows={exportPaymentRows}
+                filename={`Payments_${exportTabLabel}`}
+                title={`Payments - ${exportTabLabel}`}
+                subtitle={[
+                  activeTab === "RECEIVABLES" && creditFilter !== "ALL" ? `Filter: ${creditFilter.replace(/_/g, " ").toLowerCase()}` : "",
+                  selectedCustomerFilter !== "ALL" && activeTab !== "CUSTOMER" ? `Customer: ${selectedCustomerFilter}` : "",
+                  followUpTagFilter !== "ALL" && activeTab === "RECEIVABLES" ? `Tag: ${followUpTagFilter}` : "",
+                  searchQuery && activeTab !== "CUSTOMER" ? `Search: "${searchQuery}"` : "",
+                ].filter(Boolean).join(" • ")}
+              />
               <div className="relative w-full sm:w-64 min-w-[200px]">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
