@@ -305,6 +305,7 @@ model Project {
   paymentStages            PaymentStageItem[]
   payments                 Payment[]
   documents                ProjectDocument[]
+  workPhotos               ProjectPhoto[]
 
   @@index([customerName])
   @@index([assignedEngineerId])
@@ -400,6 +401,21 @@ model PaymentStageItem {
   paymentMethod  String?
   referenceNumber String?
   remarks        String?
+
+  @@index([projectId])
+}
+
+/// Extra before/after work photos. The original single photos stay in
+/// Project.beforeWorkPhotoUrl / afterWorkPhotoUrl and are shown first.
+model ProjectPhoto {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stage      String
+  url        String
+  caption    String?
+  uploadedBy String?
+  createdAt  DateTime @default(now())
 
   @@index([projectId])
 }

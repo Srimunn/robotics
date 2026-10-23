@@ -32,6 +32,8 @@ import PDFDocument from "pdfkit/js/pdfkit.standalone.js";
 import { db } from "~/lib/db";
 import { toNumber } from "./utils";
 import { calculateEarnedWage } from "./calculations";
+import { fetchExtraPhotos } from "./project-photos";
+import { combineWorkPhotos, type WorkPhoto } from "~/lib/work-photos";
 
 /** Helper to validate if an ArrayBuffer has JPEG or PNG magic byte headers for PDFKit image parser */
 function isValidPdfImageBuffer(buf: ArrayBuffer | Buffer | null): boolean {
@@ -176,6 +178,94 @@ function renderPdf(builder: (doc: any) => Promise<void>): Promise<Buffer> {
   });
 }
 
+/** Fetch all photo images in parallel; a failed fetch gives null so one bad photo never fails the PDF. */
+async function fetchPhotoBuffers(photos: WorkPhoto[]): Promise<(ArrayBuffer | null)[]> {
+  return Promise.all(photos.map((ph) => fetchImageBuffer(ph.url).catch(() => null)));
+}
+
+/** Draw one image into a box, or a "Photo unavailable" placeholder when it cannot be embedded. */
+function drawPhotoOrPlaceholder(doc: any, buf: ArrayBuffer | null, x: number, y: number, w: number, h: number, smallLabel = false) {
+  if (buf && isValidPdfImageBuffer(buf)) {
+    try {
+      doc.image(buf, x, y, { fit: [w, h], align: "center", valign: "center" });
+      return;
+    } catch (err) {
+      console.error("[PDFKit] Error embedding work photo:", err);
+    }
+  }
+  doc.rect(x, y, w, h).fillAndStroke("#fef2f2", "#fca5a5");
+  doc
+    .fontSize(smallLabel ? 6 : 8.5)
+    .font("Helvetica-Bold")
+    .fillColor("#dc2626")
+    .text(smallLabel ? "Photo N/A" : "Photo unavailable", x, y + h / 2 - 4, { width: w, align: "center", lineBreak: false });
+}
+
+/**
+ * Single project report: a captioned grid of photos for one stage (3 per row),
+ * continuing onto new pages as needed. Returns nothing; leaves doc.y below the grid.
+ */
+async function drawWorkPhotoGrid(doc: any, title: string, photos: WorkPhoto[]) {
+  if (photos.length === 0) return;
+  const cols = 3;
+  const cellW = 165;
+  const imgH = 115;
+  const gapX = 15;
+  const rowH = imgH + 26;
+  const left = 40;
+  const pageBottom = 790;
+
+  if (doc.y + 14 + rowH > pageBottom) doc.addPage();
+  doc.fontSize(9).font("Helvetica-Bold").fillColor("#475569").text(`${title} (${photos.length})`, left, doc.y);
+  doc.moveDown(0.3);
+
+  const buffers = await fetchPhotoBuffers(photos);
+  let rowY = doc.y;
+  for (let i = 0; i < photos.length; i++) {
+    const col = i % cols;
+    if (col === 0 && i > 0) rowY += rowH;
+    if (col === 0 && rowY + rowH > pageBottom) {
+      doc.addPage();
+      rowY = doc.y;
+    }
+    const x = left + col * (cellW + gapX);
+    drawPhotoOrPlaceholder(doc, buffers[i], x, rowY, cellW, imgH);
+    const caption = photos[i].caption || `Photo ${i + 1}`;
+    doc
+      .fontSize(7.5)
+      .font("Helvetica")
+      .fillColor("#334155")
+      .text(caption, x, rowY + imgH + 4, { width: cellW, height: 18, align: "center", ellipsis: true });
+  }
+  doc.y = rowY + rowH;
+  doc.moveDown(0.3);
+}
+
+/** Projects master report: one row of small thumbnails per stage. Returns the y below the rows. */
+async function drawWorkPhotoThumbRows(doc: any, before: WorkPhoto[], after: WorkPhoto[], startY: number): Promise<number> {
+  const size = 42;
+  const gap = 5;
+  const labelW = 70;
+  const left = 40;
+  let y = startY;
+  if (before.length === 0 && after.length === 0) {
+    doc.fontSize(8).font("Helvetica").fillColor("#64748b").text("Work Photos: none uploaded.", left, y);
+    return y + 14;
+  }
+  for (const [label, photos] of [["Before", before], ["After", after]] as const) {
+    if (photos.length === 0) continue;
+    if (y + size > 790) {
+      doc.addPage();
+      y = doc.y;
+    }
+    doc.fontSize(7.5).font("Helvetica-Bold").fillColor("#64748b").text(`${label} (${photos.length})`, left, y + size / 2 - 4, { width: labelW, lineBreak: false });
+    const buffers = await fetchPhotoBuffers(photos);
+    photos.forEach((_, i) => drawPhotoOrPlaceholder(doc, buffers[i], left + labelW + i * (size + gap), y, size, size, true));
+    y += size + 6;
+  }
+  return y;
+}
+
 /** Server function to generate Projects Report PDF with embedded before/after photos */
 export const generateProjectsReport = createServerFn({ method: "POST" })
   .validator((input: { status?: string; startDate?: string; endDate?: string; gstFilter?: string }) => input)
@@ -213,6 +303,7 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
       return true;
     });
 
+    const { byProject: extraPhotos } = await fetchExtraPhotos(filteredProjects.map((p) => p.id));
     const nowStr = formatPdfDate(new Date());
 
     const pdfBuffer = await renderPdf(async (doc) => {
@@ -281,49 +372,9 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
           doc.text(`Balance Amount: INR ${bal.toLocaleString("en-IN")}`, 230, infoY + 33);
         }
 
-        // Before & After Photos
-        const beforeBuffer = await fetchImageBuffer(p.beforeWorkPhotoUrl);
-        const afterBuffer = await fetchImageBuffer(p.afterWorkPhotoUrl);
-
-        const beforeX = 430;
-        const afterX = 495;
-        const photoY = infoY;
-
-        doc.fontSize(7.5).fillColor("#64748b").text("Before", beforeX, photoY - 9);
-        if (beforeBuffer && isValidPdfImageBuffer(beforeBuffer)) {
-          try {
-            doc.image(beforeBuffer, beforeX, photoY, { fit: [50, 50], align: "center", valign: "center" });
-            console.log(`[reports.ts] Embedded before photo in projects report for ${p.id}`);
-          } catch (err) {
-            console.error("[PDFKit] Error embedding before photo in projects report:", err);
-            doc.rect(beforeX, photoY, 50, 50).fillAndStroke("#fef2f2", "#fca5a5");
-            doc.fontSize(6).fillColor("#dc2626").text("Photo N/A", beforeX + 2, photoY + 20);
-          }
-        } else if (p.beforeWorkPhotoUrl) {
-          doc.rect(beforeX, photoY, 50, 50).fillAndStroke("#fef2f2", "#fca5a5");
-          doc.fontSize(6).fillColor("#dc2626").text("Photo N/A", beforeX + 2, photoY + 20);
-        } else {
-          doc.rect(beforeX, photoY, 50, 50).fillAndStroke("#f1f5f9", "#cbd5e1");
-        }
-
-        doc.fontSize(7.5).fillColor("#64748b").text("After", afterX, photoY - 9);
-        if (afterBuffer && isValidPdfImageBuffer(afterBuffer)) {
-          try {
-            doc.image(afterBuffer, afterX, photoY, { fit: [50, 50], align: "center", valign: "center" });
-            console.log(`[reports.ts] Embedded after photo in projects report for ${p.id}`);
-          } catch (err) {
-            console.error("[PDFKit] Error embedding after photo in projects report:", err);
-            doc.rect(afterX, photoY, 50, 50).fillAndStroke("#fef2f2", "#fca5a5");
-            doc.fontSize(6).fillColor("#dc2626").text("Photo N/A", afterX + 2, photoY + 20);
-          }
-        } else if (p.afterWorkPhotoUrl) {
-          doc.rect(afterX, photoY, 50, 50).fillAndStroke("#fef2f2", "#fca5a5");
-          doc.fontSize(6).fillColor("#dc2626").text("Photo N/A", afterX + 2, photoY + 20);
-        } else {
-          doc.rect(beforeX, photoY, 50, 50).fillAndStroke("#f1f5f9", "#cbd5e1");
-        }
-
-        doc.y = Math.max(infoY + 38, photoY + 55);
+        // Before & After Work Photos (original single photo first, then added photos)
+        const { before: beforePhotos, after: afterPhotos } = combineWorkPhotos(p, extraPhotos.get(p.id));
+        doc.y = await drawWorkPhotoThumbRows(doc, beforePhotos, afterPhotos, infoY + (discount > 0 ? 54 : 46));
 
         // 3. Assigned Labours & Work Logs Summary
         doc.fillColor("#0f172a").fontSize(8.5).font("Helvetica-Bold").text("ASSIGNED LABOUR ROSTER & WORK LOGS SUMMARY:", 35, doc.y);
@@ -748,52 +799,15 @@ export const generateSingleProjectReport = createServerFn({ method: "POST" })
         doc.moveDown(0.5);
       }
 
-      // Section 7: Before / After Work Photos
-      if (project.beforeWorkPhotoUrl || project.afterWorkPhotoUrl) {
+      // Section 7: Before / After Work Photos (original single photo first, then added photos)
+      const { byProject: extraPhotos } = await fetchExtraPhotos([project.id]);
+      const { before: beforePhotos, after: afterPhotos } = combineWorkPhotos(project, extraPhotos.get(project.id));
+      if (beforePhotos.length > 0 || afterPhotos.length > 0) {
         if (doc.y > 640) doc.addPage();
         doc.fontSize(11).font("Helvetica-Bold").fillColor("#1e293b").text("7. Work Verification Photos", 30, doc.y);
         doc.moveDown(0.5);
-
-        const photoBoxY = doc.y;
-        console.log(`[reports.ts Section 7] Fetching verification photos: before=${project.beforeWorkPhotoUrl}, after=${project.afterWorkPhotoUrl}`);
-        const beforeBuffer = await fetchImageBuffer(project.beforeWorkPhotoUrl);
-        const afterBuffer = await fetchImageBuffer(project.afterWorkPhotoUrl);
-
-        if (project.beforeWorkPhotoUrl) {
-          doc.fontSize(8).font("Helvetica-Bold").fillColor("#475569").text("Before Work Photo:", 40, photoBoxY);
-          if (beforeBuffer && isValidPdfImageBuffer(beforeBuffer)) {
-            try {
-              doc.image(beforeBuffer, 40, photoBoxY + 14, { fit: [200, 120] });
-              console.log("[reports.ts Section 7] Successfully embedded before work photo into single project report");
-            } catch (err) {
-              console.error("[PDFKit] Failed to embed before work photo:", err);
-              doc.rect(40, photoBoxY + 14, 200, 100).fillAndStroke("#f8fafc", "#e2e8f0");
-              doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#dc2626").text("Photo unavailable", 50, photoBoxY + 55);
-            }
-          } else {
-            doc.rect(40, photoBoxY + 14, 200, 100).fillAndStroke("#f8fafc", "#e2e8f0");
-            doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#dc2626").text("Photo unavailable", 50, photoBoxY + 55);
-          }
-        }
-
-        if (project.afterWorkPhotoUrl) {
-          doc.fontSize(8).font("Helvetica-Bold").fillColor("#475569").text("After Work Photo:", 280, photoBoxY);
-          if (afterBuffer && isValidPdfImageBuffer(afterBuffer)) {
-            try {
-              doc.image(afterBuffer, 280, photoBoxY + 14, { fit: [200, 120] });
-              console.log("[reports.ts Section 7] Successfully embedded after work photo into single project report");
-            } catch (err) {
-              console.error("[PDFKit] Failed to embed after work photo:", err);
-              doc.rect(280, photoBoxY + 14, 200, 100).fillAndStroke("#f8fafc", "#e2e8f0");
-              doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#dc2626").text("Photo unavailable", 290, photoBoxY + 55);
-            }
-          } else {
-            doc.rect(280, photoBoxY + 14, 200, 100).fillAndStroke("#f8fafc", "#e2e8f0");
-            doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#dc2626").text("Photo unavailable", 290, photoBoxY + 55);
-          }
-        }
-
-        doc.y = photoBoxY + 140;
+        await drawWorkPhotoGrid(doc, "Before Work Photos", beforePhotos);
+        await drawWorkPhotoGrid(doc, "After Work Photos", afterPhotos);
         doc.moveDown(0.5);
       }
 
