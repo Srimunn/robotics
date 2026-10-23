@@ -33,6 +33,7 @@ import {
   KeyRound,
   Edit,
 } from "lucide-react";
+import { ExportButtons } from "@/components/export-buttons";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -468,6 +469,20 @@ function LaboursComponent() {
     return matchesSearch && matchesType && matchesActive;
   });
 
+  const exportLabourRows = () =>
+    filteredLabours.map((l) => ({
+      "Labour ID": l.id,
+      Name: l.name,
+      Phone: l.phone,
+      Type: l.type,
+      "Daily Wage (INR)": l.dailyWage ?? Math.round((l.defaultWeeklyWage || 0) / 6),
+      "Weekly Wage (INR)": l.defaultWeeklyWage,
+      Status: l.status,
+      Active: l.isActive === false ? "No" : "Yes",
+      Skills: (l.skills || []).join(", "),
+      Address: l.address || "",
+    }));
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -475,6 +490,17 @@ function LaboursComponent() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Labours</h1>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+        <ExportButtons
+          rows={exportLabourRows}
+          filename="Labours"
+          title="Labours"
+          subtitle={[
+            labourTypeFilter !== "ALL" ? `Type: ${labourTypeFilter.toLowerCase()}` : "",
+            showInactive ? "Including inactive" : "",
+            searchQuery ? `Search: "${searchQuery}"` : "",
+          ].filter(Boolean).join(" • ")}
+        />
         {canFullEdit && (
           <div className="flex items-center gap-2">
             <Button
@@ -496,6 +522,7 @@ function LaboursComponent() {
             </Button>
           </div>
         )}
+        </div>
       </div>
 
       {/* Navigation Tabs */}

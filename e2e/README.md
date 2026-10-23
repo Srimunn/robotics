@@ -10,6 +10,7 @@
 | --- | --- |
 | `crawl.spec.ts` | Logs in as CEO and visits every route in `src/routes`, including `/tools/<machineId>`. Clicks every tab and filter toggle. Fails on page errors, `console.error`, 5xx responses or the "Application Error" screen. Also has a login smoke test for each role, the view-only (CS) checks and the Labour-portal checks. |
 | `logic.spec.ts` | Business rules checked through the UI: enquiry to project conversion, payments and balances, discounts, machine issue and return, material issue, payroll, and deleting a project that has payments. |
+| `features.spec.ts` | Customers table, Excel/PDF downloads on every list page, B2B/B2C on enquiries, the B2B/B2C report filter, and payment / follow-up reminders. Expected values are read straight from the database with Prisma, so the test process needs the same local `DATABASE_URL` as the dev server. |
 | `helpers.ts` | Login helpers, the error collector and label-based field lookup (the app's `<Label>`s have no `htmlFor`). |
 | `target-guard.ts`, `global-setup.ts` | The production guard (see below) and the per-run id and state file. |
 

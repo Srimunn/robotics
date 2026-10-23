@@ -228,6 +228,29 @@ function ReportsComponent() {
   // View Customer Ledger Statement Modal state
   const [selectedCustomerLedger, setSelectedCustomerLedger] = useState<any | null>(null);
 
+  // Two independent filters shared by the Revenue, Projects, Pending, Enquiries and Ledger reports:
+  // customer type (B2B / B2C) and tax (GST / Non-GST). Any combination is possible.
+  // "NOT_SET" matches records saved before these fields existed.
+  const [customerTypeFilter, setCustomerTypeFilter] = useState<"ALL" | "B2B" | "B2C" | "NOT_SET">("ALL");
+  const [taxFilter, setTaxFilter] = useState<"ALL" | "GST" | "NON_GST" | "NOT_SET">("ALL");
+  // Projects always have a GST setting, so "not set" only applies to enquiries.
+  const projectGstFilter = taxFilter === "NOT_SET" ? "ALL" : taxFilter;
+  const matchesType = (t: string | undefined) =>
+    customerTypeFilter === "ALL" || (customerTypeFilter === "NOT_SET" ? !t : t === customerTypeFilter);
+  const matchesProjectType = (p: { isGST?: boolean; customerType?: string }) =>
+    matchesType(p.customerType) &&
+    (projectGstFilter === "ALL" || (projectGstFilter === "GST" ? Boolean(p.isGST) : !p.isGST));
+  const typeFilterLabel = customerTypeFilter === "NOT_SET" ? "Type-NotSet" : customerTypeFilter;
+  const taxFilterLabel = taxFilter === "NON_GST" ? "NonGST" : taxFilter === "NOT_SET" ? "GST-NotSet" : taxFilter;
+  const effectiveTaxLabel = activeReport === "ENQUIRIES" ? taxFilterLabel : projectGstFilter === "NON_GST" ? "NonGST" : projectGstFilter;
+  const typeFileLabel =
+    (customerTypeFilter !== "ALL" ? `_${typeFilterLabel}` : "") + (effectiveTaxLabel !== "ALL" ? `_${effectiveTaxLabel}` : "");
+  const typeTitleParts = [
+    customerTypeFilter !== "ALL" ? (customerTypeFilter === "NOT_SET" ? "Type not set" : customerTypeFilter) : "",
+    effectiveTaxLabel !== "ALL" ? (effectiveTaxLabel === "NonGST" ? "Non-GST" : effectiveTaxLabel === "GST-NotSet" ? "GST not set" : "GST") : "",
+  ].filter(Boolean);
+  const typeTitleLabel = typeTitleParts.length ? ` [${typeTitleParts.join(", ")}]` : "";
+
   // Customer Account Ledger Custom Filtering States
   const [custLedgerStatusFilter, setCustLedgerStatusFilter] = useState<string>("ALL");
   const [custStartDateFilter, setCustStartDateFilter] = useState<string>("");
@@ -238,7 +261,7 @@ function ReportsComponent() {
   const filteredCustomerLedgers = customers
     .map((c) => {
       const cProjs = projects.filter(
-        (p) => p.customerName.toLowerCase().trim() === c.name.toLowerCase().trim()
+        (p) => p.customerName.toLowerCase().trim() === c.name.toLowerCase().trim() && matchesProjectType(p)
       );
       const totalVal = cProjs.reduce((s, p) => s + (p.projectValue || 0), 0);
       const totalDiscount = cProjs.reduce((s, p) => s + (p.discountAmount ? Number(p.discountAmount) : 0), 0);
@@ -262,6 +285,9 @@ function ReportsComponent() {
       };
     })
     .filter((item) => {
+      // 0. B2B/B2C + GST filters: only customers that have projects matching them
+      if ((projectGstFilter !== "ALL" || customerTypeFilter !== "ALL") && item.projectCount === 0) return false;
+
       // 1. Status Filter
       if (custLedgerStatusFilter === "DUE" && item.balanceDue === 0) return false;
       if (custLedgerStatusFilter === "SETTLED" && item.balanceDue > 0) return false;
@@ -295,6 +321,8 @@ function ReportsComponent() {
 
   // Revenue Filtered Array
   const filteredRevenueReport = projects.filter((p) => {
+    if (!matchesProjectType(p)) return false;
+
     // 1. Payment Status Filter
     if (revenuePaymentStatusFilter !== "ALL") {
       if (revenuePaymentStatusFilter === "Unpaid") {
@@ -351,6 +379,7 @@ function ReportsComponent() {
   // Pending Collections Filtered Array
   const filteredPendingReport = projects
     .filter((p) => (p.balanceAmount || 0) > 0)
+    .filter((p) => matchesProjectType(p))
     .filter((p) => {
       // 1. Payment Status Filter
       if (pendingPaymentStatusFilter !== "ALL") {
@@ -462,7 +491,6 @@ function ReportsComponent() {
 
   // Projects Report Custom Filtering States
   const [projectStatusFilter, setProjectStatusFilter] = useState<string>("ALL");
-  const [projectGstFilter, setProjectGstFilter] = useState<"ALL" | "GST" | "NON_GST">("ALL");
   const [startDateFilter, setStartDateFilter] = useState<string>("");
   const [endDateFilter, setEndDateFilter] = useState<string>("");
   const [projectSearchQuery, setProjectSearchQuery] = useState<string>("");
@@ -474,9 +502,8 @@ function ReportsComponent() {
       return false;
     }
 
-    // 1b. GST Filter
-    if (projectGstFilter === "GST" && !p.isGST) return false;
-    if (projectGstFilter === "NON_GST" && p.isGST) return false;
+    // 1b. B2B (GST) / B2C (Non-GST) Filter
+    if (!matchesProjectType(p)) return false;
 
     // 2. Date Range Filter
     const pDate = p.scheduledDate || p.createdAt?.slice(0, 10) || "";
@@ -508,8 +535,7 @@ function ReportsComponent() {
   const waitingCount = projects.filter((p) => p.status === "Waiting").length;
   const completedCount = projects.filter((p) => p.status === "Completed").length;
   const closedCount = projects.filter((p) => p.status === "Closed").length;
-  const gstCount = projects.filter((p) => p.isGST).length;
-  const nonGstCount = projects.filter((p) => !p.isGST).length;
+
 
   // Enquiries Report Custom Filtering States
   const [enquiryDecisionFilter, setEnquiryDecisionFilter] = useState<string>("ALL");
@@ -519,6 +545,12 @@ function ReportsComponent() {
 
   // Enquiries Filtered Array
   const filteredEnquiriesReport = enquiries.filter((e) => {
+    // 0. B2B / B2C Filter
+    if (!matchesType(e.customerType)) return false;
+    if (taxFilter === "GST" && e.isGST !== true) return false;
+    if (taxFilter === "NON_GST" && e.isGST !== false) return false;
+    if (taxFilter === "NOT_SET" && e.isGST !== undefined) return false;
+
     // 1. Decision / Status Filter
     if (enquiryDecisionFilter !== "ALL") {
       const d = (e.customerDecision || "").toLowerCase().replace(/[^a-z]/g, "");
@@ -627,6 +659,7 @@ function ReportsComponent() {
           startDate: startDateFilter || undefined,
           endDate: endDateFilter || undefined,
           gstFilter: projectGstFilter !== "ALL" ? projectGstFilter : undefined,
+          customerTypeFilter: customerTypeFilter !== "ALL" ? customerTypeFilter : undefined,
         },
       });
       if (res?.base64) {
@@ -839,6 +872,51 @@ function ReportsComponent() {
         ))}
       </div>
 
+      {/* B2B/B2C and GST/Non-GST filters (customer & money reports only) */}
+      {["REVENUE", "PROJECTS", "PENDING", "ENQUIRIES", "CUSTOMER"].includes(activeReport) && (() => {
+        const isEnq = activeReport === "ENQUIRIES";
+        const list: { customerType?: string; isGST?: boolean }[] = isEnq ? enquiries : projects;
+        const chip = (selected: boolean) =>
+          `text-[11px] font-bold px-2.5 py-1 rounded-full border transition-all duration-150 cursor-pointer ${
+            selected
+              ? "bg-purple-600 text-white border-purple-600 shadow-xs"
+              : "bg-background text-foreground border-border hover:bg-accent"
+          }`;
+        const typeChips = [
+          { id: "ALL", label: `All (${list.length})` },
+          { id: "B2B", label: `B2B (${list.filter((x) => x.customerType === "B2B").length})` },
+          { id: "B2C", label: `B2C (${list.filter((x) => x.customerType === "B2C").length})` },
+          { id: "NOT_SET", label: `Not set (${list.filter((x) => !x.customerType).length})` },
+        ] as const;
+        const taxChips = [
+          { id: "ALL", label: `All (${list.length})` },
+          { id: "GST", label: `GST (${list.filter((x) => x.isGST === true).length})` },
+          { id: "NON_GST", label: `Non-GST (${list.filter((x) => (isEnq ? x.isGST === false : !x.isGST)).length})` },
+          ...(isEnq ? [{ id: "NOT_SET", label: `Not set (${list.filter((x) => x.isGST === undefined).length})` }] : []),
+        ] as { id: typeof taxFilter; label: string }[];
+        const selectedTax = isEnq ? taxFilter : projectGstFilter;
+        return (
+          <div className="flex flex-col gap-2 bg-white dark:bg-card px-4 py-3 rounded-xl border border-border shadow-xs" data-testid="customer-type-filter">
+            <div className="flex flex-wrap items-center gap-1.5" data-testid="type-filter">
+              <span className="text-[11px] font-bold text-muted-foreground mr-1 w-24">Customer Type:</span>
+              {typeChips.map((c) => (
+                <button key={c.id} type="button" onClick={() => setCustomerTypeFilter(c.id)} className={chip(customerTypeFilter === c.id)}>
+                  {c.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5" data-testid="tax-filter">
+              <span className="text-[11px] font-bold text-muted-foreground mr-1 w-24">Tax:</span>
+              {taxChips.map((c) => (
+                <button key={c.id} type="button" onClick={() => setTaxFilter(c.id)} className={chip(selectedTax === c.id)}>
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* 1. REVENUE REPORT WITH DATE-TO-DATE CUSTOMIZATION & DOWNLOAD */}
       {activeReport === "REVENUE" && (
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
@@ -861,7 +939,7 @@ function ReportsComponent() {
                     const statusLabel = revenuePaymentStatusFilter === "ALL" ? "All_Payments" : revenuePaymentStatusFilter;
                     const dateLabel = revenueStartDateFilter || revenueEndDateFilter ? `_${revenueStartDateFilter}_to_${revenueEndDateFilter}` : "";
                     handleExportCSV(
-                      `Custom_Revenue_Report_${statusLabel}${dateLabel}`,
+                      `Custom_Revenue_Report_${statusLabel}${typeFileLabel}${dateLabel}`,
                       ["Project ID", "Customer Name", "Work Description", "Scheduled Date", "Contract Value (INR)", "Discount (INR)", "Net Payable (INR)", "Amount Received (INR)", "Balance Due (INR)", "Payment Status"],
                       filteredRevenueReport.map((p) => [
                         p.id,
@@ -888,7 +966,7 @@ function ReportsComponent() {
                     const statusLabel = revenuePaymentStatusFilter === "ALL" ? "All_Payments" : revenuePaymentStatusFilter;
                     const dateLabel = revenueStartDateFilter || revenueEndDateFilter ? ` (${revenueStartDateFilter} to ${revenueEndDateFilter})` : "";
                     handleExportPDF(
-                      `Custom Revenue & Billing Summary Report - ${statusLabel}${dateLabel}`,
+                      `Custom Revenue & Billing Summary Report - ${statusLabel}${typeTitleLabel}${dateLabel}`,
                       ["Project ID", "Customer Name", "Work Description", "Scheduled Date", "Contract Value (₹)", "Discount (₹)", "Net Payable (₹)", "Received (₹)", "Balance Due (₹)", "Status"],
                       filteredRevenueReport.map((p) => [
                         p.id,
@@ -1109,14 +1187,15 @@ function ReportsComponent() {
                   size="sm"
                   onClick={() => {
                     const statusLabel = projectStatusFilter === "ALL" ? "All_Statuses" : projectStatusFilter;
-                    const gstLabel = projectGstFilter === "ALL" ? "" : `_${projectGstFilter}`;
+                    const gstLabel = typeFileLabel;
                     const dateLabel = startDateFilter || endDateFilter ? `_${startDateFilter}_to_${endDateFilter}` : "";
                     handleExportCSV(
                       `Custom_Projects_Report_${statusLabel}${gstLabel}${dateLabel}`,
-                      ["Project ID", "Customer Name", "GST Status", "Work Description", "Lead Engineer", "Scheduled Date", "Location", "Contract Value (INR)", "Discount (INR)", "Net Payable (INR)", "Payment Status", "Project Status"],
+                      ["Project ID", "Customer Name", "Customer Type", "GST Status", "Work Description", "Lead Engineer", "Scheduled Date", "Location", "Contract Value (INR)", "Discount (INR)", "Net Payable (INR)", "Payment Status", "Project Status"],
                       filteredProjectsReport.map((p) => [
                         p.id,
                         p.customerName,
+                        p.customerType || "Not set",
                         p.isGST ? "GST" : "Non-GST",
                         p.natureOfWork,
                         p.assignedEngineerName || "Unassigned",
@@ -1174,29 +1253,6 @@ function ReportsComponent() {
               ))}
             </div>
 
-            {/* GST Filter Tabs */}
-            <div className="flex flex-wrap items-center gap-1.5 pt-1">
-              <span className="text-[11px] font-bold text-muted-foreground mr-1">Tax Classification:</span>
-              {[
-                { id: "ALL", label: `All (${projects.length})` },
-                { id: "GST", label: `GST (${gstCount})` },
-                { id: "NON_GST", label: `Non-GST (${nonGstCount})` },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setProjectGstFilter(tab.id as any)}
-                  className={`text-[11px] font-bold px-2.5 py-1 rounded-full border transition-all duration-150 cursor-pointer ${
-                    projectGstFilter === tab.id
-                      ? "bg-purple-600 text-white border-purple-600 shadow-xs"
-                      : "bg-background text-foreground border-border hover:bg-accent"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
             {/* Interactive Filters Panel: Date-to-Date & Search */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-2 bg-slate-50 dark:bg-muted/30 p-3 rounded-xl border border-slate-200 dark:border-border">
               {/* Date From */}
@@ -1244,7 +1300,8 @@ function ReportsComponent() {
                   size="sm"
                   onClick={() => {
                     setProjectStatusFilter("ALL");
-                    setProjectGstFilter("ALL");
+                    setCustomerTypeFilter("ALL");
+                    setTaxFilter("ALL");
                     setStartDateFilter("");
                     setEndDateFilter("");
                     setProjectSearchQuery("");
@@ -1262,6 +1319,7 @@ function ReportsComponent() {
               <span className="font-semibold text-muted-foreground">
                 Showing <b className="text-foreground">{filteredProjectsReport.length}</b> of {projects.length} Projects
                 {projectStatusFilter !== "ALL" && ` (Status: ${projectStatusFilter})`}
+                {customerTypeFilter !== "ALL" && ` (${customerTypeFilter === "NOT_SET" ? "Type not set" : customerTypeFilter})`}
                 {projectGstFilter !== "ALL" && ` (${projectGstFilter === "GST" ? "GST" : "Non-GST"})`}
                 {startDateFilter && ` (From: ${startDateFilter})`}
                 {endDateFilter && ` (To: ${endDateFilter})`}
@@ -1381,7 +1439,7 @@ function ReportsComponent() {
                     const statusLabel = pendingPaymentStatusFilter === "ALL" ? "All_Pending" : pendingPaymentStatusFilter;
                     const dateLabel = pendingStartDateFilter || pendingEndDateFilter ? `_${pendingStartDateFilter}_to_${pendingEndDateFilter}` : "";
                     handleExportCSV(
-                      `Custom_Pending_Collections_Report_${statusLabel}${dateLabel}`,
+                      `Custom_Pending_Collections_Report_${statusLabel}${typeFileLabel}${dateLabel}`,
                       ["Project ID", "Customer Name", "Contact Phone", "Work Description", "Scheduled / Due Date", "Contract Value (INR)", "Discount (INR)", "Net Payable (INR)", "Amount Received (INR)", "Outstanding Due (INR)", "Payment Status"],
                       filteredPendingReport.map((p) => [
                         p.id,
@@ -1409,7 +1467,7 @@ function ReportsComponent() {
                     const statusLabel = pendingPaymentStatusFilter === "ALL" ? "All_Pending" : pendingPaymentStatusFilter;
                     const dateLabel = pendingStartDateFilter || pendingEndDateFilter ? ` (${pendingStartDateFilter} to ${pendingEndDateFilter})` : "";
                     handleExportPDF(
-                      `Custom Pending Receivables & Collections Report - ${statusLabel}${dateLabel}`,
+                      `Custom Pending Receivables & Collections Report - ${statusLabel}${typeTitleLabel}${dateLabel}`,
                       ["Project ID", "Customer Name", "Contact Phone", "Work Description", "Scheduled / Due Date", "Contract Value (₹)", "Discount (₹)", "Net Payable (₹)", "Received (₹)", "Outstanding Due (₹)", "Status"],
                       filteredPendingReport.map((p) => [
                         p.id,
@@ -1634,10 +1692,12 @@ function ReportsComponent() {
                     const decLabel = enquiryDecisionFilter === "ALL" ? "All_Decisions" : enquiryDecisionFilter;
                     const dateLabel = enquiryStartDateFilter || enquiryEndDateFilter ? `_${enquiryStartDateFilter}_to_${enquiryEndDateFilter}` : "";
                     handleExportCSV(
-                      `Custom_Enquiries_Report_${decLabel}${dateLabel}`,
+                      `Custom_Enquiries_Report_${decLabel}${typeFileLabel}${dateLabel}`,
                       [
                         "Enquiry ID",
                         "Customer Name",
+                        "Customer Type",
+                        "GST",
                         "Phone",
                         "Location",
                         "Leakage / Service Need",
@@ -1653,6 +1713,8 @@ function ReportsComponent() {
                       filteredEnquiriesReport.map((e) => [
                         e.id,
                         e.customerName,
+                        e.customerType || "Not set",
+                        e.isGST === undefined ? "Not set" : e.isGST ? "GST" : "Non-GST",
                         e.phone || "N/A",
                         e.location || "N/A",
                         e.leakageType || "N/A",
@@ -1678,10 +1740,12 @@ function ReportsComponent() {
                     const decLabel = enquiryDecisionFilter === "ALL" ? "All_Decisions" : enquiryDecisionFilter;
                     const dateLabel = enquiryStartDateFilter || enquiryEndDateFilter ? ` (${enquiryStartDateFilter} to ${enquiryEndDateFilter})` : "";
                     handleExportPDF(
-                      `Custom Enquiries & Quotations Funnel Report - ${decLabel}${dateLabel}`,
+                      `Custom Enquiries & Quotations Funnel Report - ${decLabel}${typeTitleLabel}${dateLabel}`,
                       [
                         "Enquiry ID",
                         "Customer Name",
+                        "Type",
+                        "GST",
                         "Phone",
                         "Location",
                         "Leakage / Need",
@@ -1697,6 +1761,8 @@ function ReportsComponent() {
                       filteredEnquiriesReport.map((e) => [
                         e.id,
                         e.customerName,
+                        e.customerType || "Not set",
+                        e.isGST === undefined ? "Not set" : e.isGST ? "GST" : "Non-GST",
                         e.phone || "N/A",
                         e.location || "N/A",
                         e.leakageType || "N/A",
@@ -2688,7 +2754,7 @@ function ReportsComponent() {
                     const statusLabel = custLedgerStatusFilter === "ALL" ? "All_Clients" : custLedgerStatusFilter;
                     const dateLabel = custStartDateFilter || custEndDateFilter ? `_${custStartDateFilter}_to_${custEndDateFilter}` : "";
                     handleExportCSV(
-                      `Customer_Account_Ledger_${statusLabel}${dateLabel}`,
+                      `Customer_Account_Ledger_${statusLabel}${typeFileLabel}${dateLabel}`,
                       ["Customer ID", "Customer Name", "Contact Phone", "Location", "Projects Count", "Total Lifetime Value (INR)", "Total Cash Received (INR)", "Outstanding Due (INR)", "Status"],
                       filteredCustomerLedgers.map((item) => [
                         item.customer.id,
@@ -2714,7 +2780,7 @@ function ReportsComponent() {
                     const statusLabel = custLedgerStatusFilter === "ALL" ? "All_Clients" : custLedgerStatusFilter;
                     const dateLabel = custStartDateFilter || custEndDateFilter ? ` (${custStartDateFilter} to ${custEndDateFilter})` : "";
                     handleExportPDF(
-                      `Customer Account Ledger & Lifetime Statements - ${statusLabel}${dateLabel}`,
+                      `Customer Account Ledger & Lifetime Statements - ${statusLabel}${typeTitleLabel}${dateLabel}`,
                       ["Customer ID", "Customer Name", "Contact Phone", "Location", "Projects", "Lifetime Value (INR)", "Cash Received (INR)", "Outstanding Due (INR)", "Status"],
                       filteredCustomerLedgers.map((item) => [
                         item.customer.id,

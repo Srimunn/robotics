@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
@@ -7,7 +7,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -18,6 +18,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { LoginPage } from "@/components/LoginPage";
 import { LaborDashboard } from "@/components/LaborDashboard";
 import { GlobalSearchModal } from "@/components/global-search-modal";
+import { describeDue, getFollowUpReminders, getPaymentReminders } from "@/lib/reminders";
 import { Search, Plus, Bell, User, CheckCircle2, AlertCircle, PhoneCall, Banknote, Calendar, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -137,6 +138,7 @@ function MainHeader() {
   const [searchOpen, setSearchOpen] = useState(false);
   const { enquiries, projects, resetToCleanDemoMode, currentUser, logout } = useRobotics();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -155,8 +157,40 @@ function MainHeader() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const activeEnquiriesCount = enquiries.filter((e) => e.customerDecision === "Thinking" || e.customerDecision === "Follow-up").length;
-  const pendingPaymentsProjects = projects.filter((p) => p.paymentStatus !== "Paid").length;
+  // Reminders for the bell: overdue + today's collections and enquiry follow-ups.
+  const paymentReminders = useMemo(() => getPaymentReminders(projects), [projects]);
+  const followUpReminders = useMemo(() => getFollowUpReminders(enquiries), [enquiries]);
+  const urgentCount =
+    paymentReminders.filter((r) => r.bucket !== "upcoming").length +
+    followUpReminders.filter((r) => r.bucket !== "upcoming").length;
+  // Up to 4 of each kind, most overdue first, so follow-ups are not hidden behind old payments.
+  const bellItems = [
+    ...followUpReminders.slice(0, 4).map((r) => ({
+      key: `f-${r.enquiry.id}`,
+      kind: "followup" as const,
+      daysOverdue: r.daysOverdue,
+      title: `Follow up: ${r.enquiry.customerName}`,
+      detail: `${r.enquiry.id}${r.enquiry.followUpNote ? ` · ${r.enquiry.followUpNote}` : ""}`,
+    })),
+    ...paymentReminders.slice(0, 4).map((r) => ({
+      key: `p-${r.key}`,
+      kind: "payment" as const,
+      daysOverdue: r.daysOverdue,
+      title: `Collect ₹${Math.round(r.amountDue).toLocaleString("en-IN")} from ${r.customerName}`,
+      detail: `${r.projectId} · ${r.stageName}`,
+    })),
+  ];
+
+  // Keep reminders fresh while the app stays open (every 5 minutes, only when the tab is visible).
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        queryClient.invalidateQueries({ queryKey: ["enquiries"] });
+        queryClient.invalidateQueries({ queryKey: ["projects"] });
+      }
+    }, 5 * 60 * 1000);
+    return () => window.clearInterval(id);
+  }, [queryClient]);
 
   return (
     <>
@@ -190,65 +224,62 @@ function MainHeader() {
           {/* Notifications Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-lg">
+              <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-lg" aria-label="Notifications" data-testid="bell">
                 <Bell className="h-4 w-4" />
-                {activeEnquiriesCount > 0 && (
-                  <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-background" />
+                {urgentCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-rose-600 text-white text-[9px] font-bold grid place-items-center ring-2 ring-white" data-testid="bell-count">
+                    {urgentCount > 99 ? "99+" : urgentCount}
+                  </span>
                 )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80 rounded-xl p-0 overflow-hidden">
               <div className="p-3 bg-muted/30 border-b flex justify-between items-center">
-                <h4 className="text-xs font-semibold text-foreground">System Notifications</h4>
+                <h4 className="text-xs font-semibold text-foreground">Reminders</h4>
                 <Badge variant="secondary" className="text-[10px]">
-                  {activeEnquiriesCount + pendingPaymentsProjects} Alerts
+                  {urgentCount} need action
                 </Badge>
               </div>
-              <div className="max-h-64 overflow-y-auto p-2 space-y-1">
-                {activeEnquiriesCount > 0 && (
-                  <Link
-                    to="/enquiries"
-                    className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-accent text-xs transition-colors"
-                  >
-                    <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+              <div className="max-h-80 overflow-y-auto p-2 space-y-1">
+                {bellItems.length === 0 ? (
+                  <div className="flex items-start gap-2.5 p-2 text-xs">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-semibold text-foreground">
-                        {activeEnquiriesCount} Active Customer Enquiry(ies)
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        Site visit & quotation decision pending.
-                      </p>
+                      <p className="font-semibold text-foreground">All clear</p>
+                      <p className="text-[11px] text-muted-foreground">No payments or follow-ups due right now.</p>
                     </div>
-                  </Link>
-                )}
-
-                {pendingPaymentsProjects > 0 && (
-                  <Link
-                    to="/payments"
-                    className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-accent text-xs transition-colors"
-                  >
-                    <Banknote className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-foreground">
-                        {pendingPaymentsProjects} Project(s) Pending Collection
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        Outstanding contract balances awaiting entry.
-                      </p>
-                    </div>
-                  </Link>
-                )}
-
-                <div className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-accent text-xs transition-colors">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-semibold text-foreground">Workflow Engine Active</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      "Enter Data Once. Never Type Twice" active.
-                    </p>
                   </div>
-                </div>
+                ) : (
+                  bellItems.map((item) => (
+                    <DropdownMenuItem key={item.key} asChild className="p-0">
+                      <Link
+                        to="/notifications"
+                        search={{ tab: item.kind === "followup" ? "followups" : "collections" }}
+                        className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-accent text-xs transition-colors cursor-pointer"
+                      >
+                        {item.kind === "followup" ? (
+                          <PhoneCall className={`h-4 w-4 shrink-0 mt-0.5 ${item.daysOverdue > 0 ? "text-rose-500" : "text-amber-500"}`} />
+                        ) : (
+                          <Banknote className={`h-4 w-4 shrink-0 mt-0.5 ${item.daysOverdue > 0 ? "text-rose-500" : "text-blue-500"}`} />
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-semibold text-foreground truncate">{item.title}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">{item.detail}</p>
+                          <p className={`text-[10px] font-bold ${item.daysOverdue > 0 ? "text-rose-600" : item.daysOverdue === 0 ? "text-amber-600" : "text-blue-600"}`}>
+                            {describeDue(item.daysOverdue)}
+                          </p>
+                        </div>
+                      </Link>
+                    </DropdownMenuItem>
+                  ))
+                )}
               </div>
+              <DropdownMenuSeparator className="m-0" />
+              <DropdownMenuItem asChild className="rounded-none">
+                <Link to="/notifications" className="justify-center text-xs font-semibold text-blue-600 py-2.5 cursor-pointer">
+                  View all reminders ({paymentReminders.length + followUpReminders.length})
+                </Link>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 

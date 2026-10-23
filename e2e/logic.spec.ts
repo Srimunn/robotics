@@ -45,7 +45,12 @@ interface ProjectRef {
   value: number;
 }
 
-async function createEnquiry(page: Page, customer: string, amount: number): Promise<string> {
+async function createEnquiry(
+  page: Page,
+  customer: string,
+  amount: number,
+  type: "B2B" | "B2C" = "B2C",
+): Promise<string> {
   await navTo(page, "/enquiries");
   await mainEl(page).getByRole("button", { name: "New Enquiry" }).click();
   const dialog = page.getByRole("dialog");
@@ -54,6 +59,8 @@ async function createEnquiry(page: Page, customer: string, amount: number): Prom
   await fieldInput(dialog, "Phone 1 *").fill(`9${String(Date.now()).slice(-9)}`);
   await fieldInput(dialog, "Location").fill("Erode");
   await fieldInput(dialog, "Amount (₹)").fill(String(amount));
+  await dialog.getByRole("radio", { name: type, exact: true }).click();
+  await dialog.getByRole("radio", { name: "Non-GST", exact: true }).click();
   await dialog.getByRole("button", { name: "Save Enquiry" }).click();
   await expect(dialog).toBeHidden({ timeout: 20_000 });
   await search(page, customer);

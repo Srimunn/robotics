@@ -15,6 +15,7 @@ import {
   Bot,
   LogOut,
   FileSpreadsheet,
+  Bell,
 } from "lucide-react";
 import {
   Sidebar,
@@ -34,6 +35,7 @@ import { useRobotics } from "@/lib/robotics-context";
 
 const items = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Notifications", url: "/notifications", icon: Bell },
   { title: "Enquiries", url: "/enquiries", icon: PhoneCall },
   { title: "Projects", url: "/projects", icon: FolderKanban },
   { title: "Customers", url: "/customers", icon: Users },

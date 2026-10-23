@@ -19,6 +19,7 @@ import {
   Clock,
   AlertTriangle,
 } from "lucide-react";
+import { ExportButtons } from "@/components/export-buttons";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -139,6 +140,17 @@ function EngineersPageComponent() {
     });
   }, [engineerRoster, searchQuery, statusFilter]);
 
+  const exportEngineerRows = () =>
+    filteredEngineers.map((eng) => ({
+      "Engineer ID": eng.id,
+      Name: eng.name,
+      Phone: eng.phone,
+      Specialty: eng.specialty,
+      Status: eng.status,
+      "Current Assignment": eng.currentProjectName || "",
+      "Next Available": eng.nextAvailableDate || "",
+    }));
+
   const handleOpenAddModal = () => {
     setFormName("");
     setFormPhone("");
@@ -188,7 +200,13 @@ function EngineersPageComponent() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Engineers</h1>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <ExportButtons
+            rows={exportEngineerRows}
+            filename="Engineers"
+            title="Engineers"
+            subtitle={[statusFilter !== "all" ? `Status: ${statusFilter}` : "", searchQuery ? `Search: "${searchQuery}"` : ""].filter(Boolean).join(" • ")}
+          />
           {canFullEdit && (
             <Button
               onClick={handleOpenAddModal}

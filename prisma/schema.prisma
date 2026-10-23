@@ -250,10 +250,18 @@ model Enquiry {
   projectId                String?            @unique
   project                  Project?           @relation("EnquiryProject", fields: [projectId], references: [id], onDelete: SetNull)
   createdByRole            String?
+  /// "B2B" or "B2C". Independent of GST. Null on enquiries created before this field existed.
+  customerType             String?
+  /// GST or Non-GST billing, independent of B2B/B2C. Null on enquiries created before this field existed.
+  isGST                    Boolean?
+  /// Next follow-up reminder date; cleared when the follow-up is marked done.
+  nextFollowUpDate         DateTime?
+  followUpNote             String?
   createdAt                DateTime           @default(now())
 
   @@index([customerName])
   @@index([assignedEngineerId])
+  @@index([nextFollowUpDate])
 }
 
 model Project {
@@ -286,6 +294,8 @@ model Project {
   balanceAmount            Decimal            @default(0) @db.Decimal(12, 2)
   paymentStatus            PaymentStatus      @default(Pending)
   isGST                    Boolean            @default(false)
+  /// "B2B" or "B2C". Independent of isGST. Null on projects created before this field existed.
+  customerType             String?
   discountAmount           Decimal?           @db.Decimal(12, 2)
   discountedBy             String?
   discountNote             String?

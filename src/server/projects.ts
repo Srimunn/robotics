@@ -49,6 +49,7 @@ const projectUpdate = z.object({
   afterWorkPhotoUrl: z.string().optional().nullable(),
   internalNotes: z.string().optional(),
   isGST: z.boolean().optional(),
+  customerType: z.enum(["B2B", "B2C"]).optional(),
   discountAmount: z.number().optional().nullable(),
   discountedBy: z.string().optional().nullable(),
   discountNote: z.string().optional().nullable(),
@@ -130,6 +131,8 @@ export const updateProject = createServerFn({ method: "POST" })
         };
         if (parsed.assignedEngineerId !== undefined || engId !== undefined) enqUpdateData.assignedEngineerId = engId;
         if (parsed.assignedEngineerName !== undefined || engName !== undefined) enqUpdateData.assignedEngineerName = engName;
+        if (parsed.customerType) enqUpdateData.customerType = parsed.customerType;
+        if (typeof parsed.isGST === "boolean") enqUpdateData.isGST = parsed.isGST;
 
         await tx.enquiry.update({
           where: { id: linkedEnq.id },

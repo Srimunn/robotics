@@ -259,6 +259,10 @@ export function mapEnquiryFromDb(e: DbEnquiry): Enquiry {
     projectId: e.projectId ?? undefined,
     createdByRole: (e as any).createdByRole ?? undefined,
     createdAt: isoDateTime(e.createdAt)!,
+    customerType: e.customerType === "B2B" || e.customerType === "B2C" ? e.customerType : undefined,
+    isGST: typeof e.isGST === "boolean" ? e.isGST : undefined,
+    nextFollowUpDate: isoDate(e.nextFollowUpDate),
+    followUpNote: e.followUpNote ?? undefined,
   };
 }
 
@@ -331,6 +335,7 @@ export function mapProjectFromDb(
     discountedBy: (p as any).discountedBy ?? null,
     discountNote: (p as any).discountNote ?? null,
     isGST: (p as any).isGST ?? false,
+    customerType: p.customerType === "B2B" || p.customerType === "B2C" ? p.customerType : undefined,
     paymentStatus: p.paymentStatus as PaymentStatus,
     beforeWorkPhotoUrl: p.beforeWorkPhotoUrl ?? undefined,
     afterWorkPhotoUrl: p.afterWorkPhotoUrl ?? undefined,

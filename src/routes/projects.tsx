@@ -9,6 +9,8 @@ import { DataPagination } from "@/components/ui/DataPagination";
 import { DeleteConfirm } from "@/components/delete-confirm";
 import { ProjectWorkPhotos } from "@/components/ProjectWorkPhotos";
 import { CreatedByBadge } from "@/components/created-by-badge";
+import { ExportButtons } from "@/components/export-buttons";
+import { CustomerTypeBadge, typeLabel } from "@/components/customer-type-toggle";
 
 import {
   FolderKanban,
@@ -546,6 +548,27 @@ function ProjectsComponent() {
     return matchesSearch && matchesStatus;
   });
 
+  const exportProjectRows = () =>
+    filteredProjects.map((p) => ({
+      "Project ID": p.id,
+      "Customer Name": p.customerName,
+      Phone: p.phone,
+      Location: p.location,
+      "Customer Type": typeLabel(p.customerType),
+      GST: p.isGST ? "GST" : "Non-GST",
+      "Work Type": p.natureOfWork,
+      Engineer: p.assignedEngineerName || "",
+      "Scheduled Date": p.scheduledDate || "",
+      "Start Date": p.workCommittedDate || "",
+      Started: p.actualWorkStartedDate || "",
+      "Contract Value (INR)": Number(p.projectValue) || 0,
+      "Discount (INR)": Number(p.discountAmount) || 0,
+      "Received (INR)": Number(p.receivedAmount) || 0,
+      "Balance (INR)": Number(p.balanceAmount) || 0,
+      "Payment Status": p.paymentStatus,
+      Status: p.status,
+    }));
+
   const totalProjectsItems = filteredProjects.length;
   const totalProjectsPages = Math.ceil(totalProjectsItems / pageSize);
   const paginatedProjects = filteredProjects.slice(
@@ -779,10 +802,16 @@ function ProjectsComponent() {
 
       {/* Projects Master Table */}
       <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
-        <CardHeader className="p-4 border-b flex flex-row items-center justify-between">
+        <CardHeader className="p-4 border-b flex flex-row flex-wrap items-center justify-between gap-2">
           <div>
             <CardTitle className="text-sm font-semibold">Projects ({filteredProjects.length})</CardTitle>
           </div>
+          <ExportButtons
+            rows={exportProjectRows}
+            filename="Projects"
+            title="Projects"
+            subtitle={[statusFilter !== "ALL" ? `Status: ${statusFilter}` : "", searchQuery ? `Search: "${searchQuery}"` : ""].filter(Boolean).join(" • ")}
+          />
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-auto max-h-[calc(100vh-280px)] min-h-[350px]">
@@ -943,6 +972,7 @@ function ProjectsComponent() {
                           >
                             {p.isGST ? "GST" : "Non-GST"}
                           </Badge>
+                          {p.customerType && <CustomerTypeBadge value={p.customerType} />}
                         </div>
                       </td>
                       <td className="p-3 text-right pr-4 whitespace-nowrap">
@@ -1037,6 +1067,47 @@ function ProjectsComponent() {
                           }}
                         />
                       </div>
+                    )}
+                    {canFullEdit ? (
+                      <div
+                        className="flex items-center gap-0.5 ml-1 bg-white dark:bg-slate-800 p-0.5 rounded-md border border-border shadow-2xs"
+                        role="radiogroup"
+                        aria-label="Customer type"
+                        title="B2B / B2C (independent of GST)"
+                      >
+                        {(["B2B", "B2C"] as const).map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            role="radio"
+                            aria-checked={activeProject.customerType === t}
+                            onClick={async () => {
+                              if (activeProject.customerType === t) return;
+                              try {
+                                await updateProject(activeProject.id, { customerType: t });
+                                setActiveProject({ ...activeProject, customerType: t });
+                                toast.success(`Project marked as ${t}`);
+                              } catch (err: any) {
+                                toast.error("Failed to update customer type: " + (err?.message || err));
+                              }
+                            }}
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                              activeProject.customerType === t
+                                ? t === "B2B"
+                                  ? "bg-indigo-600 text-white"
+                                  : "bg-teal-600 text-white"
+                                : "text-muted-foreground hover:bg-accent"
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                        {!activeProject.customerType && (
+                          <span className="text-[10px] text-amber-600 font-medium px-1">Not set</span>
+                        )}
+                      </div>
+                    ) : (
+                      <CustomerTypeBadge value={activeProject.customerType} />
                     )}
                     {activeProject.enquiryId && (
                       <Badge variant="outline" className="text-[10px] bg-blue-100/80 text-blue-800 border-blue-300">
