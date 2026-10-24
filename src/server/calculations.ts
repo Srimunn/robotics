@@ -28,6 +28,21 @@ export function calculateHoursFromTimes(inTime?: string | null, outTime?: string
   return diff > 0 ? Math.round(diff * 10) / 10 : 8;
 }
 
+/** A normal working day is 9 AM to 6 PM (lunch included). Time beyond that is overtime. */
+export const STANDARD_SHIFT_HOURS = 9;
+
+/** Overtime hours in a day: hours beyond the standard shift. */
+export function calculateOvertimeHours(hoursWorked?: number | null): number {
+  const hrs = Number(hoursWorked) || 0;
+  return hrs > STANDARD_SHIFT_HOURS ? Math.round((hrs - STANDARD_SHIFT_HOURS) * 10) / 10 : 0;
+}
+
+/** Overtime pay: each hour beyond the standard shift pays the daily wage / 8. */
+export function calculateOvertimePay(dailyWage: number, hoursWorked?: number | null): number {
+  const wage = Number(dailyWage) || 0;
+  return Math.round((calculateOvertimeHours(hoursWorked) * wage) / 8);
+}
+
 export function calculateEarnedWage(
   dailyWage: number,
   status: string | number = "Present",
@@ -39,12 +54,12 @@ export function calculateEarnedWage(
   // Backward compatibility: If 2nd argument was hoursWorked as number
   if (typeof status === "number") {
     if (status <= 0) return 0;
-    return Math.round(wage);
+    return Math.round(wage) + calculateOvertimePay(wage, status);
   }
 
   const s = String(status || "").toLowerCase().replace(/[\s_-]/g, "");
   if (s === "present" || s === "overtime") {
-    return Math.round(wage);
+    return Math.round(wage) + calculateOvertimePay(wage, hoursWorked);
   }
   if (s === "halfday" || s === "half") {
     return Math.round(wage / 2);
@@ -57,7 +72,7 @@ export function calculateEarnedWage(
   if (hoursWorked !== undefined && hoursWorked <= 0) {
     return 0;
   }
-  return Math.round(wage);
+  return Math.round(wage) + calculateOvertimePay(wage, hoursWorked);
 }
 
 /** Compute PaymentStatus from project net payable (projectValue - discount) + received + stages */

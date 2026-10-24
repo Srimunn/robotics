@@ -2325,7 +2325,7 @@ function ProjectsComponent() {
               {/* REALTIME CALCULATED WORKING HOURS & EARNED MONEY BOX */}
               {(() => {
                 const hours = calculateHoursFromTimes(editingLogData.inTime, editingLogData.outTime);
-                const money = calculateEarnedWage(editingLogData.weeklyWage || 1400, hours);
+                const money = calculateEarnedWage(Math.round((editingLogData.weeklyWage || 1400) / 6), hours);
                 return (
                   <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 flex items-center justify-between text-xs font-semibold">
                     <div>

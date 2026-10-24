@@ -270,7 +270,7 @@ function LaboursComponent() {
         outTime: attOutTime,
         attendance: "Present",
         hoursWorked: calculateHoursFromTimes(attInTime, attOutTime),
-        earnedMoney: calculateEarnedWage(weeklyWage, calculateHoursFromTimes(attInTime, attOutTime)),
+        earnedMoney: calculateEarnedWage(Math.round(weeklyWage / 6), calculateHoursFromTimes(attInTime, attOutTime)),
         workDescription: attWorkDesc,
       });
     }
@@ -1090,7 +1090,7 @@ function LaboursComponent() {
                                   }
                                   return workerLogs.slice(0, 5).map((rec) => {
                                     const hrs = rec.hoursWorked || 0;
-                                    const earnedMoney = rec.earnedMoney || calculateEarnedWage(rec.weeklyWage || activeLabour.defaultWeeklyWage || 1400, hrs);
+                                    const earnedMoney = rec.earnedMoney || calculateEarnedWage(Math.round((rec.weeklyWage || activeLabour.defaultWeeklyWage || 1400) / 6), hrs);
 
                                     return (
                                       <tr key={rec.id} className="hover:bg-accent/40 transition-colors">

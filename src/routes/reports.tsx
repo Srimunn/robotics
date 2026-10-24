@@ -125,10 +125,14 @@ function ReportsComponent() {
     const totalPayable = filteredPayrollItems.reduce((acc, i) => acc + i.totalEarned, 0);
     const totalDays = filteredPayrollItems.reduce((acc, i) => acc + i.daysPresent, 0);
     const totalHours = filteredPayrollItems.reduce((acc, i) => acc + i.totalHours, 0);
+    const overtimeHours = filteredPayrollItems.reduce((acc, i) => acc + (i.overtimeHours || 0), 0);
+    const overtimeAmount = filteredPayrollItems.reduce((acc, i) => acc + (i.overtimeAmount || 0), 0);
     return {
       totalPayable,
       totalDays,
       totalHours: Number(totalHours.toFixed(1)),
+      overtimeHours: Number(overtimeHours.toFixed(1)),
+      overtimeAmount,
       count: filteredPayrollItems.length,
     };
   }, [filteredPayrollItems]);
@@ -2329,6 +2333,8 @@ function ReportsComponent() {
                         "Projects Worked",
                         "Days Present",
                         "Hours Worked",
+                        "Overtime Hours",
+                        "Overtime Pay (INR)",
                         "Amount Payable (INR)",
                       ],
                       filteredPayrollItems.map((item) => [
@@ -2339,8 +2345,11 @@ function ReportsComponent() {
                         (item.distinctProjects || []).join("; ") || "General Duty",
                         item.daysPresent,
                         item.totalHours,
+                        item.overtimeHours || 0,
+                        item.overtimeAmount || 0,
                         item.totalEarned,
-                      ])
+                      ]),
+                      ["", `GRAND TOTAL (${filteredPayrollItems.length} labourers)`, "", "", "", payrollFilteredTotals.totalDays, payrollFilteredTotals.totalHours, payrollFilteredTotals.overtimeHours, payrollFilteredTotals.overtimeAmount, payrollFilteredTotals.totalPayable]
                     );
                   }}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
@@ -2499,6 +2508,7 @@ function ReportsComponent() {
                       <th className="p-3 whitespace-nowrap">Projects Worked</th>
                       <th className="p-3 text-center whitespace-nowrap">Days Present</th>
                       <th className="p-3 text-center whitespace-nowrap">Hours Worked</th>
+                      <th className="p-3 text-center whitespace-nowrap">Overtime</th>
                       <th className="p-3 text-right whitespace-nowrap">Daily Wage (₹/day)</th>
                       <th className="p-3 text-right pr-4 whitespace-nowrap">Amount Payable</th>
                     </tr>
@@ -2506,7 +2516,7 @@ function ReportsComponent() {
                   <tbody className="divide-y">
                     {filteredPayrollItems.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="p-8 text-center text-muted-foreground font-medium">
+                        <td colSpan={8} className="p-8 text-center text-muted-foreground font-medium">
                           No payroll entries or attendance records match the selected date range and filters.
                         </td>
                       </tr>
@@ -2553,6 +2563,16 @@ function ReportsComponent() {
                           <td className="p-3 text-center font-mono font-semibold text-slate-700 whitespace-nowrap">
                             {item.totalHours} hrs
                           </td>
+                          <td className="p-3 text-center whitespace-nowrap">
+                            {item.overtimeHours > 0 ? (
+                              <>
+                                <div className="font-mono font-semibold text-amber-700">{item.overtimeHours} hrs</div>
+                                <div className="text-[10px] text-muted-foreground">+₹{item.overtimeAmount.toLocaleString("en-IN")}</div>
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
                           <td className="p-3 text-right font-medium text-muted-foreground whitespace-nowrap">
                             ₹{item.dailyWage.toLocaleString("en-IN")}/day
                           </td>
@@ -2574,6 +2594,10 @@ function ReportsComponent() {
                         </td>
                         <td className="p-3 text-center font-extrabold text-foreground">
                           {payrollFilteredTotals.totalHours} hrs
+                        </td>
+                        <td className="p-3 text-center font-extrabold text-amber-700">
+                          {payrollFilteredTotals.overtimeHours} hrs
+                          <div className="text-[10px] font-semibold text-muted-foreground">+₹{payrollFilteredTotals.overtimeAmount.toLocaleString("en-IN")}</div>
                         </td>
                         <td className="p-3 text-right text-muted-foreground font-normal">—</td>
                         <td className="p-3 text-right pr-4 font-extrabold text-emerald-700 text-base">
