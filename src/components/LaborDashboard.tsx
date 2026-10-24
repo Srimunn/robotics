@@ -306,7 +306,7 @@ export function LaborDashboard() {
 
     let y = bannerY + fontSize + 8;
     ctx.fillStyle = tagType === "CLOCK IN" ? "#34d399" : "#fb7185";
-    ctx.fillText(`ROBOTICS ERP — GEO-TAGGED ${tagType}`, padding, y);
+    ctx.fillText(`SERVICE_OS — GEO-TAGGED ${tagType}`, padding, y);
 
     ctx.fillStyle = "#ffffff";
     y += fontSize + 4;
@@ -513,7 +513,7 @@ export function LaborDashboard() {
   const verifiedWages = verifiedLogs.reduce((acc, log) => {
     if (log.earnedMoney) return acc + log.earnedMoney;
     const hours = log.hoursWorked || (log.inTime && log.outTime ? calculateHoursFromTimes(log.inTime, log.outTime) : 0);
-    return acc + calculateEarnedWage(log.weeklyWage || defaultWeeklyWage, hours);
+    return acc + calculateEarnedWage(Math.round((log.weeklyWage || defaultWeeklyWage) / 6), hours);
   }, 0);
 
   // Toggle log history drawer

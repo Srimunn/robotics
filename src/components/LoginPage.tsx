@@ -12,8 +12,8 @@ type AppRole = "Admin" | "RS" | "DRS" | "CS" | "BS" | "Labour";
 
 const ROLES: { id: AppRole; label: string; description: string }[] = [
   { id: "Admin", label: "Admin", description: "CEO Executive Login" },
-  { id: "RS", label: "RS", description: "Robotics Service Login" },
-  { id: "DRS", label: "DRS", description: "Deepak Robotics Login" },
+  { id: "RS", label: "RS", description: "Service_OS Service Login" },
+  { id: "DRS", label: "DRS", description: "Deepak Service_OS Login" },
   { id: "CS", label: "CS", description: "Construction Solutions Login" },
   { id: "BS", label: "BS", description: "Builder Supply Login" },
   { id: "Labour", label: "Labour", description: "Field Crew Member Login" },
@@ -81,7 +81,7 @@ export function LoginPage() {
           <img src="/logo.png" alt="RPC Logo" className="h-16 w-16 object-contain drop-shadow-md" />
           <div>
             <h1 className="text-xl font-bold tracking-tight text-slate-900">
-              Robotics Bricks & Blocks
+              Service_OS
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5 font-medium">
               Enterprise Resource Planning
@@ -175,7 +175,7 @@ export function LoginPage() {
         {/* Footer Copyright */}
         <div className="pt-2 text-center">
           <p className="text-[11px] text-muted-foreground font-medium">
-            © 2026 Robotics Bricks & Blocks Pvt. Ltd.
+            © 2026 Service_OS
           </p>
         </div>
       </Card>

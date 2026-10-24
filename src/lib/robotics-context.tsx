@@ -178,7 +178,7 @@ const SESSION_KEY = "robotics_erp_current_user";
 export const SESSION_TIMEOUT_MS = 15 * 60 * 1000;
 
 const defaultSettings: SystemSettings = {
-  companyName: "Robotics Bricks and Blocks Pvt. Ltd.",
+  companyName: "Service_OS",
   companyAddress: "",
   phone: "",
   email: "",
@@ -567,8 +567,8 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
     const staffRole = role === "Worker" && !loginIdOrId ? "RS" : role;
     const staffSessions = {
       CEO: { user: { role: "CEO", name: "CEO Executive" }, error: "Incorrect Executive PIN", welcome: "Welcome back, CEO!" },
-      RS: { user: { role: "Worker", subRole: "RS", name: "Robotics Service" }, error: "Incorrect Robotics Service PIN", welcome: "Robotics Service session initiated" },
-      DRS: { user: { role: "Worker", subRole: "DRS", name: "Deepak Robotics" }, error: "Incorrect Deepak Robotics PIN", welcome: "Deepak Robotics session initiated" },
+      RS: { user: { role: "Worker", subRole: "RS", name: "Service_OS Service" }, error: "Incorrect Service_OS Service PIN", welcome: "Service_OS Service session initiated" },
+      DRS: { user: { role: "Worker", subRole: "DRS", name: "Deepak Service_OS" }, error: "Incorrect Deepak Service_OS PIN", welcome: "Deepak Service_OS session initiated" },
       CS: { user: { role: "Worker", subRole: "CS", name: "Construction Solutions" }, error: "Incorrect Construction Solutions PIN", welcome: "Construction Solutions session initiated" },
       BS: { user: { role: "Worker", subRole: "BS", name: "Builder Supply" }, error: "Incorrect Builder Supply PIN", welcome: "Builder Supply session initiated" },
     } as const;

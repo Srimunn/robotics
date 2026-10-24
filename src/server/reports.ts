@@ -31,7 +31,7 @@ import { createServerFn } from "@tanstack/react-start";
 import PDFDocument from "pdfkit/js/pdfkit.standalone.js";
 import { db } from "~/lib/db";
 import { toNumber } from "./utils";
-import { calculateEarnedWage } from "./calculations";
+import { calculateEarnedWage, calculateOvertimeHours, calculateOvertimePay } from "./calculations";
 import { fetchExtraPhotos } from "./project-photos";
 import { combineWorkPhotos, type WorkPhoto } from "~/lib/work-photos";
 
@@ -317,7 +317,7 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
         .fontSize(16)
         .font("Helvetica-Bold")
         .fillColor("#0f172a")
-        .text("Robotics Bricks & Blocks — Project Master Report", { align: "center" })
+        .text("Service_OS — Project Master Report", { align: "center" })
         .moveDown(0.3);
 
       doc
@@ -556,7 +556,7 @@ export const generateAttendanceReport = createServerFn({ method: "POST" })
         .fontSize(16)
         .font("Helvetica-Bold")
         .fillColor("#0f172a")
-        .text("Robotics Bricks & Blocks — Attendance Report", { align: "center" })
+        .text("Service_OS — Attendance Report", { align: "center" })
         .moveDown(0.3);
 
       doc
@@ -676,7 +676,7 @@ export const generateSingleProjectReport = createServerFn({ method: "POST" })
         .fontSize(16)
         .font("Helvetica-Bold")
         .fillColor("#0f172a")
-        .text("Robotics Bricks & Blocks — Single Project Master Report", { align: "center" })
+        .text("Service_OS — Single Project Master Report", { align: "center" })
         .moveDown(0.3);
 
       doc
@@ -856,6 +856,8 @@ export interface PayrollLabourSummary {
   distinctProjects: string[];
   daysPresent: number;
   totalHours: number;
+  overtimeHours: number;
+  overtimeAmount: number;
   totalEarned: number;
   projectBreakdowns: PayrollProjectItem[];
 }
@@ -866,6 +868,8 @@ export interface PayrollReportResult {
     totalPayable: number;
     totalDaysPresent: number;
     totalHoursWorked: number;
+    totalOvertimeHours: number;
+    totalOvertimeAmount: number;
     totalLabourers: number;
   };
   startDate: string;
@@ -905,7 +909,16 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
     status: string;
     hoursWorked: number;
     earnedMoney: number;
+    overtimeHours: number;
+    overtimeAmount: number;
   }
+
+  // Overtime applies only to full days (Present / Overtime), never to half days or absences.
+  const overtimeOf = (dailyWage: number, status: string | null | undefined, hours: number) => {
+    const st = String(status || "").toLowerCase();
+    if (st !== "present" && st !== "overtime") return { overtimeHours: 0, overtimeAmount: 0 };
+    return { overtimeHours: calculateOvertimeHours(hours), overtimeAmount: calculateOvertimePay(dailyWage, hours) };
+  };
 
   const entryMap = new Map<string, DailyLog>();
 
@@ -919,8 +932,9 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
     const labDailyWage = lab.dailyWage ?? (lab.defaultWeeklyWage ? Math.round(lab.defaultWeeklyWage / 6) : 0);
     const earned = calculateEarnedWage(labDailyWage, ar.status, ar.hoursWorked ? Number(ar.hoursWorked) : 8);
 
-    const pId = ar.projectId || "GENERAL";
-    const key = `${ar.labourId}_${dateStr}_${pId}`;
+    // One paid day per labour per date. A labour logged on two sites the same day
+    // (or marked in Attendance and on a site) must not be paid twice.
+    const key = `${ar.labourId}_${dateStr}`;
     const proj = ar.projectId ? projMap.get(ar.projectId) : undefined;
     entryMap.set(key, {
       labourId: ar.labourId,
@@ -932,6 +946,7 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
       status: ar.status,
       hoursWorked: toNumber(ar.hoursWorked) || 0,
       earnedMoney: earned,
+      ...overtimeOf(labDailyWage, ar.status, toNumber(ar.hoursWorked) || 0),
     });
   }
 
@@ -946,7 +961,7 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
       const labDailyWage = lab.dailyWage ?? (lab.defaultWeeklyWage ? Math.round(lab.defaultWeeklyWage / 6) : 0);
       const earned = calculateEarnedWage(labDailyWage, lg.attendance, lg.hoursWorked ? Number(lg.hoursWorked) : 8);
 
-      const key = `${lg.labourId}_${lgDateStr}_${p.id}`;
+      const key = `${lg.labourId}_${lgDateStr}`;
       if (!entryMap.has(key)) {
         entryMap.set(key, {
           labourId: lg.labourId,
@@ -958,6 +973,7 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
           status: lg.attendance || "Present",
           hoursWorked: toNumber(lg.hoursWorked) || 0,
           earnedMoney: earned,
+          ...overtimeOf(labDailyWage, lg.attendance || "Present", toNumber(lg.hoursWorked) || 0),
         });
       }
     }
@@ -969,6 +985,8 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
   let totalGrandPayable = 0;
   let totalGrandDays = 0;
   let totalGrandHours = 0;
+  let totalGrandOtHours = 0;
+  let totalGrandOtAmount = 0;
 
   for (const lab of labours) {
     const labEntries = allEntries.filter((e) => e.labourId === lab.id);
@@ -981,6 +999,8 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
     const presentDates = new Set<string>();
     let labTotalHours = 0;
     let labTotalEarned = 0;
+    let labOtHours = 0;
+    let labOtAmount = 0;
 
     for (const entry of labEntries) {
       const isPresent = entry.status === "Present" || entry.status === "HalfDay" || entry.status === "Overtime" || entry.hoursWorked > 0;
@@ -990,6 +1010,8 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
 
       labTotalHours += entry.hoursWorked;
       labTotalEarned += entry.earnedMoney;
+      labOtHours += entry.overtimeHours;
+      labOtAmount += entry.overtimeAmount;
 
       const pKey = entry.projectId || "General Duty";
       const pName = entry.projectName || (entry.projectId ? `Project ${entry.projectId}` : "General Site Duty");
@@ -1023,6 +1045,8 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
     totalGrandPayable += labTotalEarned;
     totalGrandDays += daysPresent;
     totalGrandHours += labTotalHours;
+    totalGrandOtHours += labOtHours;
+    totalGrandOtAmount += labOtAmount;
 
     items.push({
       labourId: lab.id,
@@ -1033,6 +1057,8 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
       distinctProjects,
       daysPresent,
       totalHours: Number(labTotalHours.toFixed(1)),
+      overtimeHours: Number(labOtHours.toFixed(1)),
+      overtimeAmount: Math.round(labOtAmount),
       totalEarned: Math.round(labTotalEarned),
       projectBreakdowns: Array.from(distinctProjectMap.values()),
     });
@@ -1044,6 +1070,8 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
       totalPayable: Math.round(totalGrandPayable),
       totalDaysPresent: totalGrandDays,
       totalHoursWorked: Number(totalGrandHours.toFixed(1)),
+      totalOvertimeHours: Number(totalGrandOtHours.toFixed(1)),
+      totalOvertimeAmount: Math.round(totalGrandOtAmount),
       totalLabourers: items.length,
     },
     startDate: effectiveStart,
@@ -1072,7 +1100,7 @@ export const generatePayrollPdfReport = createServerFn({ method: "POST" })
         .fontSize(16)
         .font("Helvetica-Bold")
         .fillColor("#0f172a")
-        .text("Robotics Bricks & Blocks — Weekly Payroll Summary", { align: "center" })
+        .text("Service_OS — Weekly Payroll Summary", { align: "center" })
         .moveDown(0.3);
 
       doc
@@ -1090,7 +1118,7 @@ export const generatePayrollPdfReport = createServerFn({ method: "POST" })
       doc.fontSize(11).font("Helvetica-Bold").fillColor("#14532d");
       doc.text(`Total Amount Payable: INR ${grandTotal.totalPayable.toLocaleString("en-IN")}`, 40, summaryY + 10);
       doc.fontSize(8.5).font("Helvetica").fillColor("#166534");
-      doc.text(`Total Days Worked: ${grandTotal.totalDaysPresent} days | Total Hours: ${grandTotal.totalHoursWorked} hrs | Active Staff: ${items.length}`, 40, summaryY + 28);
+      doc.text(`Total Days Worked: ${grandTotal.totalDaysPresent} days | Total Hours: ${grandTotal.totalHoursWorked} hrs | Overtime: ${grandTotal.totalOvertimeHours} hrs (INR ${grandTotal.totalOvertimeAmount.toLocaleString("en-IN")}) | Active Staff: ${items.length}`, 40, summaryY + 28);
 
       doc.y = summaryY + 58;
       doc.moveDown(0.4);
@@ -1116,7 +1144,7 @@ export const generatePayrollPdfReport = createServerFn({ method: "POST" })
         doc.fontSize(9.5).font("Helvetica-Bold").fillColor("#059669").text(`Payable: INR ${item.totalEarned.toLocaleString("en-IN")}`, 410, cardY + 8, { align: "right", width: 145 });
 
         doc.fontSize(8).font("Helvetica").fillColor("#475569");
-        doc.text(`Days Present: ${item.daysPresent} | Total Hours: ${item.totalHours} hrs | Daily Wage: INR ${item.dailyWage}/day`, 40, cardY + 22);
+        doc.text(`Days Present: ${item.daysPresent} | Total Hours: ${item.totalHours} hrs | Overtime: ${item.overtimeHours} hrs (INR ${item.overtimeAmount.toLocaleString("en-IN")}) | Daily Wage: INR ${item.dailyWage}/day`, 40, cardY + 22);
 
         let projY = cardY + 36;
         for (const pb of item.projectBreakdowns) {
@@ -1206,7 +1234,7 @@ export const generateMachineHistoryReport = createServerFn({ method: "POST" })
         .fontSize(16)
         .font("Helvetica-Bold")
         .fillColor("#0f172a")
-        .text("Robotics Bricks & Blocks — Machine History Report", { align: "center" })
+        .text("Service_OS — Machine History Report", { align: "center" })
         .moveDown(0.2);
 
       doc

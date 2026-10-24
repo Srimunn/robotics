@@ -98,7 +98,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Robotics Service Management System" },
+      { title: "Service_OS" },
       { name: "description", content: "Enterprise ERP for Robotics & Industrial Automation Service Operations" },
       { name: "theme-color", content: "#1a56db" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
@@ -199,7 +199,7 @@ function MainHeader() {
           <SidebarTrigger className="text-slate-700 hover:text-slate-900 hover:bg-slate-100" />
           <div className="hidden sm:flex items-center gap-2 text-xs text-slate-600">
             <img src="/logo.png" alt="RPC Logo" className="h-6 w-6 object-contain" />
-            <span className="font-bold text-slate-900 tracking-wide">Robotics ERP</span>
+            <span className="font-bold text-slate-900 tracking-wide">Service_OS</span>
           </div>
         </div>
 
@@ -380,8 +380,8 @@ function PwaInstallBanner() {
       <div className="flex items-center gap-2.5 min-w-0">
         <img src="/logo.png" alt="RPC Logo" className="h-8 w-8 object-contain shrink-0 drop-shadow-xs" />
         <div className="min-w-0">
-          <p className="text-xs font-bold truncate">Install Robotics ERP</p>
-          <p className="text-[10px] text-blue-100 truncate">Install Robotics ERP for a better experience</p>
+          <p className="text-xs font-bold truncate">Install Service_OS</p>
+          <p className="text-[10px] text-blue-100 truncate">Install Service_OS for a better experience</p>
         </div>
       </div>
       <div className="flex items-center gap-1.5 shrink-0">

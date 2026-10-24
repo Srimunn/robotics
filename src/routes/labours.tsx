@@ -270,7 +270,7 @@ function LaboursComponent() {
         outTime: attOutTime,
         attendance: "Present",
         hoursWorked: calculateHoursFromTimes(attInTime, attOutTime),
-        earnedMoney: calculateEarnedWage(weeklyWage, calculateHoursFromTimes(attInTime, attOutTime)),
+        earnedMoney: calculateEarnedWage(Math.round(weeklyWage / 6), calculateHoursFromTimes(attInTime, attOutTime)),
         workDescription: attWorkDesc,
       });
     }
@@ -863,7 +863,7 @@ function LaboursComponent() {
                               size="sm"
                               variant="outline"
                               onClick={() => {
-                                const text = `Robotics ERP Labour Portal Credentials\nLabour Name: ${activeLabour.name}\nLabour ID: ${activeLabour.id}\nLogin ID: ${activeLabour.loginId || activeLabour.name.split(" ")[0]}\nPIN: ${activeLabour.pin || "4827"}`;
+                                const text = `Service_OS Labour Portal Credentials\nLabour Name: ${activeLabour.name}\nLabour ID: ${activeLabour.id}\nLogin ID: ${activeLabour.loginId || activeLabour.name.split(" ")[0]}\nPIN: ${activeLabour.pin || "4827"}`;
                                 navigator.clipboard.writeText(text);
                                 toast.success(`Copied login credentials for ${activeLabour.name}`);
                               }}
@@ -1090,7 +1090,7 @@ function LaboursComponent() {
                                   }
                                   return workerLogs.slice(0, 5).map((rec) => {
                                     const hrs = rec.hoursWorked || 0;
-                                    const earnedMoney = rec.earnedMoney || calculateEarnedWage(rec.weeklyWage || activeLabour.defaultWeeklyWage || 1400, hrs);
+                                    const earnedMoney = rec.earnedMoney || calculateEarnedWage(Math.round((rec.weeklyWage || activeLabour.defaultWeeklyWage || 1400) / 6), hrs);
 
                                     return (
                                       <tr key={rec.id} className="hover:bg-accent/40 transition-colors">
