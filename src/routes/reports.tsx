@@ -701,9 +701,9 @@ function ReportsComponent() {
   };
 
   // Export Excel (.xlsx) Helper with Auto-Fit Column Widths (Fixes ##### issue in Excel!)
-  const handleExportCSV = (filename: string, headers: string[], rows: (string | number)[][]) => {
+  const handleExportCSV = (filename: string, headers: string[], rows: (string | number)[][], totalRow?: (string | number)[]) => {
     try {
-      const cleanRows = rows.map((row) =>
+      const cleanRows = (totalRow ? [...rows, totalRow] : rows).map((row) =>
         row.map((val) => {
           if (val === null || val === undefined) return "";
           const str = String(val);
@@ -754,7 +754,7 @@ function ReportsComponent() {
   };
 
   // Export Printable PDF Helper
-  const handleExportPDF = (reportTitle: string, headers: string[], rows: (string | number)[][]) => {
+  const handleExportPDF = (reportTitle: string, headers: string[], rows: (string | number)[][], totalRow?: (string | number)[]) => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
       toast.error("Please allow popups to download PDF report");
@@ -779,6 +779,15 @@ function ReportsComponent() {
             .join("")}</tr>`
       )
       .join("");
+
+    const tableTotalRow = totalRow
+      ? `<tr>${totalRow
+          .map(
+            (cell) =>
+              `<td style="padding:8px 10px; border:1px solid #cbd5e1; background:#f1f5f9; font-size:10px; font-weight:bold; color:#1e293b;">${cell ?? ""}</td>`
+          )
+          .join("")}</tr>`
+      : "";
 
     const now = new Date().toLocaleDateString("en-IN", {
       year: "numeric",
@@ -816,7 +825,7 @@ function ReportsComponent() {
           </div>
           <table>
             <thead><tr>${tableHeaders}</tr></thead>
-            <tbody>${tableRows}</tbody>
+            <tbody>${tableRows}${tableTotalRow}</tbody>
           </table>
           <div class="footer">
             Generated via Robotics ERP System
@@ -1453,7 +1462,8 @@ function ReportsComponent() {
                         p.receivedAmount || 0,
                         p.balanceAmount || 0,
                         p.paymentStatus || "Unpaid",
-                      ])
+                      ]),
+                      ["", `GRAND TOTAL (${filteredPendingReport.length} projects)`, "", "", "", totalPendingContractVal, totalPendingDiscount, totalPendingNetPayable, totalPendingReceivedVal, totalPendingReceivables, "Total to collect"]
                     );
                   }}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"
@@ -1481,7 +1491,20 @@ function ReportsComponent() {
                         `₹${(p.receivedAmount || 0).toLocaleString("en-IN")}`,
                         `₹${(p.balanceAmount || 0).toLocaleString("en-IN")}`,
                         p.paymentStatus || "Unpaid",
-                      ])
+                      ]),
+                      [
+                        "",
+                        `GRAND TOTAL (${filteredPendingReport.length} projects)`,
+                        "",
+                        "",
+                        "",
+                        `₹${totalPendingContractVal.toLocaleString("en-IN")}`,
+                        totalPendingDiscount > 0 ? `−₹${totalPendingDiscount.toLocaleString("en-IN")}` : "—",
+                        `₹${totalPendingNetPayable.toLocaleString("en-IN")}`,
+                        `₹${totalPendingReceivedVal.toLocaleString("en-IN")}`,
+                        `₹${totalPendingReceivables.toLocaleString("en-IN")}`,
+                        "Total to collect",
+                      ]
                     );
                   }}
                   className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg gap-1.5 shadow-xs"

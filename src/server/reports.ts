@@ -919,8 +919,9 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
     const labDailyWage = lab.dailyWage ?? (lab.defaultWeeklyWage ? Math.round(lab.defaultWeeklyWage / 6) : 0);
     const earned = calculateEarnedWage(labDailyWage, ar.status, ar.hoursWorked ? Number(ar.hoursWorked) : 8);
 
-    const pId = ar.projectId || "GENERAL";
-    const key = `${ar.labourId}_${dateStr}_${pId}`;
+    // One paid day per labour per date. A labour logged on two sites the same day
+    // (or marked in Attendance and on a site) must not be paid twice.
+    const key = `${ar.labourId}_${dateStr}`;
     const proj = ar.projectId ? projMap.get(ar.projectId) : undefined;
     entryMap.set(key, {
       labourId: ar.labourId,
@@ -946,7 +947,7 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
       const labDailyWage = lab.dailyWage ?? (lab.defaultWeeklyWage ? Math.round(lab.defaultWeeklyWage / 6) : 0);
       const earned = calculateEarnedWage(labDailyWage, lg.attendance, lg.hoursWorked ? Number(lg.hoursWorked) : 8);
 
-      const key = `${lg.labourId}_${lgDateStr}_${p.id}`;
+      const key = `${lg.labourId}_${lgDateStr}`;
       if (!entryMap.has(key)) {
         entryMap.set(key, {
           labourId: lg.labourId,
