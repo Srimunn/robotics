@@ -317,7 +317,7 @@ export const generateProjectsReport = createServerFn({ method: "POST" })
         .fontSize(16)
         .font("Helvetica-Bold")
         .fillColor("#0f172a")
-        .text("Robotics Bricks & Blocks — Project Master Report", { align: "center" })
+        .text("Service_OS — Project Master Report", { align: "center" })
         .moveDown(0.3);
 
       doc
@@ -556,7 +556,7 @@ export const generateAttendanceReport = createServerFn({ method: "POST" })
         .fontSize(16)
         .font("Helvetica-Bold")
         .fillColor("#0f172a")
-        .text("Robotics Bricks & Blocks — Attendance Report", { align: "center" })
+        .text("Service_OS — Attendance Report", { align: "center" })
         .moveDown(0.3);
 
       doc
@@ -676,7 +676,7 @@ export const generateSingleProjectReport = createServerFn({ method: "POST" })
         .fontSize(16)
         .font("Helvetica-Bold")
         .fillColor("#0f172a")
-        .text("Robotics Bricks & Blocks — Single Project Master Report", { align: "center" })
+        .text("Service_OS — Single Project Master Report", { align: "center" })
         .moveDown(0.3);
 
       doc
@@ -1100,7 +1100,7 @@ export const generatePayrollPdfReport = createServerFn({ method: "POST" })
         .fontSize(16)
         .font("Helvetica-Bold")
         .fillColor("#0f172a")
-        .text("Robotics Bricks & Blocks — Weekly Payroll Summary", { align: "center" })
+        .text("Service_OS — Weekly Payroll Summary", { align: "center" })
         .moveDown(0.3);
 
       doc
@@ -1234,7 +1234,7 @@ export const generateMachineHistoryReport = createServerFn({ method: "POST" })
         .fontSize(16)
         .font("Helvetica-Bold")
         .fillColor("#0f172a")
-        .text("Robotics Bricks & Blocks — Machine History Report", { align: "center" })
+        .text("Service_OS — Machine History Report", { align: "center" })
         .moveDown(0.2);
 
       doc

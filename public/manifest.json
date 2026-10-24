@@ -1,7 +1,7 @@
 {
   "name": "Service_OS",
   "short_name": "Service_OS",
-  "description": "Robotics Bricks & Blocks — Enterprise Resource Planning",
+  "description": "Service_OS — Enterprise Resource Planning",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
