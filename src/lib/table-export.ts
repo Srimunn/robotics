@@ -94,13 +94,13 @@ export function exportRowsToPdf(
   @media print { body { padding: 0; } @page { size: A4 landscape; margin: 10mm; } }
 </style></head><body>
 <div class="header">
-  <div class="company">${escapeHtml(opts.companyName || "Robotics ERP")}</div>
+  <div class="company">${escapeHtml(opts.companyName || "Service_OS")}</div>
   <div class="title">${escapeHtml(title)}</div>
   <div class="meta">${opts.subtitle ? `${escapeHtml(opts.subtitle)} • ` : ""}${rows.length} record(s) • Generated ${escapeHtml(generated)}</div>
 </div>
 <table><thead><tr>${headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead>
 <tbody>${rows.map((r) => `<tr>${headers.map((h) => `<td>${escapeHtml(pdfCell(r[h]))}</td>`).join("")}</tr>`).join("")}</tbody></table>
-<div class="footer">Generated via Robotics ERP</div>
+<div class="footer">Generated via Service_OS</div>
 <script>window.onload = function () { window.print(); };</script>
 </body></html>`);
   w.document.close();

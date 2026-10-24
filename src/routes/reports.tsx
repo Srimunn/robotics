@@ -820,7 +820,7 @@ function ReportsComponent() {
         <body>
           <div class="header">
             <div>
-              <div class="logo">ROBOTICS ERP — EXECUTIVE REPORT</div>
+              <div class="logo">SERVICE_OS — EXECUTIVE REPORT</div>
               <div class="subtitle">${reportTitle} • Generated on ${now}</div>
             </div>
             <div style="text-align: right; font-size: 10px; font-weight: bold; color: #2563eb;">
@@ -832,7 +832,7 @@ function ReportsComponent() {
             <tbody>${tableRows}${tableTotalRow}</tbody>
           </table>
           <div class="footer">
-            Generated via Robotics ERP System
+            Generated via Service_OS
           </div>
           <script>
             window.onload = function() {

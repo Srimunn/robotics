@@ -863,7 +863,7 @@ function LaboursComponent() {
                               size="sm"
                               variant="outline"
                               onClick={() => {
-                                const text = `Robotics ERP Labour Portal Credentials\nLabour Name: ${activeLabour.name}\nLabour ID: ${activeLabour.id}\nLogin ID: ${activeLabour.loginId || activeLabour.name.split(" ")[0]}\nPIN: ${activeLabour.pin || "4827"}`;
+                                const text = `Service_OS Labour Portal Credentials\nLabour Name: ${activeLabour.name}\nLabour ID: ${activeLabour.id}\nLogin ID: ${activeLabour.loginId || activeLabour.name.split(" ")[0]}\nPIN: ${activeLabour.pin || "4827"}`;
                                 navigator.clipboard.writeText(text);
                                 toast.success(`Copied login credentials for ${activeLabour.name}`);
                               }}

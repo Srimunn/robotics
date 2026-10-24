@@ -73,7 +73,7 @@ export function AppSidebar() {
           <img src="/logo.png" alt="RPC Logo" className="h-8 w-8 object-contain shrink-0" />
           <div className="min-w-0">
             <div className="truncate text-base font-extrabold tracking-tight text-slate-900">
-              Robotics ERP
+              Service_OS
             </div>
           </div>
         </Link>

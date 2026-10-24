@@ -306,7 +306,7 @@ export function LaborDashboard() {
 
     let y = bannerY + fontSize + 8;
     ctx.fillStyle = tagType === "CLOCK IN" ? "#34d399" : "#fb7185";
-    ctx.fillText(`ROBOTICS ERP — GEO-TAGGED ${tagType}`, padding, y);
+    ctx.fillText(`SERVICE_OS — GEO-TAGGED ${tagType}`, padding, y);
 
     ctx.fillStyle = "#ffffff";
     y += fontSize + 4;

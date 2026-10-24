@@ -1,6 +1,6 @@
 {
-  "name": "Robotics ERP",
-  "short_name": "Robotics",
+  "name": "Service_OS",
+  "short_name": "Service_OS",
   "description": "Robotics Bricks & Blocks — Enterprise Resource Planning",
   "start_url": "/",
   "display": "standalone",
