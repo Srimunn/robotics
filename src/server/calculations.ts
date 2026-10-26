@@ -28,8 +28,8 @@ export function calculateHoursFromTimes(inTime?: string | null, outTime?: string
   return diff > 0 ? Math.round(diff * 10) / 10 : 8;
 }
 
-/** A normal working day is 9 AM to 6 PM (lunch included). Time beyond that is overtime. */
-export const STANDARD_SHIFT_HOURS = 9;
+/** A normal working day is 9:30 AM to 6 PM (lunch included). Time beyond that is overtime. */
+export const STANDARD_SHIFT_HOURS = 8.5;
 
 /** Overtime hours in a day: hours beyond the standard shift. */
 export function calculateOvertimeHours(hoursWorked?: number | null): number {

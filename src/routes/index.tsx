@@ -140,7 +140,7 @@ function DashboardComponent() {
   const [payRefInput, setPayRefInput] = useState<string>("");
 
   const [selectedAttLabourId, setSelectedAttLabourId] = useState<string>("");
-  const [attInTimeInput, setAttInTimeInput] = useState<string>("09:00 AM");
+  const [attInTimeInput, setAttInTimeInput] = useState<string>("09:30 AM");
   const [attOutTimeInput, setAttOutTimeInput] = useState<string>("06:00 PM");
 
   // Form Inputs for New Enquiry
@@ -2134,7 +2134,7 @@ function DashboardComponent() {
                 <Input
                   value={attInTimeInput}
                   onChange={(e) => setAttInTimeInput(e.target.value)}
-                  placeholder="09:00 AM"
+                  placeholder="09:30 AM"
                   className="h-8 text-xs rounded-lg mt-1 font-semibold"
                 />
               </div>

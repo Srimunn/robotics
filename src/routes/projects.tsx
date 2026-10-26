@@ -1721,7 +1721,7 @@ function ProjectsComponent() {
                                           dailyWage: dailyWageVal,
                                           weeklyWage: dailyWageVal * 6,
                                           date: selectedLogDate,
-                                          inTime: inTime || "09:00 AM",
+                                          inTime: inTime || "09:30 AM",
                                           outTime: outTime || "06:00 PM",
                                           attendance: attendanceStatus as any,
                                           hoursWorked: hours || 8.5,
@@ -2304,7 +2304,7 @@ function ProjectsComponent() {
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">Start Time / In Time (e.g. 09:00 AM)</Label>
                   <Input
-                    placeholder="09:00 AM"
+                    placeholder="09:30 AM"
                     value={editingLogData.inTime || ""}
                     onChange={(e) => setEditingLogData({ ...editingLogData, inTime: e.target.value })}
                     className="h-9 rounded-lg font-mono font-semibold"

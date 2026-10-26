@@ -4,7 +4,7 @@
 // Public API of useRobotics() kept stable — mutations are now async.
 // ============================================================
 
-export { calculateHoursFromTimes, calculateEarnedWage } from "~/server/calculations";
+export { calculateHoursFromTimes, calculateEarnedWage, calculateOvertimeHours } from "~/server/calculations";
 export { canEdit, canEditEnquiries, canConvertEnquiry } from "~/lib/permissions";
 
 import { verifyRolePin } from "~/server/auth";
