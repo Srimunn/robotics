@@ -245,7 +245,7 @@ function LaboursComponent() {
   const [attLabourId, setAttLabourId] = useState("");
   const [attProjectId, setAttProjectId] = useState("");
   const [attDate, setAttDate] = useState(new Date().toISOString().slice(0, 10));
-  const [attInTime, setAttInTime] = useState("09:00 AM");
+  const [attInTime, setAttInTime] = useState("09:30 AM");
   const [attOutTime, setAttOutTime] = useState("06:00 PM");
   const [attWorkDesc, setAttWorkDesc] = useState("On-site servicing");
 
@@ -1722,7 +1722,7 @@ function LaboursComponent() {
                 <Input
                   value={attInTime}
                   onChange={(e) => setAttInTime(e.target.value)}
-                  placeholder="09:00 AM"
+                  placeholder="09:30 AM"
                   className="h-9 rounded-lg font-mono font-semibold text-xs"
                 />
               </div>

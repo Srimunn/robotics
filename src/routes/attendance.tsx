@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { useRobotics, calculateHoursFromTimes, calculateEarnedWage } from "@/lib/robotics-context";
+import { useRobotics, calculateHoursFromTimes, calculateEarnedWage, calculateOvertimeHours } from "@/lib/robotics-context";
 import { canEdit } from "@/lib/permissions";
 import type { AttendanceRecord, LabourType } from "@/lib/robotics-types";
 import * as XLSX from "xlsx";
@@ -63,6 +63,36 @@ function dailyWageOf(lab?: { dailyWage?: number | null; defaultWeeklyWage?: numb
   return lab?.dailyWage ?? Math.round((lab?.defaultWeeklyWage || 1400) / 6);
 }
 
+const DEFAULT_IN_TIME = "09:30 AM";
+const DEFAULT_OUT_TIME = "06:00 PM";
+
+// Local YYYY-MM-DD (toISOString would give yesterday's date before 5:30 AM in India).
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Monday of the current week.
+function startOfThisWeek(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return localDateStr(d);
+}
+
+// Every date from start to end inclusive, as YYYY-MM-DD.
+function datesBetween(start: string, end: string): string[] {
+  const out: string[] = [];
+  const d = new Date(`${start}T00:00:00`);
+  const last = new Date(`${end}T00:00:00`);
+  while (d <= last && out.length < 400) {
+    out.push(localDateStr(d));
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+}
+
+const isFullDay = (l: AttendanceRecord) =>
+  l.status === "Present" || l.status === "Overtime" || (l.status !== "Half Day" && l.status !== "Absent" && l.status !== "Leave" && ((l.hoursWorked || 0) > 0 || Boolean(l.inTime && l.inTime.trim())));
+
 function AttendancePageComponent() {
   const { labours, attendance, projects, updateProjectLabourLog, verifyAttendanceRecord, currentUser } = useRobotics();
 
@@ -71,18 +101,31 @@ function AttendancePageComponent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [projectFilter, setProjectFilter] = useState<string>("all");
-  const [selectedMonth, setSelectedMonth] = useState<string>("all");
+  const [rangeStart, setRangeStart] = useState<string>(startOfThisWeek());
+  const [rangeEnd, setRangeEnd] = useState<string>(localDateStr(new Date()));
 
   // Mark Attendance Modal state
   const [markAttendanceOpen, setMarkAttendanceOpen] = useState(false);
   const [attLabourId, setAttLabourId] = useState("");
   const [attProjectId, setAttProjectId] = useState("");
   const [attDate, setAttDate] = useState(new Date().toISOString().slice(0, 10));
-  const [attInTime, setAttInTime] = useState("09:00 AM");
-  const [attOutTime, setAttOutTime] = useState("06:00 PM");
+  const [attInTime, setAttInTime] = useState(DEFAULT_IN_TIME);
+  const [attOutTime, setAttOutTime] = useState(DEFAULT_OUT_TIME);
   const [attWorkDesc, setAttWorkDesc] = useState("On-site servicing");
   const [attInPhotoUrl, setAttInPhotoUrl] = useState("");
   const [attOutPhotoUrl, setAttOutPhotoUrl] = useState("");
+
+  // Each person starts from a fresh form, so one person's times or photos never carry over to the next.
+  const openMarkAttendance = (labourId: string, projectId: string) => {
+    setAttLabourId(labourId);
+    setAttProjectId(projectId);
+    setAttInTime(DEFAULT_IN_TIME);
+    setAttOutTime(DEFAULT_OUT_TIME);
+    setAttInPhotoUrl("");
+    setAttOutPhotoUrl("");
+    setAttWorkDesc("On-site servicing");
+    setMarkAttendanceOpen(true);
+  };
 
   const handleMarkAttendanceSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -178,54 +221,29 @@ function AttendancePageComponent() {
     }
 
     return targetLabours.map((lab) => {
-      // Filter logs for this labour in selected month
-      const labLogs = allAttendanceLogs.filter((log) => {
-        const isLabour = log.labourId === lab.id;
-        const matchesMonth = selectedMonth === "all" || !selectedMonth || log.date.startsWith(selectedMonth);
-        const matchesProject = projectFilter === "all" || log.projectId === projectFilter;
-        return isLabour && matchesMonth && matchesProject;
-      });
+      // Logs for this labour inside the selected From–To dates
+      const labLogs = allAttendanceLogs
+        .filter((log) => {
+          const d = log.date.slice(0, 10);
+          const inRange = (!rangeStart || d >= rangeStart) && (!rangeEnd || d <= rangeEnd);
+          const matchesProject = projectFilter === "all" || log.projectId === projectFilter;
+          return log.labourId === lab.id && inRange && matchesProject;
+        })
+        .sort((a, b) => a.date.localeCompare(b.date));
 
-      const presentCount = labLogs.filter(
-        (l) => l.status === "Present" || Boolean(l.inTime && l.inTime.trim().length > 0) || (l.hoursWorked && l.hoursWorked > 0)
-      ).length;
+      const presentCount = labLogs.filter(isFullDay).length;
       const halfDayCount = labLogs.filter((l) => l.status === "Half Day").length;
-      const absentCount = labLogs.filter((l) => l.status === "Absent").length;
+      const absentCount = labLogs.filter((l) => l.status === "Absent" || l.status === "Leave").length;
+      const totalHours = Math.round(labLogs.reduce((acc, l) => acc + (l.hoursWorked || 0), 0) * 10) / 10;
 
-      const rawOvertimeHours = labLogs.reduce((acc, l) => {
-        if (l.hoursWorked && l.hoursWorked > 8) {
-          return acc + (l.hoursWorked - 8);
-        }
-        return acc + (l.status === "Overtime" ? (l.hoursWorked || 2) : 0);
-      }, 0);
-      const overtimeHours = Math.round(rawOvertimeHours * 10) / 10;
+      // Same rules as the payroll report: overtime only on full days, beyond the 9:30–6:00 shift.
+      const overtimeHours =
+        Math.round(labLogs.reduce((acc, l) => acc + (isFullDay(l) ? calculateOvertimeHours(l.hoursWorked) : 0), 0) * 10) / 10;
 
-      const defaultWage = lab.defaultWeeklyWage || 1400;
-
-      const totalEarnedFromLogs = labLogs.reduce((acc, l) => {
-        if (l.earnedMoney) return acc + l.earnedMoney;
-        return acc + calculateEarnedWage(dailyWageOf(lab), l.hoursWorked || 0);
-      }, 0);
-
-      const periodEarnings = totalEarnedFromLogs > 0
-        ? totalEarnedFromLogs
-        : Math.round((presentCount / 6) * defaultWage);
-
-      // Earnings already cover the whole filtered period, so average them per month and per week
-      // actually worked instead of scaling a period total up again.
-      const monthsCovered = Math.max(1, new Set(labLogs.map((l) => l.date.slice(0, 7))).size);
-      const weeksCovered = Math.max(
-        1,
-        new Set(
-          labLogs.map((l) => {
-            const d = new Date(`${l.date.slice(0, 10)}T00:00:00Z`);
-            d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
-            return d.toISOString().slice(0, 10);
-          })
-        ).size
+      const periodEarnings = labLogs.reduce(
+        (acc, l) => acc + calculateEarnedWage(dailyWageOf(lab), l.status || "Present", l.hoursWorked ? Number(l.hoursWorked) : 8),
+        0
       );
-      const calculatedMonthlyWage = Math.round(periodEarnings / monthsCovered);
-      const calculatedWeeklyWage = Math.round(periodEarnings / weeksCovered);
 
       return {
         labour: lab,
@@ -233,18 +251,19 @@ function AttendancePageComponent() {
         presentCount,
         halfDayCount,
         absentCount,
+        totalHours,
         overtimeHours,
-        defaultWeeklyWage: defaultWage,
-        calculatedWeeklyWage,
-        calculatedMonthlyWage,
+        periodEarnings,
       };
     });
-  }, [labours, projects, allAttendanceLogs, selectedMonth, projectFilter]);
+  }, [labours, projects, allAttendanceLogs, rangeStart, rangeEnd, projectFilter]);
 
-  const totalDaysLogged = allAttendanceLogs.length;
+  const rangeDates = useMemo(() => (rangeStart && rangeEnd ? datesBetween(rangeStart, rangeEnd) : []), [rangeStart, rangeEnd]);
+
+  const totalDaysLogged = aggregatedPayroll.reduce((acc, a) => acc + a.logs.length, 0);
   const totalPresentCount = aggregatedPayroll.reduce((acc, a) => acc + a.presentCount, 0);
   const totalOvertimeHours = Math.round(aggregatedPayroll.reduce((acc, a) => acc + a.overtimeHours, 0) * 10) / 10;
-  const totalMonthlyPayroll = aggregatedPayroll.reduce((acc, a) => acc + a.calculatedMonthlyWage, 0);
+  const totalPeriodPayroll = aggregatedPayroll.reduce((acc, a) => acc + a.periodEarnings, 0);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -279,12 +298,14 @@ function AttendancePageComponent() {
       Name: a.labour.name,
       Phone: a.labour.phone,
       Type: a.labour.type,
+      Period: `${rangeStart} to ${rangeEnd}`,
       Present: a.presentCount,
       "Half Day": a.halfDayCount,
       Absent: a.absentCount,
+      "Hours Worked": a.totalHours,
       "Overtime (hrs)": a.overtimeHours,
-      "Weekly Wage (INR)": a.calculatedWeeklyWage,
-      "Monthly Wage (INR)": a.calculatedMonthlyWage,
+      "Daily Wage (INR)": dailyWageOf(a.labour),
+      "Earned (INR)": a.periodEarnings,
     }));
 
   return (
@@ -307,7 +328,7 @@ function AttendancePageComponent() {
             filename="Attendance"
             title="Attendance & Wages"
             subtitle={[
-              selectedMonth && selectedMonth !== "all" ? `Month: ${selectedMonth}` : "All months",
+              `Dates: ${rangeStart} to ${rangeEnd}`,
               projectFilter !== "all" ? `Project: ${projectFilter}` : "",
               typeFilter !== "all" ? `Type: ${typeFilter}` : "",
               searchQuery ? `Search: "${searchQuery}"` : "",
@@ -315,11 +336,7 @@ function AttendancePageComponent() {
           />
           {canFullEdit && (
             <Button
-              onClick={() => {
-                if (labours.length > 0) setAttLabourId(labours[0].id);
-                if (projects.length > 0) setAttProjectId(projects[0].id);
-                setMarkAttendanceOpen(true);
-              }}
+              onClick={() => openMarkAttendance(labours[0]?.id || "", projects[0]?.id || "")}
               className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold h-9 rounded-xl gap-1.5 shadow-xs"
             >
               <CalendarCheck className="h-4 w-4" /> Mark Attendance
@@ -428,8 +445,8 @@ function AttendancePageComponent() {
         <Card className="rounded-xl border border-border shadow-xs bg-white dark:bg-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-medium text-purple-600 uppercase tracking-wider">Monthly Payroll</p>
-              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-purple-600">₹{totalMonthlyPayroll.toLocaleString("en-IN")}</h3>
+              <p className="text-[11px] font-medium text-purple-600 uppercase tracking-wider">Payroll (Selected Dates)</p>
+              <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-purple-600">₹{totalPeriodPayroll.toLocaleString("en-IN")}</h3>
             </div>
             <div className="h-9 w-9 rounded-lg bg-purple-50 dark:bg-purple-950/40 grid place-items-center text-purple-600">
               <DollarSign className="h-5 w-5" />
@@ -452,6 +469,35 @@ function AttendancePageComponent() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold text-muted-foreground">From</span>
+              <Input
+                type="date"
+                value={rangeStart}
+                max={rangeEnd || undefined}
+                onChange={(e) => setRangeStart(e.target.value)}
+                className="h-9 w-[140px] text-xs rounded-lg font-mono"
+              />
+              <span className="text-[11px] font-bold text-muted-foreground">To</span>
+              <Input
+                type="date"
+                value={rangeEnd}
+                min={rangeStart || undefined}
+                onChange={(e) => setRangeEnd(e.target.value)}
+                className="h-9 w-[140px] text-xs rounded-lg font-mono"
+              />
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setRangeStart(startOfThisWeek());
+                  setRangeEnd(localDateStr(new Date()));
+                }}
+                className="h-9 text-xs rounded-lg"
+              >
+                This Week
+              </Button>
+            </div>
+
             <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger className="h-9 text-xs w-[140px] rounded-lg">
                 <SelectValue placeholder="Type: All" />
@@ -489,10 +535,10 @@ function AttendancePageComponent() {
                 <TableHead className="text-xs font-bold text-muted-foreground min-w-[200px]">WORKER</TableHead>
                 <TableHead className="text-xs font-bold text-muted-foreground">TYPE</TableHead>
                 <TableHead className="text-xs font-bold text-muted-foreground text-center">PRESENT</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground text-center">HOURS</TableHead>
                 <TableHead className="text-xs font-bold text-muted-foreground text-center">OVERTIME</TableHead>
                 <TableHead className="text-xs font-bold text-muted-foreground text-right">DAILY WAGE</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-right">WEEKLY WAGE</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-right">MONTHLY WAGE</TableHead>
+                <TableHead className="text-xs font-bold text-muted-foreground text-right">EARNED (SELECTED DATES)</TableHead>
                 <TableHead className="text-xs font-bold text-muted-foreground text-right pr-4">ACTION</TableHead>
               </TableRow>
             </TableHeader>
@@ -505,14 +551,14 @@ function AttendancePageComponent() {
                         <CalendarCheck className="h-6 w-6 stroke-[1.5]" />
                       </div>
                       <div className="space-y-1">
-                        <p className="text-base font-semibold text-foreground">No attendance recorded yet.</p>
+                        <p className="text-base font-semibold text-foreground">No labour staff to show.</p>
                         <p className="text-xs text-muted-foreground">Assign labour to active site projects to automatically track daily attendance and wages.</p>
                       </div>
                     </div>
                   </TableCell>
                 </TableRow>
               ) : (
-                paginatedPayroll.map(({ labour, presentCount, halfDayCount, overtimeHours, calculatedWeeklyWage, calculatedMonthlyWage }) => (
+                paginatedPayroll.map(({ labour, presentCount, halfDayCount, absentCount, totalHours, overtimeHours, periodEarnings }) => (
                   <TableRow key={labour.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/30 transition-colors">
                     <TableCell className="font-mono text-xs font-bold text-purple-600 dark:text-purple-400">
                       {labour.id}
@@ -549,6 +595,13 @@ function AttendancePageComponent() {
                       {halfDayCount > 0 && (
                         <div className="text-[10px] text-amber-600 mt-0.5">({halfDayCount} half days)</div>
                       )}
+                      {absentCount > 0 && (
+                        <div className="text-[10px] text-rose-600 mt-0.5">({absentCount} absent)</div>
+                      )}
+                    </TableCell>
+
+                    <TableCell className="text-center font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      {totalHours} hrs
                     </TableCell>
 
                     <TableCell className="text-center">
@@ -565,12 +618,8 @@ function AttendancePageComponent() {
                       ₹{(labour.dailyWage ?? Math.round((labour.defaultWeeklyWage || 1400) / 6)).toLocaleString("en-IN")}
                     </TableCell>
 
-                    <TableCell className="text-right font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
-                      ₹{calculatedWeeklyWage.toLocaleString("en-IN")}
-                    </TableCell>
-
                     <TableCell className="text-right font-mono text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
-                      ₹{calculatedMonthlyWage.toLocaleString("en-IN")}
+                      ₹{periodEarnings.toLocaleString("en-IN")}
                     </TableCell>
 
                     <TableCell className="text-right pr-4">
@@ -578,12 +627,7 @@ function AttendancePageComponent() {
                         {canFullEdit && (
                           <Button
                             size="sm"
-                            onClick={() => {
-                              setAttLabourId(labour.id);
-                              if (projectFilter !== "all") setAttProjectId(projectFilter);
-                              else if (projects.length > 0) setAttProjectId(projects[0].id);
-                              setMarkAttendanceOpen(true);
-                            }}
+                            onClick={() => openMarkAttendance(labour.id, projectFilter !== "all" ? projectFilter : projects[0]?.id || "")}
                             className="h-7 text-[11px] font-bold rounded-lg gap-1 bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs"
                           >
                             <Clock className="h-3 w-3" /> Log Time
@@ -618,6 +662,90 @@ function AttendancePageComponent() {
         />
       </Card>
 
+      {/* DAY-BY-DAY ATTENDANCE REGISTER FOR THE SELECTED DATES */}
+      <Card className="rounded-xl border border-border/80 bg-white dark:bg-card shadow-xs overflow-hidden">
+        <CardHeader className="p-4 border-b">
+          <CardTitle className="text-sm font-bold flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-blue-600" /> Daily Attendance Register
+          </CardTitle>
+          <CardDescription className="text-xs">
+            {rangeStart} to {rangeEnd} • P = Present, ½ = Half Day, A = Absent / Leave, – = not marked. Hover a cell for in/out times.
+          </CardDescription>
+        </CardHeader>
+        {rangeDates.length > 31 ? (
+          <CardContent className="p-6 text-center text-xs text-muted-foreground">
+            Choose 31 days or fewer to see the day-by-day register.
+          </CardContent>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead className="bg-slate-50 dark:bg-slate-900">
+                <tr>
+                  <th className="p-2 pl-4 text-left font-bold text-muted-foreground sticky left-0 bg-slate-50 dark:bg-slate-900 min-w-[150px]">Worker</th>
+                  {rangeDates.map((d) => {
+                    const dt = new Date(`${d}T00:00:00`);
+                    const isSunday = dt.getDay() === 0;
+                    return (
+                      <th key={d} className={`p-2 text-center font-bold min-w-[44px] ${isSunday ? "text-rose-500" : "text-muted-foreground"}`}>
+                        <div>{dt.getDate()}</div>
+                        <div className="text-[9px] font-medium">{dt.toLocaleDateString("en-IN", { weekday: "short" })}</div>
+                      </th>
+                    );
+                  })}
+                  <th className="p-2 text-center font-bold text-muted-foreground">Present</th>
+                  <th className="p-2 pr-4 text-right font-bold text-muted-foreground">Earned</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {filteredPayroll.map(({ labour, logs, presentCount, halfDayCount, periodEarnings }) => {
+                  const byDate = new Map(logs.map((l) => [l.date.slice(0, 10), l]));
+                  return (
+                    <tr key={labour.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/30">
+                      <td className="p-2 pl-4 font-semibold text-foreground sticky left-0 bg-white dark:bg-card">
+                        {labour.name}
+                        <div className="text-[10px] font-mono text-muted-foreground">{labour.id}</div>
+                      </td>
+                      {rangeDates.map((d) => {
+                        const log = byDate.get(d);
+                        let label = "–";
+                        let cls = "text-slate-300 dark:text-slate-600";
+                        if (log) {
+                          if (log.status === "Half Day") {
+                            label = "½";
+                            cls = "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300";
+                          } else if (log.status === "Absent" || log.status === "Leave") {
+                            label = "A";
+                            cls = "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300";
+                          } else if (isFullDay(log)) {
+                            label = "P";
+                            cls = "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300";
+                          }
+                        }
+                        const ot = log && isFullDay(log) ? calculateOvertimeHours(log.hoursWorked) : 0;
+                        const tip = log
+                          ? `${log.status} • ${log.inTime || "—"} to ${log.outTime || "—"} • ${log.hoursWorked || 0} hrs${ot > 0 ? ` (+${ot} OT)` : ""}`
+                          : "Not marked";
+                        return (
+                          <td key={d} className="p-1 text-center" title={tip}>
+                            <span className={`inline-grid place-items-center h-7 w-7 rounded-md font-bold ${cls}`}>{label}</span>
+                            {ot > 0 && <div className="text-[9px] font-mono text-amber-600">+{ot}h</div>}
+                          </td>
+                        );
+                      })}
+                      <td className="p-2 text-center font-bold text-emerald-700">
+                        {presentCount}
+                        {halfDayCount > 0 && <span className="text-amber-600"> + {halfDayCount} half</span>}
+                      </td>
+                      <td className="p-2 pr-4 text-right font-mono font-bold text-emerald-700">₹{periodEarnings.toLocaleString("en-IN")}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
       {/* DETAILED DAILY LOGS MODAL */}
       <Dialog open={!!selectedLabourId} onOpenChange={(open) => !open && setSelectedLabourId(null)}>
         <DialogContent className="max-w-2xl rounded-2xl p-6">
@@ -639,7 +767,7 @@ function AttendancePageComponent() {
                   <div className="text-[11px] text-muted-foreground">{activeLabourDetail.labour.type} Staff • Daily Wage: ₹{activeLabourDetail.labour.dailyWage ?? Math.round((activeLabourDetail.labour.defaultWeeklyWage || 1400) / 6)}/day</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs font-bold text-emerald-600">Monthly Est: ₹{activeLabourDetail.calculatedMonthlyWage.toLocaleString("en-IN")}</div>
+                  <div className="text-xs font-bold text-emerald-600">Earned: ₹{activeLabourDetail.periodEarnings.toLocaleString("en-IN")}</div>
                   <div className="text-[10px] text-muted-foreground">{activeLabourDetail.presentCount} Days Present</div>
                 </div>
               </div>
@@ -760,7 +888,7 @@ function AttendancePageComponent() {
                 <Input
                   value={attInTime}
                   onChange={(e) => setAttInTime(e.target.value)}
-                  placeholder="09:00 AM"
+                  placeholder="09:30 AM"
                   className="h-9 rounded-lg font-mono font-semibold text-xs"
                 />
               </div>
