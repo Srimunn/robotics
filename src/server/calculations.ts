@@ -19,28 +19,47 @@ export function parseTimeToHours(str: string | null | undefined): number {
   }
 }
 
+/** Clock time of a normal day: 9:30 AM to 6:00 PM. Used when a check-out time is missing. */
+export const STANDARD_SHIFT_HOURS = 8.5;
+
+/** Unpaid lunch break taken out of every full day's clock time. */
+export const LUNCH_BREAK_HOURS = 0.5;
+
+/** Paid working hours in a full day. Pay is worked out per hour at dailyWage / 8. */
+export const FULL_DAY_HOURS = 8;
+
 export function calculateHoursFromTimes(inTime?: string | null, outTime?: string | null): number {
   if (!inTime || !inTime.trim()) return 0;
-  if (!outTime || !outTime.trim()) return 8;
+  if (!outTime || !outTime.trim()) return STANDARD_SHIFT_HOURS;
   const inH = parseTimeToHours(inTime);
   const outH = parseTimeToHours(outTime);
   const diff = outH - inH;
-  return diff > 0 ? Math.round(diff * 10) / 10 : 8;
+  return diff > 0 ? Math.round(diff * 10) / 10 : STANDARD_SHIFT_HOURS;
 }
 
-/** A normal working day is 9:30 AM to 6 PM (lunch included). Time beyond that is overtime. */
-export const STANDARD_SHIFT_HOURS = 8.5;
-
-/** Overtime hours in a day: hours beyond the standard shift. */
-export function calculateOvertimeHours(hoursWorked?: number | null): number {
-  const hrs = Number(hoursWorked) || 0;
-  return hrs > STANDARD_SHIFT_HOURS ? Math.round((hrs - STANDARD_SHIFT_HOURS) * 10) / 10 : 0;
+/** Paid hours for a day: clock hours (in to out) minus the lunch break. */
+export function calculatePaidHours(clockHours?: number | null): number {
+  const hrs = Number(clockHours) || 0;
+  return Math.max(0, Math.round((hrs - LUNCH_BREAK_HOURS) * 10) / 10);
 }
 
-/** Overtime pay: each hour beyond the standard shift pays the daily wage / 8. */
-export function calculateOvertimePay(dailyWage: number, hoursWorked?: number | null): number {
+/** Overtime hours in a day: paid hours beyond the 8-hour day. */
+export function calculateOvertimeHours(clockHours?: number | null): number {
+  const paid = calculatePaidHours(clockHours);
+  return paid > FULL_DAY_HOURS ? Math.round((paid - FULL_DAY_HOURS) * 10) / 10 : 0;
+}
+
+/** Overtime pay: each hour beyond the 8-hour day pays dailyWage / 8. */
+export function calculateOvertimePay(dailyWage: number, clockHours?: number | null): number {
   const wage = Number(dailyWage) || 0;
-  return Math.round((calculateOvertimeHours(hoursWorked) * wage) / 8);
+  return Math.round((calculateOvertimeHours(clockHours) * wage) / FULL_DAY_HOURS);
+}
+
+/** Pay for a worked day by the hour: paid hours x dailyWage / 8 (less than 8 hours pays less, more pays overtime). */
+function hourlyPay(wage: number, clockHours?: number | null): number {
+  // No hours recorded (e.g. marked Present without times) counts as a full day.
+  if (clockHours === undefined || clockHours === null || !(Number(clockHours) > 0)) return Math.round(wage);
+  return Math.round((calculatePaidHours(clockHours) * wage) / FULL_DAY_HOURS);
 }
 
 export function calculateEarnedWage(
@@ -54,12 +73,12 @@ export function calculateEarnedWage(
   // Backward compatibility: If 2nd argument was hoursWorked as number
   if (typeof status === "number") {
     if (status <= 0) return 0;
-    return Math.round(wage) + calculateOvertimePay(wage, status);
+    return hourlyPay(wage, status);
   }
 
   const s = String(status || "").toLowerCase().replace(/[\s_-]/g, "");
   if (s === "present" || s === "overtime") {
-    return Math.round(wage) + calculateOvertimePay(wage, hoursWorked);
+    return hourlyPay(wage, hoursWorked);
   }
   if (s === "halfday" || s === "half") {
     return Math.round(wage / 2);
@@ -72,7 +91,21 @@ export function calculateEarnedWage(
   if (hoursWorked !== undefined && hoursWorked <= 0) {
     return 0;
   }
-  return Math.round(wage) + calculateOvertimePay(wage, hoursWorked);
+  return hourlyPay(wage, hoursWorked);
+}
+
+/**
+ * Pay for one day's attendance record under today's rules (wage, 8-hour day, overtime).
+ * Every screen and report uses this so the amounts always agree with payroll,
+ * instead of the amount saved on the record when it was first logged.
+ */
+export function payForDay(dailyWage: number, status?: string | null, hoursWorked?: number | null): number {
+  return calculateEarnedWage(dailyWage, status || "Present", hoursWorked ? Number(hoursWorked) : undefined);
+}
+
+/** Daily wage for a labour: the stored daily wage, else the weekly wage spread over a 6-day week. */
+export function dailyWageOfLabour(lab?: { dailyWage?: number | null; defaultWeeklyWage?: number | null } | null): number {
+  return lab?.dailyWage ?? Math.round((lab?.defaultWeeklyWage || 1400) / 6);
 }
 
 /** Compute PaymentStatus from project net payable (projectValue - discount) + received + stages */

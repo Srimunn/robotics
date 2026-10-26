@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { useRobotics, calculateHoursFromTimes, calculateEarnedWage, calculateOvertimeHours } from "@/lib/robotics-context";
+import { useRobotics, calculateHoursFromTimes, calculateEarnedWage, calculateOvertimeHours, calculatePaidHours, payForDay } from "@/lib/robotics-context";
 import { canEdit } from "@/lib/permissions";
 import type { AttendanceRecord, LabourType } from "@/lib/robotics-types";
 import * as XLSX from "xlsx";
@@ -234,14 +234,14 @@ function AttendancePageComponent() {
       const presentCount = labLogs.filter(isFullDay).length;
       const halfDayCount = labLogs.filter((l) => l.status === "Half Day").length;
       const absentCount = labLogs.filter((l) => l.status === "Absent" || l.status === "Leave").length;
-      const totalHours = Math.round(labLogs.reduce((acc, l) => acc + (l.hoursWorked || 0), 0) * 10) / 10;
+      const totalHours = Math.round(labLogs.reduce((acc, l) => acc + calculatePaidHours(l.hoursWorked), 0) * 10) / 10;
 
       // Same rules as the payroll report: overtime only on full days, beyond the 9:30–6:00 shift.
       const overtimeHours =
         Math.round(labLogs.reduce((acc, l) => acc + (isFullDay(l) ? calculateOvertimeHours(l.hoursWorked) : 0), 0) * 10) / 10;
 
       const periodEarnings = labLogs.reduce(
-        (acc, l) => acc + calculateEarnedWage(dailyWageOf(lab), l.status || "Present", l.hoursWorked ? Number(l.hoursWorked) : 8),
+        (acc, l) => acc + payForDay(dailyWageOf(lab), l.status, l.hoursWorked),
         0
       );
 
@@ -723,7 +723,7 @@ function AttendancePageComponent() {
                         }
                         const ot = log && isFullDay(log) ? calculateOvertimeHours(log.hoursWorked) : 0;
                         const tip = log
-                          ? `${log.status} • ${log.inTime || "—"} to ${log.outTime || "—"} • ${log.hoursWorked || 0} hrs${ot > 0 ? ` (+${ot} OT)` : ""}`
+                          ? `${log.status} • ${log.inTime || "—"} to ${log.outTime || "—"} • ${calculatePaidHours(log.hoursWorked)} working hrs${ot > 0 ? ` (+${ot} OT)` : ""}`
                           : "Not marked";
                         return (
                           <td key={d} className="p-1 text-center" title={tip}>
@@ -934,12 +934,13 @@ function AttendancePageComponent() {
             {(() => {
               const selectedL = labours.find((l) => l.id === attLabourId);
               const wage = dailyWageOf(selectedL);
-              const hours = calculateHoursFromTimes(attInTime, attOutTime);
-              const money = calculateEarnedWage(wage, hours);
+              const clockHours = calculateHoursFromTimes(attInTime, attOutTime);
+              const hours = calculatePaidHours(clockHours);
+              const money = calculateEarnedWage(wage, clockHours);
               return (
                 <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 flex items-center justify-between text-xs font-semibold">
                   <div>
-                    <span className="text-emerald-900 dark:text-emerald-300 font-bold">Calculated Working Hours:</span>
+                    <span className="text-emerald-900 dark:text-emerald-300 font-bold">Working Hours (after 30 min lunch):</span>
                     <p className="text-base font-extrabold text-emerald-700 dark:text-emerald-400 mt-0.5">
                       {hours > 0 ? `${hours} hrs` : "0 hrs"}
                     </p>
