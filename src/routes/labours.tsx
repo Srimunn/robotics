@@ -319,7 +319,7 @@ function LaboursComponent() {
       name: labourFormData.name,
       phone: labourFormData.phone,
       loginId: labourFormData.loginId.trim() || "",
-      pin: labourFormData.pin.trim() || "0000",
+      pin: labourFormData.pin.trim(), // blank: the server generates a random PIN
       type: labourFormData.type,
       dailyWage: dailyWageVal,
       defaultWeeklyWage: dailyWageVal * 6,
