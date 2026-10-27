@@ -512,7 +512,7 @@ export function LaborDashboard() {
 
   const verifiedWages = verifiedLogs.reduce((acc, log) => {
     const hours = log.hoursWorked || (log.inTime && log.outTime ? calculateHoursFromTimes(log.inTime, log.outTime) : 0);
-    return acc + payForDay(dailyWageOfLabour(laborProfile), log.attendance, hours);
+    return acc + payForDay(dailyWageOfLabour(laborProfile), log.attendance, hours, log.overtimeHours);
   }, 0);
 
   // Toggle log history drawer

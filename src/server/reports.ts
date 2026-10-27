@@ -31,7 +31,7 @@ import { createServerFn } from "@tanstack/react-start";
 import PDFDocument from "pdfkit/js/pdfkit.standalone.js";
 import { db } from "~/lib/db";
 import { toNumber } from "./utils";
-import { payForDay, calculatePaidHours, calculateOvertimeHours, calculateOvertimePay } from "./calculations";
+import { payForDay, regularHoursOf, overtimeHoursOf, calculateOvertimePay } from "./calculations";
 import { fetchExtraPhotos } from "./project-photos";
 import { combineWorkPhotos, type WorkPhoto } from "~/lib/work-photos";
 
@@ -913,11 +913,11 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
     overtimeAmount: number;
   }
 
-  // Overtime applies only to full days (Present / Overtime), never to half days or absences.
-  const overtimeOf = (dailyWage: number, status: string | null | undefined, hours: number) => {
+  // Overtime is the hours the manager entered; it is never paid on an absent day or leave.
+  const overtimeOf = (dailyWage: number, status: string | null | undefined, overtimeHours: number | null | undefined) => {
     const st = String(status || "").toLowerCase();
-    if (st !== "present" && st !== "overtime") return { overtimeHours: 0, overtimeAmount: 0 };
-    return { overtimeHours: calculateOvertimeHours(hours), overtimeAmount: calculateOvertimePay(dailyWage, hours) };
+    if (st === "absent" || st === "leave") return { overtimeHours: 0, overtimeAmount: 0 };
+    return { overtimeHours: overtimeHoursOf(overtimeHours), overtimeAmount: calculateOvertimePay(dailyWage, overtimeHours) };
   };
 
   const entryMap = new Map<string, DailyLog>();
@@ -930,7 +930,7 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
 
     const lab = activeLabMap.get(ar.labourId)!;
     const labDailyWage = lab.dailyWage ?? (lab.defaultWeeklyWage ? Math.round(lab.defaultWeeklyWage / 6) : 0);
-    const earned = payForDay(labDailyWage, ar.status, toNumber(ar.hoursWorked));
+    const earned = payForDay(labDailyWage, ar.status, toNumber(ar.hoursWorked), toNumber(ar.overtimeHours));
 
     // One paid day per labour per date. A labour logged on two sites the same day
     // (or marked in Attendance and on a site) must not be paid twice.
@@ -946,7 +946,7 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
       status: ar.status,
       hoursWorked: toNumber(ar.hoursWorked) || 0,
       earnedMoney: earned,
-      ...overtimeOf(labDailyWage, ar.status, toNumber(ar.hoursWorked) || 0),
+      ...overtimeOf(labDailyWage, ar.status, toNumber(ar.overtimeHours)),
     });
   }
 
@@ -959,7 +959,7 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
 
       const lab = activeLabMap.get(lg.labourId)!;
       const labDailyWage = lab.dailyWage ?? (lab.defaultWeeklyWage ? Math.round(lab.defaultWeeklyWage / 6) : 0);
-      const earned = payForDay(labDailyWage, lg.attendance, toNumber(lg.hoursWorked));
+      const earned = payForDay(labDailyWage, lg.attendance, toNumber(lg.hoursWorked), toNumber(lg.overtimeHours));
 
       const key = `${lg.labourId}_${lgDateStr}`;
       if (!entryMap.has(key)) {
@@ -973,7 +973,7 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
           status: lg.attendance || "Present",
           hoursWorked: toNumber(lg.hoursWorked) || 0,
           earnedMoney: earned,
-          ...overtimeOf(labDailyWage, lg.attendance || "Present", toNumber(lg.hoursWorked) || 0),
+          ...overtimeOf(labDailyWage, lg.attendance || "Present", toNumber(lg.overtimeHours)),
         });
       }
     }
@@ -1011,7 +1011,7 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
         dayCredit.set(entry.date, Math.max(dayCredit.get(entry.date) || 0, credit));
       }
 
-      labTotalHours += calculatePaidHours(entry.hoursWorked);
+      labTotalHours += regularHoursOf(entry.hoursWorked);
       labTotalEarned += entry.earnedMoney;
       labOtHours += entry.overtimeHours;
       labOtAmount += entry.overtimeAmount;
@@ -1037,7 +1037,7 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
 
       const pItem = distinctProjectMap.get(pKey)!;
       if (isPresent) pItem.daysWorked += credit;
-      pItem.hoursWorked += calculatePaidHours(entry.hoursWorked);
+      pItem.hoursWorked += regularHoursOf(entry.hoursWorked);
       pItem.earnedAmount += entry.earnedMoney;
     }
 

@@ -1683,7 +1683,7 @@ function ProjectsComponent() {
                             const isPresent = Boolean(inTime && inTime.trim().length > 0);
                             const attendanceStatus = isPresent ? "Present" : "Absent";
                             const hours = isPresent ? calculateHoursFromTimes(inTime, outTime) : 0;
-                            const earnedWage = existingLog ? payForDay(dailyWageVal, existingLog.attendance, existingLog.hoursWorked || hours) : calculateEarnedWage(dailyWageVal, attendanceStatus, hours);
+                            const earnedWage = existingLog ? payForDay(dailyWageVal, existingLog.attendance, existingLog.hoursWorked || hours, existingLog.overtimeHours) : calculateEarnedWage(dailyWageVal, attendanceStatus, hours);
                             const workDesc = existingLog?.workDescription || "Assigned on site";
 
                             return (

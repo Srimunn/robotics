@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { useRobotics, calculateHoursFromTimes, calculateEarnedWage, calculateOvertimeHours, calculatePaidHours, payForDay } from "@/lib/robotics-context";
+import { useRobotics, calculateHoursFromTimes, regularHoursOf, overtimeHoursOf, payForDay } from "@/lib/robotics-context";
 import { canEdit } from "@/lib/permissions";
 import type { AttendanceRecord, LabourType } from "@/lib/robotics-types";
 import * as XLSX from "xlsx";
@@ -117,6 +117,8 @@ function AttendancePageComponent() {
   const [attOutTime, setAttOutTime] = useState(DEFAULT_OUT_TIME);
   const [attWorkDesc, setAttWorkDesc] = useState("On-site servicing");
   const [attStatus, setAttStatus] = useState<"Present" | "Half Day" | "Absent">("Present");
+  // Overtime is typed in by the manager (hours); it is not worked out from the out-time.
+  const [attOvertime, setAttOvertime] = useState("");
   const [attInPhotoUrl, setAttInPhotoUrl] = useState("");
   const [attOutPhotoUrl, setAttOutPhotoUrl] = useState("");
 
@@ -133,6 +135,7 @@ function AttendancePageComponent() {
     setAttStatus(
       !existing ? "Present" : existing.status === "Half Day" ? "Half Day" : isFullDay(existing) ? "Present" : "Absent"
     );
+    setAttOvertime(existing?.overtimeHours ? String(existing.overtimeHours) : "");
     setAttInPhotoUrl("");
     setAttOutPhotoUrl("");
     setAttWorkDesc(existing?.workDescription || "On-site servicing");
@@ -170,8 +173,9 @@ function AttendancePageComponent() {
         inPhotoUrl: attInPhotoUrl || undefined,
         outPhotoUrl: attOutPhotoUrl || undefined,
         attendance: attStatus,
+        overtimeHours: attStatus === "Absent" ? 0 : overtimeHoursOf(Number(attOvertime)),
         hoursWorked: attStatus === "Absent" ? 0 : calculateHoursFromTimes(attInTime, attOutTime),
-        earnedMoney: calculateEarnedWage(dailyWageOf(lab), attStatus, calculateHoursFromTimes(attInTime, attOutTime)),
+        earnedMoney: payForDay(dailyWageOf(lab), attStatus, calculateHoursFromTimes(attInTime, attOutTime), overtimeHoursOf(Number(attOvertime))),
         workDescription: attWorkDesc,
       });
     }
@@ -197,6 +201,7 @@ function AttendancePageComponent() {
         inTime: lg.inTime,
         outTime: lg.outTime,
         hoursWorked: lg.hoursWorked,
+        overtimeHours: lg.overtimeHours,
         earnedMoney: lg.earnedMoney,
         workDescription: lg.workDescription,
         weeklyWage: lg.weeklyWage,
@@ -261,14 +266,14 @@ function AttendancePageComponent() {
       const unmarkedDays =
         projectFilter === "all" ? rangeDates.filter((d) => isWorkingDayToCount(d) && !markedDates.has(d)).length : 0;
       const absentCount = labLogs.filter((l) => l.status === "Absent" || l.status === "Leave").length + unmarkedDays;
-      const totalHours = Math.round(labLogs.reduce((acc, l) => acc + calculatePaidHours(l.hoursWorked), 0) * 10) / 10;
+      const totalHours = Math.round(labLogs.reduce((acc, l) => acc + regularHoursOf(l.hoursWorked), 0) * 10) / 10;
 
-      // Same rules as the payroll report: overtime only on full days, beyond the 9:30–6:00 shift.
+      // Same rules as the payroll report: overtime is the hours the manager entered, never on an absent day.
       const overtimeHours =
-        Math.round(labLogs.reduce((acc, l) => acc + (isFullDay(l) ? calculateOvertimeHours(l.hoursWorked) : 0), 0) * 10) / 10;
+        Math.round(labLogs.reduce((acc, l) => acc + (l.status === "Absent" || l.status === "Leave" ? 0 : overtimeHoursOf(l.overtimeHours)), 0) * 10) / 10;
 
       const periodEarnings = labLogs.reduce(
-        (acc, l) => acc + payForDay(dailyWageOf(lab), l.status, l.hoursWorked),
+        (acc, l) => acc + payForDay(dailyWageOf(lab), l.status, l.hoursWorked, l.overtimeHours),
         0
       );
 
@@ -753,9 +758,9 @@ function AttendancePageComponent() {
                             cls = "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300";
                           }
                         }
-                        const ot = log && isFullDay(log) ? calculateOvertimeHours(log.hoursWorked) : 0;
+                        const ot = log && log.status !== "Absent" && log.status !== "Leave" ? overtimeHoursOf(log.overtimeHours) : 0;
                         const tip = log
-                          ? `${log.status} • ${log.inTime || "—"} to ${log.outTime || "—"} • ${calculatePaidHours(log.hoursWorked)} working hrs${ot > 0 ? ` (+${ot} OT)` : ""}`
+                          ? `${log.status} • ${log.inTime || "—"} to ${log.outTime || "—"} • ${regularHoursOf(log.hoursWorked)} working hrs${ot > 0 ? ` (+${ot} OT)` : ""}`
                           : isWorkingDayToCount(d)
                           ? "Not marked: counted as absent"
                           : isSunday(d)
@@ -990,6 +995,22 @@ function AttendancePageComponent() {
                 />
               </div>
             </div>
+
+            <div>
+              <label className="text-xs font-semibold block mb-1">Overtime (hours)</label>
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={24}
+                step={0.5}
+                value={attOvertime}
+                onChange={(e) => setAttOvertime(e.target.value)}
+                placeholder="0"
+                className="h-9 rounded-lg font-mono font-semibold text-xs"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Each overtime hour pays daily wage ÷ 8.</p>
+            </div>
             </>
             )}
 
@@ -999,14 +1020,16 @@ function AttendancePageComponent() {
               const selectedL = labours.find((l) => l.id === attLabourId);
               const wage = dailyWageOf(selectedL);
               const clockHours = attStatus === "Absent" ? 0 : calculateHoursFromTimes(attInTime, attOutTime);
-              const hours = calculatePaidHours(clockHours);
-              const money = calculateEarnedWage(wage, attStatus, clockHours);
+              const hours = regularHoursOf(clockHours);
+              const ot = attStatus === "Absent" ? 0 : overtimeHoursOf(Number(attOvertime));
+              const money = attStatus === "Absent" ? 0 : payForDay(wage, attStatus, clockHours, ot);
               return (
                 <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 flex items-center justify-between text-xs font-semibold">
                   <div>
                     <span className="text-emerald-900 dark:text-emerald-300 font-bold">Working Hours (after 30 min lunch):</span>
                     <p className="text-base font-extrabold text-emerald-700 dark:text-emerald-400 mt-0.5">
                       {hours > 0 ? `${hours} hrs` : "0 hrs"}
+                      {ot > 0 ? ` + ${ot} OT` : ""}
                     </p>
                   </div>
                   <div className="text-right">
