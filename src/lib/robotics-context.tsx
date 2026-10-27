@@ -760,6 +760,8 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
         date: log.date,
         inTime: log.inTime,
         outTime: log.outTime,
+        // Present/Absent come from the in-time (none = Absent); only Half Day has to be sent.
+        attendance: log.attendance === "Half Day" ? "Half Day" : undefined,
         weeklyWage: log.weeklyWage,
         workDescription: log.workDescription,
         remarks: log.remarks,
