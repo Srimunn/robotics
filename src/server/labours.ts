@@ -6,13 +6,25 @@ import { db } from "~/lib/db";
 import { cleanPhone, generateSafeId } from "./utils";
 import { assertCanEdit } from "./permissions";
 
+// The list is loaded before sign-in and by view-only roles, so it never carries labour PINs.
 export const listLabours = createServerFn({ method: "GET" }).handler(async () => {
   return db.labour.findMany({
     where: { isActive: true },
     orderBy: { name: "asc" },
+    omit: { pin: true },
     include: { wageHistory: { orderBy: { assignedDate: "desc" } } },
   });
 });
+
+// A labour's PIN, for roles that can edit labours (shown on the profile and in Copy Credentials).
+export const getLabourPin = createServerFn({ method: "POST" })
+  .validator((input: { id: string; requestedByRole?: string | null; requestedBySubRole?: string | null }) => input)
+  .handler(async ({ data }) => {
+    assertCanEdit(data);
+    if (data.requestedByRole !== "CEO" && data.requestedByRole !== "Worker") throw new Error("Access denied");
+    const lab = await db.labour.findUnique({ where: { id: data.id }, select: { pin: true } });
+    return { pin: lab?.pin || "0000" };
+  });
 
 const labourInput = z.object({
   name: z.string().min(1),

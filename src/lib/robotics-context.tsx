@@ -7,7 +7,7 @@
 export { calculateHoursFromTimes, calculateEarnedWage, calculateOvertimeHours, calculatePaidHours, payForDay, dailyWageOfLabour } from "~/server/calculations";
 export { canEdit, canEditEnquiries, canConvertEnquiry } from "~/lib/permissions";
 
-import { verifyRolePin } from "~/server/auth";
+import { verifyRolePin, verifyLabourPin } from "~/server/auth";
 import {
   getSettings,
   updateSettings as updateSettingsFn,
@@ -32,6 +32,7 @@ import {
   listLabours,
   addLabour as addLabourFn,
   updateLabour as updateLabourFn,
+  getLabourPin as getLabourPinFn,
   deleteLabour as deleteLabourFn,
   deactivateLabour as deactivateLabourFn,
   reactivateLabour as reactivateLabourFn,
@@ -248,6 +249,7 @@ type RoboticsContextType = {
 
   addLabour: (l: Omit<Labour, "id">) => Promise<Labour>;
   updateLabour: (id: string, l: Partial<Labour>) => Promise<void>;
+  getLabourPin: (id: string) => Promise<string>;
   deleteLabour: (id: string) => Promise<void>;
   deactivateLabour: (id: string) => Promise<void>;
   reactivateLabour: (id: string) => Promise<void>;
@@ -588,16 +590,14 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
     }
     if (role === "Labor") {
       if (!loginIdOrId || !loginIdOrId.trim()) { toast.error("Labour Name or Login ID is required"); return false; }
-      if (laboursQuery.isLoading || labours.length === 0) { toast.error("Please wait for data to load..."); return false; }
-      const t = loginIdOrId.trim().toLowerCase();
-      const lab = labours.find((l: Labour) => {
-        const idMatch = l.id?.toLowerCase() === t;
-        const loginIdMatch = l.loginId?.toLowerCase() === t;
-        const nameMatch = l.name?.toLowerCase() === t;
-        const firstNameMatch = l.name?.toLowerCase().split(" ")[0] === t;
-        const pinMatch = (l.pin || "0000") === trimmedPin;
-        return (idMatch || loginIdMatch || nameMatch || firstNameMatch) && pinMatch;
-      });
+      let lab: { id: string; name: string } | null = null;
+      try {
+        const res = await verifyLabourPin({ data: { loginIdOrId: loginIdOrId.trim(), pin: trimmedPin } });
+        if (res.ok) lab = { id: res.id, name: res.name };
+      } catch {
+        toast.error("Could not verify PIN. Please try again.");
+        return false;
+      }
       if (!lab) { toast.error("Incorrect Labour Name/ID or PIN"); return false; }
       setCurrentUser({ role: "Labor", id: lab.id, name: lab.name });
       toast.success(`Welcome, ${lab.name}!`);
@@ -1130,6 +1130,7 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
 
         addLabour: (l) => addLabourM.mutateAsync(l),
         updateLabour: async (id, l) => { await updateLabourM.mutateAsync({ id, updates: l }); },
+        getLabourPin: async (id) => (await getLabourPinFn({ data: { id, requestedByRole: currentUser?.role, requestedBySubRole: currentUser?.subRole } })).pin,
         deleteLabour: async (id) => { await deleteLabourM.mutateAsync(id); },
         deactivateLabour: async (id) => { await deactivateLabourM.mutateAsync(id); },
         reactivateLabour: async (id) => { await reactivateLabourM.mutateAsync(id); },
