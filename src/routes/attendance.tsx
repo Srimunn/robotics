@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { useRobotics, calculateHoursFromTimes, calculateEarnedWage, calculateOvertimeHours } from "@/lib/robotics-context";
+import { useRobotics, calculateHoursFromTimes, calculateEarnedWage, calculateOvertimeHours, calculatePaidHours, payForDay } from "@/lib/robotics-context";
 import { canEdit } from "@/lib/permissions";
 import type { AttendanceRecord, LabourType } from "@/lib/robotics-types";
 import * as XLSX from "xlsx";
@@ -90,6 +90,10 @@ function datesBetween(start: string, end: string): string[] {
   return out;
 }
 
+// Sunday is the weekly off; dates after today aren't due yet.
+const isSunday = (date: string) => new Date(`${date}T00:00:00`).getDay() === 0;
+const isWorkingDayToCount = (date: string) => !isSunday(date) && date <= localDateStr(new Date());
+
 const isFullDay = (l: AttendanceRecord) =>
   l.status === "Present" || l.status === "Overtime" || (l.status !== "Half Day" && l.status !== "Absent" && l.status !== "Leave" && ((l.hoursWorked || 0) > 0 || Boolean(l.inTime && l.inTime.trim())));
 
@@ -112,18 +116,30 @@ function AttendancePageComponent() {
   const [attInTime, setAttInTime] = useState(DEFAULT_IN_TIME);
   const [attOutTime, setAttOutTime] = useState(DEFAULT_OUT_TIME);
   const [attWorkDesc, setAttWorkDesc] = useState("On-site servicing");
+  const [attStatus, setAttStatus] = useState<"Present" | "Half Day" | "Absent">("Present");
   const [attInPhotoUrl, setAttInPhotoUrl] = useState("");
   const [attOutPhotoUrl, setAttOutPhotoUrl] = useState("");
 
-  // Each person starts from a fresh form, so one person's times or photos never carry over to the next.
-  const openMarkAttendance = (labourId: string, projectId: string) => {
+  // Fill the form for one person on one date: what was already marked that day (so a wrong
+  // mark can be corrected on the same site), or a fresh 9:30–6:00 form. Nothing carries over
+  // from the previous person.
+  const loadDay = (labourId: string, date: string, fallbackProjectId: string) => {
+    const existing = allAttendanceLogs.find((l) => l.labourId === labourId && l.date.slice(0, 10) === date);
     setAttLabourId(labourId);
-    setAttProjectId(projectId);
-    setAttInTime(DEFAULT_IN_TIME);
-    setAttOutTime(DEFAULT_OUT_TIME);
+    setAttDate(date);
+    setAttProjectId(existing?.projectId || fallbackProjectId);
+    setAttInTime(existing?.inTime || DEFAULT_IN_TIME);
+    setAttOutTime(existing?.outTime || DEFAULT_OUT_TIME);
+    setAttStatus(
+      !existing ? "Present" : existing.status === "Half Day" ? "Half Day" : isFullDay(existing) ? "Present" : "Absent"
+    );
     setAttInPhotoUrl("");
     setAttOutPhotoUrl("");
-    setAttWorkDesc("On-site servicing");
+    setAttWorkDesc(existing?.workDescription || "On-site servicing");
+  };
+
+  const openMarkAttendance = (labourId: string, projectId: string) => {
+    loadDay(labourId, attDate, projectId);
     setMarkAttendanceOpen(true);
   };
 
@@ -136,6 +152,10 @@ function AttendancePageComponent() {
     const lab = labours.find((l) => l.id === attLabourId);
     const targetProj = projects.find((p) => p.id === attProjectId) || projects[0];
     const weeklyWage = lab?.defaultWeeklyWage || 1400;
+    if (!targetProj) {
+      toast.error("Please select a site project");
+      return;
+    }
 
     if (targetProj) {
       updateProjectLabourLog(targetProj.id, {
@@ -144,13 +164,14 @@ function AttendancePageComponent() {
         labourType: lab?.type || "Permanent",
         weeklyWage: weeklyWage,
         date: attDate,
-        inTime: attInTime,
-        outTime: attOutTime,
+        // Absent clears the times, which the server records as Absent with 0 hours and ₹0.
+        inTime: attStatus === "Absent" ? "" : attInTime,
+        outTime: attStatus === "Absent" ? "" : attOutTime,
         inPhotoUrl: attInPhotoUrl || undefined,
         outPhotoUrl: attOutPhotoUrl || undefined,
-        attendance: "Present",
-        hoursWorked: calculateHoursFromTimes(attInTime, attOutTime),
-        earnedMoney: calculateEarnedWage(dailyWageOf(lab), calculateHoursFromTimes(attInTime, attOutTime)),
+        attendance: attStatus,
+        hoursWorked: attStatus === "Absent" ? 0 : calculateHoursFromTimes(attInTime, attOutTime),
+        earnedMoney: calculateEarnedWage(dailyWageOf(lab), attStatus, calculateHoursFromTimes(attInTime, attOutTime)),
         workDescription: attWorkDesc,
       });
     }
@@ -191,16 +212,18 @@ function AttendancePageComponent() {
       }))
     );
 
+    // One record per person per day. The central attendance record holds the latest mark
+    // (including a correction to Absent), so it wins over the site log for that day.
     const map = new Map<string, AttendanceRecord>();
-    [...centralLogs, ...projLogs].forEach((item) => {
-      const existing = map.get(item.id);
-      if (!existing || (item.hoursWorked && item.hoursWorked > 0) || item.verificationStatus === "Verified") {
-        map.set(item.id, item);
-      }
+    centralLogs.forEach((item) => map.set(item.id, item));
+    projLogs.forEach((item) => {
+      if (!map.has(item.id)) map.set(item.id, item);
     });
 
     return Array.from(map.values());
   }, [attendance, projects]);
+
+  const rangeDates = useMemo(() => (rangeStart && rangeEnd ? datesBetween(rangeStart, rangeEnd) : []), [rangeStart, rangeEnd]);
 
   // Aggregate attendance and calculate weekly & monthly wages per labour
   const aggregatedPayroll = useMemo(() => {
@@ -233,15 +256,19 @@ function AttendancePageComponent() {
 
       const presentCount = labLogs.filter(isFullDay).length;
       const halfDayCount = labLogs.filter((l) => l.status === "Half Day").length;
-      const absentCount = labLogs.filter((l) => l.status === "Absent" || l.status === "Leave").length;
-      const totalHours = Math.round(labLogs.reduce((acc, l) => acc + (l.hoursWorked || 0), 0) * 10) / 10;
+      // A working day (Mon–Sat, up to today) with no mark at all counts as absent too.
+      const markedDates = new Set(labLogs.map((l) => l.date.slice(0, 10)));
+      const unmarkedDays =
+        projectFilter === "all" ? rangeDates.filter((d) => isWorkingDayToCount(d) && !markedDates.has(d)).length : 0;
+      const absentCount = labLogs.filter((l) => l.status === "Absent" || l.status === "Leave").length + unmarkedDays;
+      const totalHours = Math.round(labLogs.reduce((acc, l) => acc + calculatePaidHours(l.hoursWorked), 0) * 10) / 10;
 
       // Same rules as the payroll report: overtime only on full days, beyond the 9:30–6:00 shift.
       const overtimeHours =
         Math.round(labLogs.reduce((acc, l) => acc + (isFullDay(l) ? calculateOvertimeHours(l.hoursWorked) : 0), 0) * 10) / 10;
 
       const periodEarnings = labLogs.reduce(
-        (acc, l) => acc + calculateEarnedWage(dailyWageOf(lab), l.status || "Present", l.hoursWorked ? Number(l.hoursWorked) : 8),
+        (acc, l) => acc + payForDay(dailyWageOf(lab), l.status, l.hoursWorked),
         0
       );
 
@@ -256,9 +283,7 @@ function AttendancePageComponent() {
         periodEarnings,
       };
     });
-  }, [labours, projects, allAttendanceLogs, rangeStart, rangeEnd, projectFilter]);
-
-  const rangeDates = useMemo(() => (rangeStart && rangeEnd ? datesBetween(rangeStart, rangeEnd) : []), [rangeStart, rangeEnd]);
+  }, [labours, projects, allAttendanceLogs, rangeDates, projectFilter]);
 
   const totalDaysLogged = aggregatedPayroll.reduce((acc, a) => acc + a.logs.length, 0);
   const totalPresentCount = aggregatedPayroll.reduce((acc, a) => acc + a.presentCount, 0);
@@ -584,7 +609,7 @@ function AttendancePageComponent() {
 
                     <TableCell className="text-center">
                       <span
-                        className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                        className={`inline-block whitespace-nowrap text-xs font-bold px-2.5 py-1 rounded-full ${
                           presentCount > 0
                             ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
                             : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
@@ -669,7 +694,7 @@ function AttendancePageComponent() {
             <Calendar className="h-4 w-4 text-blue-600" /> Daily Attendance Register
           </CardTitle>
           <CardDescription className="text-xs">
-            {rangeStart} to {rangeEnd} • P = Present, ½ = Half Day, A = Absent / Leave, – = not marked. Hover a cell for in/out times.
+            {rangeStart} to {rangeEnd} • P = Present, ½ = Half Day, A = Absent (dashed A = not marked, counted as absent), Off = Sunday. Hover a cell for in/out times.
           </CardDescription>
         </CardHeader>
         {rangeDates.length > 31 ? (
@@ -707,8 +732,15 @@ function AttendancePageComponent() {
                       </td>
                       {rangeDates.map((d) => {
                         const log = byDate.get(d);
-                        let label = "–";
+                        let label = "";
                         let cls = "text-slate-300 dark:text-slate-600";
+                        if (!log && isWorkingDayToCount(d)) {
+                          label = "A";
+                          cls = "bg-rose-50 text-rose-500 border border-dashed border-rose-300 dark:bg-rose-950/40 dark:text-rose-400";
+                        } else if (!log && isSunday(d)) {
+                          label = "Off";
+                          cls = "text-[9px] text-slate-400";
+                        }
                         if (log) {
                           if (log.status === "Half Day") {
                             label = "½";
@@ -723,8 +755,12 @@ function AttendancePageComponent() {
                         }
                         const ot = log && isFullDay(log) ? calculateOvertimeHours(log.hoursWorked) : 0;
                         const tip = log
-                          ? `${log.status} • ${log.inTime || "—"} to ${log.outTime || "—"} • ${log.hoursWorked || 0} hrs${ot > 0 ? ` (+${ot} OT)` : ""}`
-                          : "Not marked";
+                          ? `${log.status} • ${log.inTime || "—"} to ${log.outTime || "—"} • ${calculatePaidHours(log.hoursWorked)} working hrs${ot > 0 ? ` (+${ot} OT)` : ""}`
+                          : isWorkingDayToCount(d)
+                          ? "Not marked: counted as absent"
+                          : isSunday(d)
+                          ? "Sunday (weekly off)"
+                          : "Not due yet";
                         return (
                           <td key={d} className="p-1 text-center" title={tip}>
                             <span className={`inline-grid place-items-center h-7 w-7 rounded-md font-bold ${cls}`}>{label}</span>
@@ -842,7 +878,7 @@ function AttendancePageComponent() {
           <form onSubmit={handleMarkAttendanceSubmit} className="space-y-3.5 text-xs">
             <div>
               <label className="text-xs font-semibold block mb-1">Select Labour Staff *</label>
-              <Select value={attLabourId} onValueChange={setAttLabourId}>
+              <Select value={attLabourId} onValueChange={(v) => loadDay(v, attDate, attProjectId)}>
                 <SelectTrigger className="h-9 text-xs rounded-lg">
                   <SelectValue placeholder="Choose Labour..." />
                 </SelectTrigger>
@@ -877,11 +913,37 @@ function AttendancePageComponent() {
               <Input
                 type="date"
                 value={attDate}
-                onChange={(e) => setAttDate(e.target.value)}
+                onChange={(e) => loadDay(attLabourId, e.target.value, attProjectId)}
                 className="h-9 rounded-lg font-mono text-xs"
               />
             </div>
 
+            <div>
+              <label className="text-xs font-semibold block mb-1">Attendance</label>
+              <div className="grid grid-cols-3 gap-2">
+                {(["Present", "Half Day", "Absent"] as const).map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setAttStatus(st)}
+                    className={`h-9 rounded-lg border text-xs font-bold transition-colors ${
+                      attStatus === st
+                        ? st === "Present"
+                          ? "bg-emerald-600 text-white border-emerald-600"
+                          : st === "Half Day"
+                          ? "bg-amber-500 text-white border-amber-500"
+                          : "bg-rose-600 text-white border-rose-600"
+                        : "bg-background text-foreground border-border hover:bg-accent"
+                    }`}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {attStatus !== "Absent" && (
+            <>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold block mb-1">Start Time / In Time</label>
@@ -928,18 +990,21 @@ function AttendancePageComponent() {
                 />
               </div>
             </div>
+            </>
+            )}
 
 
             {/* REALTIME HOURS & EARNED MONEY BOX */}
             {(() => {
               const selectedL = labours.find((l) => l.id === attLabourId);
               const wage = dailyWageOf(selectedL);
-              const hours = calculateHoursFromTimes(attInTime, attOutTime);
-              const money = calculateEarnedWage(wage, hours);
+              const clockHours = attStatus === "Absent" ? 0 : calculateHoursFromTimes(attInTime, attOutTime);
+              const hours = calculatePaidHours(clockHours);
+              const money = calculateEarnedWage(wage, attStatus, clockHours);
               return (
                 <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 flex items-center justify-between text-xs font-semibold">
                   <div>
-                    <span className="text-emerald-900 dark:text-emerald-300 font-bold">Calculated Working Hours:</span>
+                    <span className="text-emerald-900 dark:text-emerald-300 font-bold">Working Hours (after 30 min lunch):</span>
                     <p className="text-base font-extrabold text-emerald-700 dark:text-emerald-400 mt-0.5">
                       {hours > 0 ? `${hours} hrs` : "0 hrs"}
                     </p>

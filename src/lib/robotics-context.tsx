@@ -4,7 +4,7 @@
 // Public API of useRobotics() kept stable — mutations are now async.
 // ============================================================
 
-export { calculateHoursFromTimes, calculateEarnedWage, calculateOvertimeHours } from "~/server/calculations";
+export { calculateHoursFromTimes, calculateEarnedWage, calculateOvertimeHours, calculatePaidHours, payForDay, dailyWageOfLabour } from "~/server/calculations";
 export { canEdit, canEditEnquiries, canConvertEnquiry } from "~/lib/permissions";
 
 import { verifyRolePin } from "~/server/auth";
@@ -760,6 +760,8 @@ export function RoboticsProvider({ children }: { children: ReactNode }) {
         date: log.date,
         inTime: log.inTime,
         outTime: log.outTime,
+        // Present/Absent come from the in-time (none = Absent); only Half Day has to be sent.
+        attendance: log.attendance === "Half Day" ? "Half Day" : undefined,
         weeklyWage: log.weeklyWage,
         workDescription: log.workDescription,
         remarks: log.remarks,

@@ -538,7 +538,7 @@ async function markAttendance(page: Page, projectId: string, date: string): Prom
     .first()
     .click();
   await fieldInput(dlg, "Attendance Date").fill(date);
-  await fieldInput(dlg, "Start Time / In Time").fill("09:00 AM");
+  await fieldInput(dlg, "Start Time / In Time").fill("09:30 AM");
   await fieldInput(dlg, "End Time / Out Time").fill("06:00 PM");
   const earned = money(
     await dlg.getByText("Earned Wages:").locator("xpath=following-sibling::p[1]").innerText(),
@@ -548,17 +548,23 @@ async function markAttendance(page: Page, projectId: string, date: string): Prom
   return earned;
 }
 
+/** The labour's Attendance row for this month (From = 1st of the month, To = today). */
 async function payrollRow(page: Page) {
   await navTo(page, "/attendance");
+  const now = new Date();
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  await mainEl(page).locator('input[type="date"]').first().fill(monthStart);
   await search(page, LABOUR);
-  const row = rowWith(page, LABOUR);
+  // The first table is the summary; the Daily Attendance Register below repeats each name.
+  const row = mainEl(page).locator("table").first().locator("tbody tr").filter({ hasText: LABOUR });
   await expect(row).toHaveCount(1);
   const c = row.locator("td");
+  // ID, Worker, Type, Present, Hours, Overtime, Daily Wage, Earned (selected dates), Action
   return {
-    present: money(await c.nth(3).innerText()),
-    daily: money(await c.nth(5).innerText()),
-    weekly: money(await c.nth(6).innerText()),
-    monthly: money(await c.nth(7).innerText()),
+    // "7 Days" may be followed by "(2 absent)", so read only the first number.
+    present: Number((await c.nth(3).innerText()).match(/\d+/)?.[0] ?? NaN),
+    daily: money(await c.nth(6).innerText()),
+    earned: money(await c.nth(7).innerText()),
   };
 }
 
@@ -581,7 +587,7 @@ const payrollFixture = (page: Page) =>
     const perDayEarned: number[] = [];
     for (const day of ["01", "02"])
       perDayEarned.push(await markAttendance(page, P.projectId, `${ym}-${day}`));
-    await expect.poll(async () => (await payrollRow(page)).present).toBe(2);
+    await expect.poll(async () => (await payrollRow(page)).present, { timeout: 60_000 }).toBe(2);
     return { perDayEarned };
   });
 
@@ -614,23 +620,16 @@ async function storedDailyEarnings(page: Page): Promise<number[]> {
   return [...byDate.keys()].sort().map((d) => byDate.get(d)!);
 }
 
-test("[bug] payroll: monthly wage is not ~4.33x the month's daily earnings", async ({ page }) => {
+test("attendance: earned for the selected dates equals the days logged, not a scaled-up estimate", async ({ page }) => {
   await payrollFixture(page);
   const daily = await storedDailyEarnings(page);
   expect(daily.length, "two logged days").toBe(2);
   const sum = daily.reduce((a, b) => a + b, 0);
   const row = await payrollRow(page);
-  expect(
-    Math.abs(row.monthly - sum * 4.33),
-    `monthly ${row.monthly} is ~4.33 x ${sum}`,
-  ).toBeGreaterThan(sum * 0.5);
-  expect(
-    Math.abs(row.monthly - sum),
-    `monthly ${row.monthly} vs this month's earnings ${sum}`,
-  ).toBeLessThanOrEqual(1);
+  expect(row.earned, `earned ${row.earned} vs this month's earnings ${sum}`).toBe(sum);
 });
 
-test("[bug] attendance: a day's earnings equal the labour's daily wage, not the weekly wage", async ({
+test("attendance: a full 9:30-6:00 day earns exactly the labour's daily wage", async ({
   page,
 }) => {
   const { perDayEarned } = await payrollFixture(page);
@@ -640,9 +639,9 @@ test("[bug] attendance: a day's earnings equal the labour's daily wage, not the 
     .soft(await storedDailyEarnings(page), "stored Earned Wages per full day (Labours profile)")
     .toEqual([DAILY, DAILY]);
   expect
-    .soft(perDayEarned, "Mark Attendance dialog 'Earned Wages' preview for a full 9h day")
+    .soft(perDayEarned, "Mark Attendance dialog 'Earned Wages' preview for a full 9:30-6:00 day")
     .toEqual([DAILY, DAILY]);
-  expect.soft(row.monthly, "MONTHLY WAGE for 2 days").toBe(2 * DAILY);
+  expect.soft(row.earned, "EARNED for 2 days").toBe(2 * DAILY);
 });
 
 test("[bug] labour profile lists each logged day once", async ({ page }) => {

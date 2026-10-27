@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useRobotics, calculateHoursFromTimes, calculateEarnedWage } from "@/lib/robotics-context";
+import { useRobotics, calculateHoursFromTimes, calculateEarnedWage, payForDay, dailyWageOfLabour } from "@/lib/robotics-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -511,9 +511,8 @@ export function LaborDashboard() {
   }, 0);
 
   const verifiedWages = verifiedLogs.reduce((acc, log) => {
-    if (log.earnedMoney) return acc + log.earnedMoney;
     const hours = log.hoursWorked || (log.inTime && log.outTime ? calculateHoursFromTimes(log.inTime, log.outTime) : 0);
-    return acc + calculateEarnedWage(Math.round((log.weeklyWage || defaultWeeklyWage) / 6), hours);
+    return acc + payForDay(dailyWageOfLabour(laborProfile), log.attendance, hours);
   }, 0);
 
   // Toggle log history drawer

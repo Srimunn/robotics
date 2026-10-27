@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { uploadImage } from "~/server/upload";
-import { useRobotics, calculateHoursFromTimes, calculateEarnedWage } from "@/lib/robotics-context";
+import { useRobotics, calculateHoursFromTimes, calculateEarnedWage, payForDay } from "@/lib/robotics-context";
 import { canEdit } from "@/lib/permissions";
 import type { Project, ProjectStatus, ProjectLabourLog, LabourType, MachineCondition, MachineIssueRecord, MaterialIssueRecord, PaymentStageItem, PaymentStatus, ProjectLabourAssignment, Payment } from "@/lib/robotics-types";
 import { SmartComboBox } from "@/components/ui/SmartComboBox";
@@ -1678,7 +1678,7 @@ function ProjectsComponent() {
                             const isPresent = Boolean(inTime && inTime.trim().length > 0);
                             const attendanceStatus = isPresent ? "Present" : "Absent";
                             const hours = isPresent ? calculateHoursFromTimes(inTime, outTime) : 0;
-                            const earnedWage = existingLog?.earnedMoney || calculateEarnedWage(dailyWageVal, attendanceStatus, hours);
+                            const earnedWage = existingLog ? payForDay(dailyWageVal, existingLog.attendance, existingLog.hoursWorked || hours) : calculateEarnedWage(dailyWageVal, attendanceStatus, hours);
                             const workDesc = existingLog?.workDescription || "Assigned on site";
 
                             return (

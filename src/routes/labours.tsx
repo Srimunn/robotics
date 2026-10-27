@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { useRobotics, calculateEarnedWage, calculateHoursFromTimes } from "@/lib/robotics-context";
+import { useRobotics, calculateEarnedWage, calculateHoursFromTimes, payForDay, dailyWageOfLabour } from "@/lib/robotics-context";
 import { canEdit } from "@/lib/permissions";
 import type { Labour, LabourType } from "@/lib/robotics-types";
 import { SmartComboBox } from "@/components/ui/SmartComboBox";
@@ -1090,7 +1090,7 @@ function LaboursComponent() {
                                   }
                                   return workerLogs.slice(0, 5).map((rec) => {
                                     const hrs = rec.hoursWorked || 0;
-                                    const earnedMoney = rec.earnedMoney || calculateEarnedWage(Math.round((rec.weeklyWage || activeLabour.defaultWeeklyWage || 1400) / 6), hrs);
+                                    const earnedMoney = payForDay(dailyWageOfLabour(activeLabour), rec.status, hrs);
 
                                     return (
                                       <tr key={rec.id} className="hover:bg-accent/40 transition-colors">

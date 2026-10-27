@@ -31,7 +31,7 @@ import { createServerFn } from "@tanstack/react-start";
 import PDFDocument from "pdfkit/js/pdfkit.standalone.js";
 import { db } from "~/lib/db";
 import { toNumber } from "./utils";
-import { calculateEarnedWage, calculateOvertimeHours, calculateOvertimePay } from "./calculations";
+import { payForDay, calculatePaidHours, calculateOvertimeHours, calculateOvertimePay } from "./calculations";
 import { fetchExtraPhotos } from "./project-photos";
 import { combineWorkPhotos, type WorkPhoto } from "~/lib/work-photos";
 
@@ -930,7 +930,7 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
 
     const lab = activeLabMap.get(ar.labourId)!;
     const labDailyWage = lab.dailyWage ?? (lab.defaultWeeklyWage ? Math.round(lab.defaultWeeklyWage / 6) : 0);
-    const earned = calculateEarnedWage(labDailyWage, ar.status, ar.hoursWorked ? Number(ar.hoursWorked) : 8);
+    const earned = payForDay(labDailyWage, ar.status, toNumber(ar.hoursWorked));
 
     // One paid day per labour per date. A labour logged on two sites the same day
     // (or marked in Attendance and on a site) must not be paid twice.
@@ -959,7 +959,7 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
 
       const lab = activeLabMap.get(lg.labourId)!;
       const labDailyWage = lab.dailyWage ?? (lab.defaultWeeklyWage ? Math.round(lab.defaultWeeklyWage / 6) : 0);
-      const earned = calculateEarnedWage(labDailyWage, lg.attendance, lg.hoursWorked ? Number(lg.hoursWorked) : 8);
+      const earned = payForDay(labDailyWage, lg.attendance, toNumber(lg.hoursWorked));
 
       const key = `${lg.labourId}_${lgDateStr}`;
       if (!entryMap.has(key)) {
@@ -1008,7 +1008,7 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
         presentDates.add(entry.date);
       }
 
-      labTotalHours += entry.hoursWorked;
+      labTotalHours += calculatePaidHours(entry.hoursWorked);
       labTotalEarned += entry.earnedMoney;
       labOtHours += entry.overtimeHours;
       labOtAmount += entry.overtimeAmount;
@@ -1034,7 +1034,7 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
 
       const pItem = distinctProjectMap.get(pKey)!;
       if (isPresent) pItem.daysWorked += 1;
-      pItem.hoursWorked += entry.hoursWorked;
+      pItem.hoursWorked += calculatePaidHours(entry.hoursWorked);
       pItem.earnedAmount += entry.earnedMoney;
     }
 
