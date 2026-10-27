@@ -609,7 +609,7 @@ function AttendancePageComponent() {
 
                     <TableCell className="text-center">
                       <span
-                        className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                        className={`inline-block whitespace-nowrap text-xs font-bold px-2.5 py-1 rounded-full ${
                           presentCount > 0
                             ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
                             : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"

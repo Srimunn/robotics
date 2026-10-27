@@ -382,10 +382,21 @@ for (const r of REPORTS) {
       .getByRole("button", { name: /Excel/i })
       .filter({ hasNotText: /All Logs/ })
       .first();
+    const isTotal = (row: Record<string, any>) => Object.values(row).some((v) => /^GRAND TOTAL/.test(String(v)));
     const pick = async (type: RegExp, tax: RegExp) => {
       await typeBar.getByRole("button", { name: type }).click();
       await taxBar.getByRole("button", { name: tax }).click();
-      return downloadExcel(page, excel);
+      const dl = await downloadExcel(page, excel);
+      if (r.tab === "Pending") {
+        // The Pending export ends with one GRAND TOTAL row of the amount still to collect.
+        const last = dl.rows[dl.rows.length - 1];
+        expect(last && isTotal(last), "Pending export ends with a GRAND TOTAL row").toBe(true);
+        const data = dl.rows.filter((x) => !isTotal(x));
+        const due = data.reduce((s, x) => s + Number(x["Outstanding Due (INR)"]), 0);
+        expect(Number(last["Outstanding Due (INR)"])).toBeCloseTo(due, 2);
+        return { ...dl, rows: data };
+      }
+      return dl;
     };
     const isEnq = r.tab === "Enquiries";
     const types = [/^B2B/, /^B2C/, /^Not set/];
