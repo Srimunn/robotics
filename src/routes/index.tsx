@@ -604,20 +604,24 @@ function DashboardComponent() {
     setAssignEngOpen(false);
   };
 
-  const handleRecordPaymentSubmit = (e: React.FormEvent) => {
+  const handleRecordPaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPayProjectId || payAmountInput <= 0) {
       toast.error("Please select a project and enter a valid payment amount");
       return;
     }
-    addPayment({
-      projectId: selectedPayProjectId,
-      paymentDate: todayStr,
-      amount: payAmountInput,
-      mode: payModeInput,
-      referenceNumber: payRefInput || `PAY-REF-${Math.floor(Math.random() * 1000000)}`,
-      remarks: `Recorded via Today's Operations Quick Action`,
-    });
+    try {
+      await addPayment({
+        projectId: selectedPayProjectId,
+        paymentDate: todayStr,
+        amount: payAmountInput,
+        mode: payModeInput,
+        referenceNumber: payRefInput || `PAY-REF-${Math.floor(Math.random() * 1000000)}`,
+        remarks: `Recorded via Today's Operations Quick Action`,
+      });
+    } catch {
+      return; // addPayment already showed the server's error
+    }
     setRecordPayOpen(false);
     setPayAmountInput(0);
     setPayRefInput("");

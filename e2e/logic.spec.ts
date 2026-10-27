@@ -311,6 +311,34 @@ test("payments: received/balance update, overpayment rejected, Partial -> Paid",
   await expect(rowWith(page, P.projectId).getByRole("button", { name: /Receive/ })).toHaveCount(0);
 });
 
+test("payments: double-clicking Save on the full balance records the payment once", async ({
+  page,
+}) => {
+  const P = await createProject(page, "DoublePay Customer", 10_000);
+  const dialog = await openProject(page, P.projectId);
+  await dialog.getByRole("button", { name: "Receive Payment" }).click();
+  const pay = page.getByRole("dialog").filter({ hasText: "Receive Payment Cockpit" });
+  await fieldInput(pay, "Amount Received (₹) *").fill("10000");
+  await pay.getByRole("button", { name: "Save Collection Receipt" }).dblclick();
+  await page.waitForTimeout(3000);
+  expect(await paymentsForProject(page, P.projectId)).toBe(1);
+  expect(await receivable(page, P.projectId)).toMatchObject({ received: 10_000, balance: 0 });
+});
+
+test("payments: the dashboard's Record Payment cannot overpay a project", async ({ page }) => {
+  const P = await createProject(page, "DashPay Customer", 10_000);
+  await navTo(page, "/");
+  await mainEl(page).getByRole("button", { name: "Record Payment", exact: true }).first().click();
+  const pay = page.getByRole("dialog").filter({ hasText: "Record Project Payment" });
+  await pay.getByRole("combobox").first().click();
+  await page.getByRole("option", { name: new RegExp(`^${escapeRe(P.projectId)} `) }).click();
+  await fieldInput(pay, "Payment Amount (₹) *").fill("10001");
+  await pay.getByRole("button", { name: "Confirm & Record Payment" }).click();
+  await expectToast(page, /cannot exceed/i);
+  await expect(pay).toBeVisible();
+  expect(await paymentsForProject(page, P.projectId)).toBe(0);
+});
+
 test("discount: balance = value - discount - received", async ({ page }) => {
   const P = await createProject(page, "Discount Customer", 100_000);
   await receivePaymentInProject(page, P.projectId, 30_000);

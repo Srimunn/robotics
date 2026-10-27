@@ -509,9 +509,11 @@ function MachinesPageComponent() {
                           <p className="text-base font-semibold text-foreground">Machine inventory is empty.</p>
                           <p className="text-xs text-muted-foreground">Add machinery and equipment to inventory to enable project dispatching.</p>
                         </div>
-                        <Button size="sm" onClick={() => setIsAddModalOpen(true)} className="mt-2 bg-blue-600 hover:bg-blue-700 text-white gap-1.5 rounded-lg shadow-xs">
-                          <Plus className="h-4 w-4" /> Add Machine / Tool
-                        </Button>
+                        {canFullEdit && (
+                          <Button size="sm" onClick={() => setIsAddModalOpen(true)} className="mt-2 bg-blue-600 hover:bg-blue-700 text-white gap-1.5 rounded-lg shadow-xs">
+                            <Plus className="h-4 w-4" /> Add Machine / Tool
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

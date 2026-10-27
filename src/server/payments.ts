@@ -59,6 +59,20 @@ export const addPayment = createServerFn({ method: "POST" })
     }
 
     return db.$transaction(async (tx) => {
+      // Lock the project so a double submit waits for the first payment, then is checked against the new balance.
+      await tx.$queryRaw`SELECT id FROM "Project" WHERE id = ${data.projectId} FOR UPDATE`;
+      const project = await tx.project.findUnique({
+        where: { id: data.projectId },
+        select: { projectValue: true, discountAmount: true, payments: { select: { amount: true } } },
+      });
+      if (!project) throw new Error("Project not found");
+      const netPayable = Math.max(0, Number(project.projectValue) - Number(project.discountAmount ?? 0));
+      const received = project.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+      const balance = Math.max(0, netPayable - received);
+      if (Math.round(data.amount * 100) > Math.round(balance * 100)) {
+        throw new Error(`Payment Amount cannot exceed project balance (₹${balance.toLocaleString("en-IN")})`);
+      }
+
       const year = new Date().getFullYear();
       const id = await generateSafeId(tx.payment, `PAY-${year}`);
 
@@ -134,6 +148,22 @@ export const updatePayment = createServerFn({ method: "POST" })
     return db.$transaction(async (tx) => {
       const existing = await tx.payment.findUnique({ where: { id: data.id } });
       if (!existing) throw new Error("Payment not found");
+      if (data.amount !== undefined) {
+        await tx.$queryRaw`SELECT id FROM "Project" WHERE id = ${existing.projectId} FOR UPDATE`;
+        const project = await tx.project.findUnique({
+          where: { id: existing.projectId },
+          select: { projectValue: true, discountAmount: true, payments: { select: { id: true, amount: true } } },
+        });
+        if (!project) throw new Error("Project not found");
+        const netPayable = Math.max(0, Number(project.projectValue) - Number(project.discountAmount ?? 0));
+        const receivedByOthers = project.payments
+          .filter((p) => p.id !== existing.id)
+          .reduce((sum, p) => sum + Number(p.amount), 0);
+        const allowed = Math.max(0, netPayable - receivedByOthers);
+        if (Math.round(data.amount * 100) > Math.round(allowed * 100)) {
+          throw new Error(`Payment amount cannot exceed allowable balance (₹${allowed.toLocaleString("en-IN")})`);
+        }
+      }
 
       const payment = await tx.payment.update({
         where: { id: data.id },
