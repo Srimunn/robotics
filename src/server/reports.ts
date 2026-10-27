@@ -996,16 +996,19 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
     }
 
     const distinctProjectMap = new Map<string, PayrollProjectItem>();
-    const presentDates = new Set<string>();
+    // A half day counts as half a day present; a date logged twice counts once, at its larger value.
+    const dayCredit = new Map<string, number>();
     let labTotalHours = 0;
     let labTotalEarned = 0;
     let labOtHours = 0;
     let labOtAmount = 0;
 
     for (const entry of labEntries) {
-      const isPresent = entry.status === "Present" || entry.status === "HalfDay" || entry.status === "Overtime" || entry.hoursWorked > 0;
+      const isHalfDay = String(entry.status || "").toLowerCase().replace(/[\s_-]/g, "") === "halfday";
+      const isPresent = isHalfDay || entry.status === "Present" || entry.status === "Overtime" || entry.hoursWorked > 0;
+      const credit = isHalfDay ? 0.5 : 1;
       if (isPresent) {
-        presentDates.add(entry.date);
+        dayCredit.set(entry.date, Math.max(dayCredit.get(entry.date) || 0, credit));
       }
 
       labTotalHours += calculatePaidHours(entry.hoursWorked);
@@ -1033,13 +1036,13 @@ async function fetchPayrollData(startDate?: string, endDate?: string): Promise<P
       }
 
       const pItem = distinctProjectMap.get(pKey)!;
-      if (isPresent) pItem.daysWorked += 1;
+      if (isPresent) pItem.daysWorked += credit;
       pItem.hoursWorked += calculatePaidHours(entry.hoursWorked);
       pItem.earnedAmount += entry.earnedMoney;
     }
 
     const distinctProjects = Array.from(distinctProjectMap.values()).map((p) => p.projectDisplay);
-    const daysPresent = presentDates.size;
+    const daysPresent = Array.from(dayCredit.values()).reduce((a, c) => a + c, 0);
     const labDailyWage = lab.dailyWage ?? (lab.defaultWeeklyWage ? Math.round(lab.defaultWeeklyWage / 6) : 0);
 
     totalGrandPayable += labTotalEarned;

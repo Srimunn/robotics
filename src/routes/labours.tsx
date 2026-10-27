@@ -135,7 +135,7 @@ function LaboursComponent() {
   const labours = robotics?.labours || [];
   const attendance = robotics?.attendance || {};
   const projects = robotics?.projects || [];
-  const { addLabour, updateLabour, deleteLabour, deactivateLabour, reactivateLabour, deleteLabourPermanently, checkLabourAvailability, addMasterDataItem, updateProjectLabourLog, verifyAttendanceRecord, currentUser } = robotics;
+  const { addLabour, updateLabour, getLabourPin, deleteLabour, deactivateLabour, reactivateLabour, deleteLabourPermanently, checkLabourAvailability, addMasterDataItem, updateProjectLabourLog, verifyAttendanceRecord, currentUser } = robotics;
 
   const { type } = Route.useSearch();
   const initialTypeFilter =
@@ -158,6 +158,15 @@ function LaboursComponent() {
 
   const canFullEdit = canEdit(currentUser);
 
+  // PINs are not in the labour list; editors fetch one on demand.
+  const [revealedPins, setRevealedPins] = useState<Record<string, string>>({});
+  const fetchPin = async (labourId: string) => {
+    if (revealedPins[labourId]) return revealedPins[labourId];
+    const pin = await getLabourPin(labourId);
+    setRevealedPins((prev) => ({ ...prev, [labourId]: pin }));
+    return pin;
+  };
+
   const [editOpen, setEditOpen] = useState(false);
   const [editTargetLabour, setEditTargetLabour] = useState<Labour | null>(null);
   const [editFormData, setEditFormData] = useState({
@@ -178,7 +187,7 @@ function LaboursComponent() {
       name: labour.name,
       phone: labour.phone,
       loginId: labour.loginId || labour.name.split(" ")[0],
-      pin: labour.pin || "",
+      pin: "",
       type: labour.type,
       dailyWage: dailyWageVal,
       defaultWeeklyWage: labour.defaultWeeklyWage || (dailyWageVal * 6),
@@ -220,6 +229,7 @@ function LaboursComponent() {
     const newPin = String(Math.floor(1000 + Math.random() * 9000));
     try {
       await updateLabour(labourId, { pin: newPin });
+      setRevealedPins((prev) => ({ ...prev, [labourId]: newPin }));
       toast.success(`PIN reset to: ${newPin} — share this with the worker`);
     } catch (err) {
       toast.error("Failed to reset PIN");
@@ -842,9 +852,22 @@ function LaboursComponent() {
                             <span className="font-semibold text-slate-700 dark:text-slate-300">
                               Login ID: <code className="bg-white dark:bg-purple-900/80 px-2 py-0.5 rounded border border-purple-300 font-extrabold text-purple-700 dark:text-purple-300 text-xs">{activeLabour.loginId || activeLabour.name.split(" ")[0]}</code>
                             </span>
-                            <span className="font-semibold text-slate-700 dark:text-slate-300">
-                              Generated 4-Digit PIN: <code className="bg-white dark:bg-purple-900/80 px-2 py-0.5 rounded border border-purple-300 font-extrabold text-purple-700 dark:text-purple-300 text-xs">{activeLabour.pin || "4827"}</code>
-                            </span>
+                            {canFullEdit && (
+                              <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                Generated 4-Digit PIN:{" "}
+                                {revealedPins[activeLabour.id] ? (
+                                  <code className="bg-white dark:bg-purple-900/80 px-2 py-0.5 rounded border border-purple-300 font-extrabold text-purple-700 dark:text-purple-300 text-xs">{revealedPins[activeLabour.id]}</code>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => fetchPin(activeLabour.id).catch(() => toast.error("Could not load PIN"))}
+                                    className="px-2 py-0.5 rounded border border-purple-300 bg-white dark:bg-purple-900/80 font-bold text-purple-700 dark:text-purple-300 text-xs cursor-pointer hover:bg-purple-100"
+                                  >
+                                    Show PIN
+                                  </button>
+                                )}
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
                             {canFullEdit && (
@@ -858,19 +881,23 @@ function LaboursComponent() {
                                 <KeyRound className="h-3.5 w-3.5 inline mr-1" /> Reset PIN
                               </Button>
                             )}
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                const text = `Service_OS Labour Portal Credentials\nLabour Name: ${activeLabour.name}\nLabour ID: ${activeLabour.id}\nLogin ID: ${activeLabour.loginId || activeLabour.name.split(" ")[0]}\nPIN: ${activeLabour.pin || "4827"}`;
-                                navigator.clipboard.writeText(text);
-                                toast.success(`Copied login credentials for ${activeLabour.name}`);
-                              }}
-                              className="h-8 text-[11px] font-bold text-purple-700 border-purple-300 hover:bg-purple-100 cursor-pointer rounded-lg gap-1"
-                            >
-                              <Copy className="h-3.5 w-3.5 inline mr-1" /> Copy Credentials
-                            </Button>
+                            {canFullEdit && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={async () => {
+                                  let pin: string;
+                                  try { pin = await fetchPin(activeLabour.id); } catch { toast.error("Could not load PIN"); return; }
+                                  const text = `Service_OS Labour Portal Credentials\nLabour Name: ${activeLabour.name}\nLabour ID: ${activeLabour.id}\nLogin ID: ${activeLabour.loginId || activeLabour.name.split(" ")[0]}\nPIN: ${pin}`;
+                                  navigator.clipboard.writeText(text);
+                                  toast.success(`Copied login credentials for ${activeLabour.name}`);
+                                }}
+                                className="h-8 text-[11px] font-bold text-purple-700 border-purple-300 hover:bg-purple-100 cursor-pointer rounded-lg gap-1"
+                              >
+                                <Copy className="h-3.5 w-3.5 inline mr-1" /> Copy Credentials
+                              </Button>
+                            )}
                           </div>
                         </div>
 
@@ -1582,6 +1609,7 @@ function LaboursComponent() {
                   <Input
                     maxLength={4}
                     value={editFormData.pin}
+                    placeholder="Leave blank to keep current PIN"
                     onChange={(e) => setEditFormData({ ...editFormData, pin: e.target.value.replace(/\D/g, "") })}
                     className="h-9 text-xs rounded-xl bg-background font-mono font-bold"
                   />
