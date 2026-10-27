@@ -273,7 +273,7 @@ function PaymentsComponent() {
     setReceiveOpen(true);
   };
 
-  const handleReceiveSubmit = (e: React.FormEvent) => {
+  const handleReceiveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProjectId) {
       toast.error("Please select a project");
@@ -290,17 +290,20 @@ function PaymentsComponent() {
       return;
     }
 
-    addPayment({
-      projectId: selectedProjectId,
-      paymentDate: payDate || new Date().toISOString().slice(0, 10),
-      amount: Number(payAmount),
-      mode: payMode,
-      referenceNumber: payRef || `PAY-REF-${Math.floor(Math.random() * 1000000)}`,
-      remarks: payRemarks || "Payment receipt logged via AR Cockpit",
-      receivedBy: payReceivedBy || "Accounts & Credit Desk",
-    });
-
-    toast.success(`Payment Added Successfully`);
+    // The success or error toast comes from addPayment once the server has replied.
+    try {
+      await addPayment({
+        projectId: selectedProjectId,
+        paymentDate: payDate || new Date().toISOString().slice(0, 10),
+        amount: Number(payAmount),
+        mode: payMode,
+        referenceNumber: payRef || `PAY-REF-${Math.floor(Math.random() * 1000000)}`,
+        remarks: payRemarks || "Payment receipt logged via AR Cockpit",
+        receivedBy: payReceivedBy || "Accounts & Credit Desk",
+      });
+    } catch {
+      return;
+    }
     setReceiveOpen(false);
   };
 

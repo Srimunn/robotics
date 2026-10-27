@@ -665,28 +665,33 @@ function ProjectsComponent() {
       return;
     }
 
-    if (editingPaymentId) {
-      await updatePayment(editingPaymentId, {
-        paymentDate: payDateInput || getTodayDateStr(),
-        amount: payAmount,
-        mode: payMode as any,
-        referenceNumber: payRef || existingPay?.referenceNumber || undefined,
-        remarks: payRemarksInput || existingPay?.remarks || undefined,
-        receivedBy: payReceivedByInput || "Accounts & Credit Desk",
-        proofName: payProofName || undefined,
-      });
-    } else {
-      let computedRef = payRef || `PAY-REF-${Math.floor(Math.random() * 1000000)}`;
-      await addPayment({
-        projectId: activeProject.id,
-        paymentDate: payDateInput || getTodayDateStr(),
-        amount: payAmount,
-        mode: payMode as any,
-        referenceNumber: computedRef,
-        remarks: payRemarksInput || `Collection received for project ${activeProject.id}`,
-        receivedBy: payReceivedByInput || "Accounts & Credit Desk",
-        proofName: payProofName,
-      });
+    // On a server error (shown by the toast) the dialog stays open so the amount can be corrected.
+    try {
+      if (editingPaymentId) {
+        await updatePayment(editingPaymentId, {
+          paymentDate: payDateInput || getTodayDateStr(),
+          amount: payAmount,
+          mode: payMode as any,
+          referenceNumber: payRef || existingPay?.referenceNumber || undefined,
+          remarks: payRemarksInput || existingPay?.remarks || undefined,
+          receivedBy: payReceivedByInput || "Accounts & Credit Desk",
+          proofName: payProofName || undefined,
+        });
+      } else {
+        let computedRef = payRef || `PAY-REF-${Math.floor(Math.random() * 1000000)}`;
+        await addPayment({
+          projectId: activeProject.id,
+          paymentDate: payDateInput || getTodayDateStr(),
+          amount: payAmount,
+          mode: payMode as any,
+          referenceNumber: computedRef,
+          remarks: payRemarksInput || `Collection received for project ${activeProject.id}`,
+          receivedBy: payReceivedByInput || "Accounts & Credit Desk",
+          proofName: payProofName,
+        });
+      }
+    } catch {
+      return;
     }
 
     setPaymentOpen(false);
