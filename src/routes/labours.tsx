@@ -1117,7 +1117,7 @@ function LaboursComponent() {
                                   }
                                   return workerLogs.slice(0, 5).map((rec) => {
                                     const hrs = rec.hoursWorked || 0;
-                                    const earnedMoney = payForDay(dailyWageOfLabour(activeLabour), rec.status, hrs);
+                                    const earnedMoney = payForDay(dailyWageOfLabour(activeLabour), rec.status, hrs, rec.overtimeHours);
 
                                     return (
                                       <tr key={rec.id} className="hover:bg-accent/40 transition-colors">

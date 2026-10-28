@@ -43,23 +43,28 @@ export function calculatePaidHours(clockHours?: number | null): number {
   return Math.max(0, Math.round((hrs - LUNCH_BREAK_HOURS) * 10) / 10);
 }
 
-/** Overtime hours in a day: paid hours beyond the 8-hour day. */
-export function calculateOvertimeHours(clockHours?: number | null): number {
-  const paid = calculatePaidHours(clockHours);
-  return paid > FULL_DAY_HOURS ? Math.round((paid - FULL_DAY_HOURS) * 10) / 10 : 0;
+/** Overtime hours the manager entered for a day (overtime is never worked out from the times). */
+export function overtimeHoursOf(overtimeHours?: number | null): number {
+  const ot = Number(overtimeHours) || 0;
+  return ot > 0 ? Math.round(ot * 10) / 10 : 0;
 }
 
-/** Overtime pay: each hour beyond the 8-hour day pays dailyWage / 8. */
-export function calculateOvertimePay(dailyWage: number, clockHours?: number | null): number {
+/** Overtime pay: each entered overtime hour pays dailyWage / 8. */
+export function calculateOvertimePay(dailyWage: number, overtimeHours?: number | null): number {
   const wage = Number(dailyWage) || 0;
-  return Math.round((calculateOvertimeHours(clockHours) * wage) / FULL_DAY_HOURS);
+  return Math.round((overtimeHoursOf(overtimeHours) * wage) / FULL_DAY_HOURS);
 }
 
-/** Pay for a worked day by the hour: paid hours x dailyWage / 8 (less than 8 hours pays less, more pays overtime). */
+/** Paid hours of the normal day, at most 8; time beyond that only pays as entered overtime. */
+export function regularHoursOf(clockHours?: number | null): number {
+  return Math.min(FULL_DAY_HOURS, calculatePaidHours(clockHours));
+}
+
+/** Pay for a worked day by the hour: paid hours (up to 8) x dailyWage / 8, so less than 8 hours pays less. */
 function hourlyPay(wage: number, clockHours?: number | null): number {
   // No hours recorded (e.g. marked Present without times) counts as a full day.
   if (clockHours === undefined || clockHours === null || !(Number(clockHours) > 0)) return Math.round(wage);
-  return Math.round((calculatePaidHours(clockHours) * wage) / FULL_DAY_HOURS);
+  return Math.round((regularHoursOf(clockHours) * wage) / FULL_DAY_HOURS);
 }
 
 export function calculateEarnedWage(
@@ -95,12 +100,20 @@ export function calculateEarnedWage(
 }
 
 /**
- * Pay for one day's attendance record under today's rules (wage, 8-hour day, overtime).
+ * Pay for one day's attendance record under today's rules (wage, 8-hour day, entered overtime).
  * Every screen and report uses this so the amounts always agree with payroll,
  * instead of the amount saved on the record when it was first logged.
  */
-export function payForDay(dailyWage: number, status?: string | null, hoursWorked?: number | null): number {
-  return calculateEarnedWage(dailyWage, status || "Present", hoursWorked ? Number(hoursWorked) : undefined);
+export function payForDay(
+  dailyWage: number,
+  status?: string | null,
+  hoursWorked?: number | null,
+  overtimeHours?: number | null
+): number {
+  const base = calculateEarnedWage(dailyWage, status || "Present", hoursWorked ? Number(hoursWorked) : undefined);
+  const s = String(status || "").toLowerCase();
+  if (s === "absent" || s === "leave") return base;
+  return base + calculateOvertimePay(dailyWage, overtimeHours);
 }
 
 /** Daily wage for a labour: the stored daily wage, else the weekly wage spread over a 6-day week. */

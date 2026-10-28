@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { AttendanceStatus, VerificationStatus } from "@prisma/client";
 import { db } from "~/lib/db";
 import { cleanPhone, toNumber, toNullableNumber } from "./utils";
-import { calculateHoursFromTimes, calculateEarnedWage } from "./calculations";
+import { calculateHoursFromTimes, calculateEarnedWage, calculateOvertimePay, overtimeHoursOf } from "./calculations";
 import { assertCanEdit } from "./permissions";
 import { recalculateProject } from "./recalc";
 
@@ -410,6 +410,8 @@ const updateLabourLogInput = z.object({
     weeklyWage: z.number().int().min(0, "Weekly wage must be a non-negative integer").optional().nullable(),
     dailyWage: z.number().int().min(0, "Daily wage must be a non-negative integer").optional().nullable(),
     attendance: z.string().optional().nullable(),
+    // Overtime hours the manager entered. Left out, the saved value is kept.
+    overtimeHours: z.number().min(0).max(24).optional().nullable(),
     workDescription: z.string().default("On-site servicing"),
     remarks: z.string().optional().nullable(),
     inPhotoUrl: z.string().optional().nullable(),
@@ -454,7 +456,10 @@ export const updateProjectLabourLog = createServerFn({ method: "POST" })
       const attendanceEnum = mapAttendanceStatusToDb(attendanceRaw);
       const recordedDailyWage = data.log.dailyWage ?? (data.log.weeklyWage ? Math.round(data.log.weeklyWage / 6) : (lab.dailyWage ?? Math.round(lab.defaultWeeklyWage / 6)));
       const recordedWeeklyWage = data.log.weeklyWage ?? (recordedDailyWage * 6);
-      const earned = calculateEarnedWage(recordedDailyWage, attendanceRaw, hours);
+      const isOff = attendanceEnum === "Absent" || attendanceEnum === "Leave";
+      const overtimeHours =
+        isOff ? 0 : data.log.overtimeHours === undefined ? undefined : overtimeHoursOf(data.log.overtimeHours);
+      const earned = calculateEarnedWage(recordedDailyWage, attendanceRaw, hours) + calculateOvertimePay(recordedDailyWage, overtimeHours);
       const date = new Date(data.log.date);
 
       const verStatus = mapVerStatusToDb(data.log.verificationStatus);
@@ -476,6 +481,7 @@ export const updateProjectLabourLog = createServerFn({ method: "POST" })
           outTime: data.log.outTime ?? undefined,
           attendance: attendanceEnum,
           hoursWorked: Number(hours),
+          overtimeHours,
           earnedMoney: Math.round(Number(earned)),
           workDescription: data.log.workDescription,
           remarks: data.log.remarks ?? undefined,
@@ -491,6 +497,7 @@ export const updateProjectLabourLog = createServerFn({ method: "POST" })
           outTime: data.log.outTime ?? undefined,
           attendance: attendanceEnum,
           hoursWorked: Number(hours),
+          overtimeHours,
           earnedMoney: Math.round(Number(earned)),
           workDescription: data.log.workDescription,
           remarks: data.log.remarks ?? undefined,
@@ -519,6 +526,7 @@ export const updateProjectLabourLog = createServerFn({ method: "POST" })
           inTime: data.log.inTime ?? undefined,
           outTime: data.log.outTime ?? undefined,
           hoursWorked: Number(hours),
+          overtimeHours,
           earnedMoney: Math.round(Number(earned)),
           workDescription: data.log.workDescription,
           weeklyWage: recordedWeeklyWage,
@@ -535,6 +543,7 @@ export const updateProjectLabourLog = createServerFn({ method: "POST" })
           outTime: data.log.outTime ?? undefined,
           status: attendanceEnum,
           hoursWorked: Number(hours),
+          overtimeHours,
           earnedMoney: Math.round(Number(earned)),
           workDescription: data.log.workDescription,
           weeklyWage: recordedWeeklyWage,

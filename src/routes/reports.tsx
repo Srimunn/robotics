@@ -631,7 +631,7 @@ function ReportsComponent() {
       const presentDays = logs.filter((log) => log.attendance === "Present" || log.inTime).length;
       const totalHours = logs.reduce((acc, log) => acc + (log.hoursWorked || 0), 0);
       const dailyWageRate = l.dailyWage ?? Math.round((l.defaultWeeklyWage || 1400) / 6);
-      const earnedWages = logs.reduce((acc, log) => acc + payForDay(dailyWageRate, log.attendance, log.hoursWorked), 0);
+      const earnedWages = logs.reduce((acc, log) => acc + payForDay(dailyWageRate, log.attendance, log.hoursWorked, log.overtimeHours), 0);
 
       return {
         labour: l,
@@ -2016,7 +2016,7 @@ function ReportsComponent() {
                           log.inTime || "N/A",
                           log.outTime || "N/A",
                           log.hoursWorked || 0,
-                          payForDay(dailyWageOfLabour(labours.find((lb) => lb.id === log.labourId)), log.attendance, log.hoursWorked),
+                          payForDay(dailyWageOfLabour(labours.find((lb) => lb.id === log.labourId)), log.attendance, log.hoursWorked, log.overtimeHours),
                           log.attendance || "Present",
                           log.verificationStatus || "Verified",
                         ])
@@ -2151,7 +2151,7 @@ function ReportsComponent() {
 
                   const totalHoursWorked = memberLogs.reduce((acc, l) => acc + (l.hoursWorked || 0), 0);
                   const selDailyWage = dailyWageOfLabour(selLabour);
-                  const totalEarned = memberLogs.reduce((acc, l) => acc + payForDay(selDailyWage, l.attendance, l.hoursWorked), 0);
+                  const totalEarned = memberLogs.reduce((acc, l) => acc + payForDay(selDailyWage, l.attendance, l.hoursWorked, l.overtimeHours), 0);
 
                   return (
                     <div className="space-y-3 p-4">
@@ -2220,7 +2220,7 @@ function ReportsComponent() {
                                     <td className="p-3 font-mono text-slate-700">{log.outTime || "Active"}</td>
                                     <td className="p-3 text-center font-bold text-foreground">{log.hoursWorked || 0} hrs</td>
                                     <td className="p-3 text-right font-bold text-emerald-600">
-                                      ₹{payForDay(selDailyWage, log.attendance, log.hoursWorked).toLocaleString("en-IN")}
+                                      ₹{payForDay(selDailyWage, log.attendance, log.hoursWorked, log.overtimeHours).toLocaleString("en-IN")}
                                     </td>
                                     <td className="p-3 text-right pr-4">
                                       <Badge

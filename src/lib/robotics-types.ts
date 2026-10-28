@@ -196,6 +196,7 @@ export interface ProjectLabourLog {
   outTime?: string;
   attendance: AttendanceStatus;
   hoursWorked: number;
+  overtimeHours?: number; // entered by the manager
   earnedMoney?: number;
   workDescription: string;
   remarks?: string;
@@ -436,6 +437,7 @@ export interface AttendanceRecord {
   inTime?: string;
   outTime?: string;
   hoursWorked?: number;
+  overtimeHours?: number; // entered by the manager
   earnedMoney?: number;
   workDescription?: string;
   weeklyWage?: number;

@@ -378,6 +378,7 @@ model ProjectLabourLog {
   outTime               String?
   attendance            AttendanceStatus
   hoursWorked           Float
+  overtimeHours         Float?
   earnedMoney           Int?
   workDescription       String
   remarks               String?
@@ -496,6 +497,7 @@ model AttendanceRecord {
   inTime                String?
   outTime               String?
   hoursWorked           Float?
+  overtimeHours         Float?
   earnedMoney           Int?
   workDescription       String?
   weeklyWage            Int?
