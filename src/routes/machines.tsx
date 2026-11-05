@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useRobotics } from "@/lib/robotics-context";
 import { canEdit } from "@/lib/permissions";
 import type {
@@ -35,6 +35,7 @@ import {
   ChevronsUpDown,
 } from "lucide-react";
 import { ExportButtons } from "@/components/export-buttons";
+import { useListView, ColumnsSwitch, ExpandHead, ExpandCell, HiddenDetailsRow } from "@/components/list-columns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -170,6 +171,8 @@ function MachinesPageComponent() {
       return matchesSearch && matchesCategory && matchesBrand && matchesStatus;
     });
   }, [machines, searchQuery, categoryFilter, brandFilter, statusFilter]);
+
+  const lv = useListView("tools");
 
   const exportMachineRows = () =>
     filteredMachines.map((m) => ({
@@ -321,6 +324,8 @@ function MachinesPageComponent() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ExportButtons
+            before={<ColumnsSwitch view={lv} />}
+            printKey="list.tools"
             rows={exportMachineRows}
             filename="Tools"
             title="Tools"
@@ -487,20 +492,21 @@ function MachinesPageComponent() {
           <Table containerClassName="max-h-[calc(100vh-280px)] min-h-[350px]">
             <TableHeader className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 shadow-2xs">
                 <TableRow className="hover:bg-transparent">
+                  <ExpandHead view={lv} />
                   <TableHead className="text-xs font-bold text-muted-foreground w-28">ID</TableHead>
                   <TableHead className="text-xs font-bold text-muted-foreground min-w-[220px]">TOOL NAME</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground">CATEGORY</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground">ATTACHMENT</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground text-center">QTY</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground text-center">BREAKDOWN</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground">CONDITION</TableHead>
+                  {lv.show("category") && <TableHead className="text-xs font-bold text-muted-foreground">CATEGORY</TableHead>}
+                  {lv.show("attachment") && <TableHead className="text-xs font-bold text-muted-foreground">ATTACHMENT</TableHead>}
+                  {lv.show("qty") && <TableHead className="text-xs font-bold text-muted-foreground text-center">QTY</TableHead>}
+                  {lv.show("breakdown") && <TableHead className="text-xs font-bold text-muted-foreground text-center">BREAKDOWN</TableHead>}
+                  {lv.show("condition") && <TableHead className="text-xs font-bold text-muted-foreground">CONDITION</TableHead>}
                   <TableHead className="text-xs font-bold text-muted-foreground text-right pr-4">ACTION</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredMachines.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12">
+                    <TableCell colSpan={lv.span(8 - lv.hidden.length)} className="text-center py-12">
                       <div className="flex flex-col items-center justify-center space-y-3">
                         <div className="grid h-12 w-12 place-items-center rounded-full bg-blue-50 text-blue-600">
                           <Wrench className="h-6 w-6 stroke-[1.5]" />
@@ -521,39 +527,23 @@ function MachinesPageComponent() {
                   filteredMachines.map((m) => {
                     const isAvailable = m.availableQuantity > 0;
 
-                    return (
-                      <TableRow key={m.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/30 transition-colors">
-                        <TableCell className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
-                          <Link
-                            to="/tools/$machineId"
-                            params={{ machineId: m.id }}
-                            className="hover:underline hover:text-blue-700 transition-colors inline-flex items-center gap-1 cursor-pointer"
-                          >
-                            {m.id}
-                          </Link>
-                        </TableCell>
-
-                        <TableCell>
-                          <div className="font-semibold text-xs text-foreground">{m.toolName}</div>
-                          {m.remarks && (
-                            <div className="text-[11px] text-muted-foreground truncate max-w-xs">{m.remarks}</div>
-                          )}
-                        </TableCell>
-
-                        <TableCell>
+                    const categoryCell = (
+                      <>
                           <div className="flex flex-col gap-1 items-start">
                             <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-medium">
                               {m.category}
                             </Badge>
                             <span className="text-[11px] font-medium text-muted-foreground">{m.brand}</span>
                           </div>
-                        </TableCell>
-
-                        <TableCell className="text-xs text-muted-foreground">
+                      </>
+                    );
+                    const attachmentCell = (
+                      <>
                           {m.attachment || "Standard Attachment"}
-                        </TableCell>
-
-                        <TableCell className="text-center">
+                      </>
+                    );
+                    const qtyCell = (
+                      <>
                           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 font-bold text-xs">
                             <span className={m.availableQuantity > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600"}>
                               {m.availableQuantity}
@@ -561,9 +551,10 @@ function MachinesPageComponent() {
                             <span className="text-muted-foreground">/</span>
                             <span>{m.currentStock} {m.unit}</span>
                           </div>
-                        </TableCell>
-
-                        <TableCell>
+                      </>
+                    );
+                    const breakdownCell = (
+                      <>
                           <div className="flex items-center justify-center gap-1.5">
                             {m.issuedQuantity > 0 && (
                               <Badge className="text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-950 border-blue-200">
@@ -584,9 +575,10 @@ function MachinesPageComponent() {
                               <span className="text-[11px] text-muted-foreground font-medium">100% In Stock</span>
                             )}
                           </div>
-                        </TableCell>
-
-                        <TableCell>
+                      </>
+                    );
+                    const conditionCell = (
+                      <>
                           <Badge
                             variant="outline"
                             className={`text-[10px] font-semibold ${
@@ -599,7 +591,39 @@ function MachinesPageComponent() {
                           >
                             {m.condition}
                           </Badge>
+                      </>
+                    );
+
+                    return (
+                      <Fragment key={m.id}>
+                      <TableRow className="hover:bg-slate-50/80 dark:hover:bg-slate-900/30 transition-colors">
+                        <ExpandCell view={lv} id={m.id} />
+                        <TableCell className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
+                          <Link
+                            to="/tools/$machineId"
+                            params={{ machineId: m.id }}
+                            className="hover:underline hover:text-blue-700 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            {m.id}
+                          </Link>
                         </TableCell>
+
+                        <TableCell>
+                          <div className="font-semibold text-xs text-foreground">{m.toolName}</div>
+                          {m.remarks && (
+                            <div className="text-[11px] text-muted-foreground truncate max-w-xs">{m.remarks}</div>
+                          )}
+                        </TableCell>
+
+                        {lv.show("category") && <TableCell>{categoryCell}</TableCell>}
+
+                        {lv.show("attachment") && <TableCell className="text-xs text-muted-foreground">{attachmentCell}</TableCell>}
+
+                        {lv.show("qty") && <TableCell className="text-center">{qtyCell}</TableCell>}
+
+                        {lv.show("breakdown") && <TableCell>{breakdownCell}</TableCell>}
+
+                        {lv.show("condition") && <TableCell>{conditionCell}</TableCell>}
 
                         <TableCell className="text-right pr-4">
                           <div className="flex items-center justify-end gap-1">
@@ -651,6 +675,19 @@ function MachinesPageComponent() {
                           </div>
                         </TableCell>
                       </TableRow>
+                      <HiddenDetailsRow
+                        view={lv}
+                        id={m.id}
+                        colSpan={lv.span(8 - lv.hidden.length)}
+                        items={[
+                          { key: "category", node: categoryCell },
+                          { key: "attachment", node: attachmentCell },
+                          { key: "qty", node: qtyCell },
+                          { key: "breakdown", node: breakdownCell },
+                          { key: "condition", node: conditionCell },
+                        ]}
+                      />
+                      </Fragment>
                     );
                   })
                 )}

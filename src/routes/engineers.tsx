@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useRobotics } from "@/lib/robotics-context";
 import { canEdit } from "@/lib/permissions";
 import type { Engineer } from "@/lib/robotics-types";
@@ -20,6 +20,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { ExportButtons } from "@/components/export-buttons";
+import { useListView, ColumnsSwitch, ExpandHead, ExpandCell, HiddenDetailsRow } from "@/components/list-columns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -140,6 +141,8 @@ function EngineersPageComponent() {
     });
   }, [engineerRoster, searchQuery, statusFilter]);
 
+  const lv = useListView("engineers");
+
   const exportEngineerRows = () =>
     filteredEngineers.map((eng) => ({
       "Engineer ID": eng.id,
@@ -202,6 +205,8 @@ function EngineersPageComponent() {
 
         <div className="flex flex-wrap items-center gap-2">
           <ExportButtons
+            before={<ColumnsSwitch view={lv} />}
+            printKey="list.engineers"
             rows={exportEngineerRows}
             filename="Engineers"
             title="Engineers"
@@ -303,19 +308,20 @@ function EngineersPageComponent() {
         <Table containerClassName="max-h-[calc(100vh-280px)] min-h-[350px]">
           <TableHeader className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 shadow-2xs">
               <TableRow className="hover:bg-transparent">
+                <ExpandHead view={lv} />
                 <TableHead className="text-xs font-bold text-muted-foreground w-28">ID</TableHead>
                 <TableHead className="text-xs font-bold text-muted-foreground min-w-[200px]">NAME</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground">SPECIALTY</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-center">STATUS</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground">ASSIGNMENT</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground">NEXT AVAILABLE</TableHead>
+                {lv.show("specialty") && <TableHead className="text-xs font-bold text-muted-foreground">SPECIALTY</TableHead>}
+                {lv.show("status") && <TableHead className="text-xs font-bold text-muted-foreground text-center">STATUS</TableHead>}
+                {lv.show("assignment") && <TableHead className="text-xs font-bold text-muted-foreground">ASSIGNMENT</TableHead>}
+                {lv.show("nextAvailable") && <TableHead className="text-xs font-bold text-muted-foreground">NEXT AVAILABLE</TableHead>}
                 <TableHead className="text-xs font-bold text-muted-foreground text-right pr-4">ACTION</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredEngineers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12">
+                  <TableCell colSpan={lv.span(7 - lv.hidden.length)} className="text-center py-12">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <UserCheck className="h-8 w-8 text-purple-600/60 stroke-[1.5]" />
                       <p className="text-base font-semibold text-foreground">No engineers assigned.</p>
@@ -329,8 +335,43 @@ function EngineersPageComponent() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredEngineers.map((eng) => (
-                  <TableRow key={eng.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/30 transition-colors">
+                filteredEngineers.map((eng) => {
+                  const specialtyCell = (
+                    <>
+                      <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-medium">
+                        {eng.specialty}
+                      </Badge>
+                    </>
+                  );
+                  const statusCell = (
+                    <>
+                      <Badge className="text-[10px] font-bold bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300">
+                        Available
+                      </Badge>
+                    </>
+                  );
+                  const assignmentCell = (
+                    <>
+                      {eng.currentProjectName ? (
+                        <div className="flex items-center gap-1.5 text-xs text-purple-700 dark:text-purple-300 font-medium">
+                          <FolderKanban className="h-3.5 w-3.5 text-purple-600" />
+                          <span>{eng.currentProjectName}</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">None (Free for dispatch)</span>
+                      )}
+                    </>
+                  );
+                  const nextAvailableCell = (
+                    <>
+                      {eng.nextAvailableDate}
+                    </>
+                  );
+
+                  return (
+                  <Fragment key={eng.id}>
+                  <TableRow className="hover:bg-slate-50/80 dark:hover:bg-slate-900/30 transition-colors">
+                    <ExpandCell view={lv} id={eng.id} />
                     <TableCell className="font-mono text-xs font-bold text-purple-600 dark:text-purple-400">
                       {eng.id}
                     </TableCell>
@@ -344,32 +385,13 @@ function EngineersPageComponent() {
                       </div>
                     </TableCell>
 
-                    <TableCell>
-                      <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-medium">
-                        {eng.specialty}
-                      </Badge>
-                    </TableCell>
+                    {lv.show("specialty") && <TableCell>{specialtyCell}</TableCell>}
 
-                    <TableCell className="text-center">
-                      <Badge className="text-[10px] font-bold bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300">
-                        Available
-                      </Badge>
-                    </TableCell>
+                    {lv.show("status") && <TableCell className="text-center">{statusCell}</TableCell>}
 
-                    <TableCell>
-                      {eng.currentProjectName ? (
-                        <div className="flex items-center gap-1.5 text-xs text-purple-700 dark:text-purple-300 font-medium">
-                          <FolderKanban className="h-3.5 w-3.5 text-purple-600" />
-                          <span>{eng.currentProjectName}</span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground italic">None (Free for dispatch)</span>
-                      )}
-                    </TableCell>
+                    {lv.show("assignment") && <TableCell>{assignmentCell}</TableCell>}
 
-                    <TableCell className="text-xs font-medium text-foreground">
-                      {eng.nextAvailableDate}
-                    </TableCell>
+                    {lv.show("nextAvailable") && <TableCell className="text-xs font-medium text-foreground">{nextAvailableCell}</TableCell>}
 
                     <TableCell className="text-right pr-4">
                       {canFullEdit && (
@@ -401,7 +423,20 @@ function EngineersPageComponent() {
                       )}
                     </TableCell>
                   </TableRow>
-                ))
+                  <HiddenDetailsRow
+                    view={lv}
+                    id={eng.id}
+                    colSpan={lv.span(7 - lv.hidden.length)}
+                    items={[
+                      { key: "specialty", node: specialtyCell },
+                      { key: "status", node: statusCell },
+                      { key: "assignment", node: assignmentCell },
+                      { key: "nextAvailable", node: nextAvailableCell },
+                    ]}
+                  />
+                  </Fragment>
+                  );
+                })
               )}
             </TableBody>
           </Table>

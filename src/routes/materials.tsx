@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useRobotics } from "@/lib/robotics-context";
 import { canEdit } from "@/lib/permissions";
 import type { Material, MaterialIssueRecord, StockAuditLog } from "@/lib/robotics-types";
@@ -23,6 +23,7 @@ import {
   PlusCircle,
 } from "lucide-react";
 import { ExportButtons } from "@/components/export-buttons";
+import { useListView, ColumnsSwitch, ExpandHead, ExpandCell, HiddenDetailsRow } from "@/components/list-columns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -138,6 +139,8 @@ function MaterialsPageComponent() {
       return matchesSearch && matchesCategory && matchesLowStock;
     });
   }, [materials, searchQuery, categoryFilter, lowStockOnly]);
+
+  const lv = useListView("materials");
 
   const exportMaterialRows = () =>
     filteredMaterials.map((m) => ({
@@ -281,6 +284,8 @@ function MaterialsPageComponent() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ExportButtons
+            before={<ColumnsSwitch view={lv} />}
+            printKey="list.materials"
             rows={exportMaterialRows}
             filename="Materials"
             title="Materials"
@@ -432,20 +437,21 @@ function MaterialsPageComponent() {
           <Table>
             <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
               <TableRow className="hover:bg-transparent">
+                <ExpandHead view={lv} />
                 <TableHead className="text-xs font-bold text-muted-foreground w-28">Material ID</TableHead>
                 <TableHead className="text-xs font-bold text-muted-foreground min-w-[220px]">Material Name</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground">Category</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-center">Current Stock / Min</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground">Supplier</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-right">Unit Cost</TableHead>
-                <TableHead className="text-xs font-bold text-muted-foreground text-right">Total Value</TableHead>
+                {lv.show("category") && <TableHead className="text-xs font-bold text-muted-foreground">Category</TableHead>}
+                {lv.show("stock") && <TableHead className="text-xs font-bold text-muted-foreground text-center">Current Stock / Min</TableHead>}
+                {lv.show("supplier") && <TableHead className="text-xs font-bold text-muted-foreground">Supplier</TableHead>}
+                {lv.show("unitCost") && <TableHead className="text-xs font-bold text-muted-foreground text-right">Unit Cost</TableHead>}
+                {lv.show("totalValue") && <TableHead className="text-xs font-bold text-muted-foreground text-right">Total Value</TableHead>}
                 <TableHead className="text-xs font-bold text-muted-foreground text-right pr-4">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredMaterials.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12">
+                  <TableCell colSpan={lv.span(8 - lv.hidden.length)} className="text-center py-12">
                     <div className="flex flex-col items-center justify-center space-y-3">
                       <div className="grid h-12 w-12 place-items-center rounded-full bg-blue-50 text-blue-600">
                         <Boxes className="h-6 w-6 stroke-[1.5]" />
@@ -467,8 +473,43 @@ function MaterialsPageComponent() {
                   const isLowStock = m.currentStock <= m.minimumStock;
                   const totalVal = m.currentStock * m.purchaseCost;
 
+                  const categoryCell = (
+                    <>
+                        <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-medium">
+                          {m.category}
+                        </Badge>
+                    </>
+                  );
+                  const stockCell = (
+                    <>
+                        <div className="flex flex-col items-center">
+                          <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                            isLowStock
+                              ? "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
+                              : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
+                          }`}>
+                            <span>{m.currentStock} {m.unit}</span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground mt-0.5">Min Threshold: {m.minimumStock} {m.unit}</span>
+                        </div>
+                    </>
+                  );
+                  const supplierCell = <>{m.supplier}</>;
+                  const unitCostCell = (
+                    <>
+                        ₹{m.purchaseCost.toLocaleString("en-IN")}
+                    </>
+                  );
+                  const totalValueCell = (
+                    <>
+                        ₹{totalVal.toLocaleString("en-IN")}
+                    </>
+                  );
+
                   return (
-                    <TableRow key={m.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/30 transition-colors">
+                    <Fragment key={m.id}>
+                    <TableRow className="hover:bg-slate-50/80 dark:hover:bg-slate-900/30 transition-colors">
+                      <ExpandCell view={lv} id={m.id} />
                       <TableCell className="font-mono text-xs font-bold text-purple-600 dark:text-purple-400">
                         {m.id}
                       </TableCell>
@@ -480,34 +521,15 @@ function MaterialsPageComponent() {
                         )}
                       </TableCell>
 
-                      <TableCell>
-                        <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-medium">
-                          {m.category}
-                        </Badge>
-                      </TableCell>
+                      {lv.show("category") && <TableCell>{categoryCell}</TableCell>}
 
-                      <TableCell className="text-center">
-                        <div className="flex flex-col items-center">
-                          <div className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                            isLowStock
-                              ? "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
-                              : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
-                          }`}>
-                            <span>{m.currentStock} {m.unit}</span>
-                          </div>
-                          <span className="text-[10px] text-muted-foreground mt-0.5">Min Threshold: {m.minimumStock} {m.unit}</span>
-                        </div>
-                      </TableCell>
+                      {lv.show("stock") && <TableCell className="text-center">{stockCell}</TableCell>}
 
-                      <TableCell className="text-xs text-muted-foreground">{m.supplier}</TableCell>
+                      {lv.show("supplier") && <TableCell className="text-xs text-muted-foreground">{supplierCell}</TableCell>}
 
-                      <TableCell className="text-right font-mono text-xs font-semibold">
-                        ₹{m.purchaseCost.toLocaleString("en-IN")}
-                      </TableCell>
+                      {lv.show("unitCost") && <TableCell className="text-right font-mono text-xs font-semibold">{unitCostCell}</TableCell>}
 
-                      <TableCell className="text-right font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                        ₹{totalVal.toLocaleString("en-IN")}
-                      </TableCell>
+                      {lv.show("totalValue") && <TableCell className="text-right font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">{totalValueCell}</TableCell>}
 
                       <TableCell className="text-right pr-4">
                         {canFullEdit && (
@@ -559,6 +581,19 @@ function MaterialsPageComponent() {
                         )}
                       </TableCell>
                     </TableRow>
+                    <HiddenDetailsRow
+                      view={lv}
+                      id={m.id}
+                      colSpan={lv.span(8 - lv.hidden.length)}
+                      items={[
+                        { key: "category", node: categoryCell },
+                        { key: "stock", node: stockCell },
+                        { key: "supplier", node: supplierCell },
+                        { key: "unitCost", node: unitCostCell },
+                        { key: "totalValue", node: totalValueCell },
+                      ]}
+                    />
+                    </Fragment>
                   );
                 })
               )}

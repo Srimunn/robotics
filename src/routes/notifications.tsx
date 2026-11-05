@@ -177,6 +177,7 @@ function CollectionsList({ items }: { items: PaymentReminder[] }) {
         <ExportButtons
           rows={exportRows}
           filename="Collection_Reminders"
+          printKey="list.notifications.collections"
           title="Collection Reminders"
         />
       </CardHeader>
@@ -308,6 +309,7 @@ function FollowUpsList({ items }: { items: FollowUpReminder[] }) {
         <ExportButtons
           rows={exportRows}
           filename="Follow-up_Reminders"
+          printKey="list.notifications.followups"
           title="Follow-up Reminders"
         />
       </CardHeader>
