@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { cn } from "@/lib/utils";
 import { useRobotics, calculateEarnedWage, calculateHoursFromTimes, payForDay, dailyWageOfLabour } from "@/lib/robotics-context";
 import { canEdit } from "@/lib/permissions";
@@ -34,6 +34,7 @@ import {
   Edit,
 } from "lucide-react";
 import { ExportButtons } from "@/components/export-buttons";
+import { useListView, ColumnsSwitch, ExpandHead, ExpandCell, HiddenDetailsRow } from "@/components/list-columns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -479,6 +480,8 @@ function LaboursComponent() {
     return matchesSearch && matchesType && matchesActive;
   });
 
+  const lv = useListView("labours");
+
   const exportLabourRows = () =>
     filteredLabours.map((l) => ({
       "Labour ID": l.id,
@@ -502,6 +505,8 @@ function LaboursComponent() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
         <ExportButtons
+          before={<ColumnsSwitch view={lv} />}
+          printKey="list.labours"
           rows={exportLabourRows}
           filename="Labours"
           title="Labours"
@@ -1347,18 +1352,35 @@ function LaboursComponent() {
               <table className="w-full text-left text-xs border-separate border-spacing-0">
                 <thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800 text-muted-foreground text-[11px] font-bold uppercase tracking-wider [&_th]:sticky [&_th]:top-0 [&_th]:bg-slate-100 [&_th]:dark:bg-slate-800 [&_th]:z-10 [&_th]:border-b [&_th]:border-slate-200 [&_th]:dark:border-slate-700 shadow-2xs">
                   <tr>
+                    <ExpandHead view={lv} />
                     <th className="p-3 pl-4">Labour ID</th>
                     <th className="p-3">Full Name</th>
-                    <th className="p-3">Phone</th>
-                    <th className="p-3">Labour Type</th>
-                    <th className="p-3">Daily Wage (₹/day)</th>
-                    <th className="p-3">Status</th>
+                    {lv.show("phone") && <th className="p-3">Phone</th>}
+                    {lv.show("type") && <th className="p-3">Labour Type</th>}
+                    {lv.show("wage") && <th className="p-3">Daily Wage (₹/day)</th>}
+                    {lv.show("status") && <th className="p-3">Status</th>}
                     <th className="p-3 text-right pr-4">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y [&_td]:border-b [&_td]:border-slate-100 dark:[&_td]:border-slate-800">
-                  {filteredLabours.map((l) => (
-                    <tr key={l.id} className={`hover:bg-accent/40 ${l.isActive === false ? "opacity-60 bg-amber-50/40 dark:bg-amber-950/20" : ""}`}>
+                  {filteredLabours.map((l) => {
+                    const phoneCell = <>{l.phone}</>;
+                    const typeCell = (
+                      <>
+                        <Badge variant="outline" className="text-[10px]">{l.type}</Badge>
+                      </>
+                    );
+                    const wageCell = <>₹{(l.dailyWage ?? Math.round((l.defaultWeeklyWage || 1400) / 6)).toLocaleString("en-IN")}/day</>;
+                    const statusCell = (
+                      <>
+                        <Badge className="bg-emerald-100 text-emerald-800 text-[10px]">{l.status}</Badge>
+                      </>
+                    );
+
+                    return (
+                    <Fragment key={l.id}>
+                    <tr className={`hover:bg-accent/40 ${l.isActive === false ? "opacity-60 bg-amber-50/40 dark:bg-amber-950/20" : ""}`}>
+                      <ExpandCell view={lv} id={l.id} />
                       <td className="p-3 pl-4 font-bold text-blue-600">{l.id}</td>
                       <td className="p-3 font-semibold text-foreground">
                         {l.name}
@@ -1368,14 +1390,10 @@ function LaboursComponent() {
                           </Badge>
                         )}
                       </td>
-                      <td className="p-3 text-muted-foreground">{l.phone}</td>
-                      <td className="p-3">
-                        <Badge variant="outline" className="text-[10px]">{l.type}</Badge>
-                      </td>
-                      <td className="p-3 font-bold text-emerald-700">₹{(l.dailyWage ?? Math.round((l.defaultWeeklyWage || 1400) / 6)).toLocaleString("en-IN")}/day</td>
-                      <td className="p-3">
-                        <Badge className="bg-emerald-100 text-emerald-800 text-[10px]">{l.status}</Badge>
-                      </td>
+                      {lv.show("phone") && <td className="p-3 text-muted-foreground">{phoneCell}</td>}
+                      {lv.show("type") && <td className="p-3">{typeCell}</td>}
+                      {lv.show("wage") && <td className="p-3 font-bold text-emerald-700">{wageCell}</td>}
+                      {lv.show("status") && <td className="p-3">{statusCell}</td>}
                       <td className="p-3 text-right pr-4">
                         {canFullEdit && (
                           <div className="flex items-center justify-end gap-1.5">
@@ -1428,7 +1446,20 @@ function LaboursComponent() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                    <HiddenDetailsRow
+                      view={lv}
+                      id={l.id}
+                      colSpan={lv.span(7 - lv.hidden.length)}
+                      items={[
+                        { key: "phone", node: phoneCell },
+                        { key: "type", node: typeCell },
+                        { key: "wage", node: wageCell },
+                        { key: "status", node: statusCell },
+                      ]}
+                    />
+                    </Fragment>
+                    );
+                  })}
                 </tbody>
 
               </table>

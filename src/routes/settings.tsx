@@ -4,6 +4,7 @@ import { useRobotics } from "@/lib/robotics-context";
 import { canEdit } from "@/lib/permissions";
 import { toast } from "sonner";
 import { MasterDataManager } from "@/components/erp/MasterDataManager";
+import { ColumnSettings } from "@/components/column-settings";
 import {
   Settings,
   Building2,
@@ -17,6 +18,7 @@ import {
   Database,
   SlidersHorizontal,
   AlertTriangle,
+  Columns3,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,7 +28,13 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
+type SettingsTab = "SETTINGS" | "MASTER_DATA" | "COLUMNS";
+
 export const Route = createFileRoute("/settings")({
+  validateSearch: (search: Record<string, unknown>): { tab?: SettingsTab } => {
+    const tab = search.tab;
+    return tab === "SETTINGS" || tab === "MASTER_DATA" || tab === "COLUMNS" ? { tab } : {};
+  },
   component: SettingsComponent,
 });
 
@@ -35,7 +43,8 @@ function SettingsComponent() {
 
   const canFullEdit = canEdit(currentUser);
 
-  const [activeTab, setActiveTab] = useState<"SETTINGS" | "MASTER_DATA">("MASTER_DATA");
+  const { tab } = Route.useSearch();
+  const [activeTab, setActiveTab] = useState<SettingsTab>(tab ?? "MASTER_DATA");
   const [formState, setFormState] = useState({ ...settings });
 
   const handleSave = (e: React.FormEvent) => {
@@ -89,9 +98,20 @@ function SettingsComponent() {
         >
           <SlidersHorizontal className="h-3.5 w-3.5" /> General Settings
         </Button>
+        <Button
+          variant={activeTab === "COLUMNS" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setActiveTab("COLUMNS")}
+          className={`text-xs rounded-lg gap-1.5 ${activeTab === "COLUMNS" ? "bg-blue-600 hover:bg-blue-700 text-white" : ""}`}
+          data-testid="settings-tab-columns"
+        >
+          <Columns3 className="h-3.5 w-3.5" /> Columns &amp; Printouts
+        </Button>
       </div>
 
       {activeTab === "MASTER_DATA" && <MasterDataManager />}
+
+      {activeTab === "COLUMNS" && <ColumnSettings />}
 
       {activeTab === "SETTINGS" && (
         <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-2 gap-6 text-xs">

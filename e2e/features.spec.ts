@@ -42,14 +42,30 @@ async function readXlsx(dl: Download): Promise<Record<string, any>[]> {
   return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
 }
 
-async function downloadExcel(page: Page, button: Locator) {
-  const [dl] = await Promise.all([page.waitForEvent("download"), button.click()]);
+/**
+ * Clicks an Excel / PDF button. When the "Choose columns" box opens, ticks every column
+ * (or keeps the saved choice) and confirms. Returns false when no box opened (empty list).
+ */
+async function clickExport(page: Page, button: Locator, opts: { allColumns?: boolean } = {}) {
+  const dialog = page.getByTestId("choose-columns-dialog");
+  await expect(dialog).toBeHidden(); // the previous box has finished closing
+  await button.click();
+  // Either the box opens, or an empty list says "Nothing to export" (no box).
+  await expect(dialog.or(page.getByText("Nothing to export"))).toBeVisible();
+  if (!(await dialog.isVisible())) return false;
+  if (opts.allColumns !== false) await dialog.getByRole("button", { name: "Select all" }).click();
+  await dialog.getByTestId("choose-columns-confirm").click();
+  return true;
+}
+
+async function downloadExcel(page: Page, button: Locator, opts: { allColumns?: boolean } = {}) {
+  const [dl] = await Promise.all([page.waitForEvent("download"), clickExport(page, button, opts)]);
   return { name: dl.suggestedFilename(), rows: await readXlsx(dl) };
 }
 
 /** Clicks a PDF button and returns the number of table rows in the print window. */
 async function pdfRowCount(page: Page, button: Locator) {
-  const [popup] = await Promise.all([page.waitForEvent("popup"), button.click()]);
+  const [popup] = await Promise.all([page.waitForEvent("popup"), clickExport(page, button)]);
   await popup.waitForLoadState("domcontentloaded");
   const n = await popup.locator("tbody tr").count();
   const title = await popup.title();
@@ -188,15 +204,15 @@ for (const m of MODULES) {
     await expect(pdfBtn).toBeVisible();
     const shown = m.title ? await countInTitle(main(page), m.title) : undefined;
     if (shown === 0) return; // nothing to export (empty module on this database)
-    const [dl] = await Promise.all([
-      page.waitForEvent("download", { timeout: 10_000 }).catch(() => null),
-      excelBtn.click(),
-    ]);
-    if (!dl) {
+    const download = page.waitForEvent("download", { timeout: 10_000 }).catch(() => null);
+    if (!(await clickExport(page, excelBtn))) {
       // Empty list: the app says so instead of downloading an empty file.
       await expectToast(page, "Nothing to export");
       return;
     }
+    const dl = await download;
+    expect(dl, "Excel download").toBeTruthy();
+    if (!dl) return;
     expect(dl.suggestedFilename()).toMatch(m.file);
     expect(dl.suggestedFilename()).toMatch(/\.xlsx$/);
     const rows = await readXlsx(dl);
@@ -258,7 +274,9 @@ test("B2B/B2C and GST: both required, independent, saved, filtered, and copied t
   expect(await enquiryRow(b2bNon)).toMatchObject({ customerType: "B2B", isGST: false });
   expect(await enquiryRow(b2cGst)).toMatchObject({ customerType: "B2C", isGST: true });
 
-  // List shows both columns; the two filters work on their own and together.
+  // List shows both columns (hidden in the short view, so open all columns); the two filters
+  // work on their own and together.
+  await main(page).getByTestId("columns-switch").click();
   await main(page).getByPlaceholder("Search...").fill(RUN);
   const rowOf = (n: string) => main(page).locator("tbody tr").filter({ hasText: n });
   await expect(rowOf(b2bNon)).toContainText("B2B");
@@ -531,6 +549,7 @@ test("reminders: follow-up date set on an enquiry shows in the bell and the page
 
   // Enquiries list column + "Follow-ups Due" filter
   await main(page).getByRole("button", { name: "Follow-ups Due" }).click();
+  await main(page).getByTestId("columns-switch").click(); // Next follow-up is hidden in the short view
   await main(page).getByPlaceholder("Search...").fill(name);
   await expect(main(page).locator("tbody tr").filter({ hasText: name })).toContainText(
     localToday(-1),
@@ -643,4 +662,102 @@ test("reminders: CS (view-only) can mark a follow-up done", async ({ page }) => 
   await expect
     .poll(async () => (await db.enquiry.findUnique({ where: { id: e!.id } }))!.nextFollowUpDate)
     .toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// 6. Column choice: short list pages, Settings toggles, and printout columns
+// ---------------------------------------------------------------------------
+
+test("columns: Enquiries list shows only the main columns; the row arrow and All columns open the rest", async ({
+  page,
+  errors,
+}) => {
+  await navTo(page, "/enquiries");
+  const head = main(page).locator("thead");
+  for (const h of ["ID", "CUSTOMER", "WORK TYPE", "AMOUNT", "STATUS", "ACTION"])
+    await expect(head.getByText(h, { exact: true })).toBeVisible();
+  for (const h of ["REFERRED BY", "ENGINEER", "START DATE", "NEXT FOLLOW-UP"])
+    await expect(head.getByText(h, { exact: true })).toHaveCount(0);
+  test.skip((await main(page).getByTestId("row-expand").count()) === 0, "no enquiries in this database");
+  await main(page).getByTestId("row-expand").first().click();
+  const details = main(page).getByTestId("row-details").first();
+  await expect(details).toContainText("Engineer");
+  await expect(details).toContainText("Next follow-up");
+  await main(page).getByTestId("columns-switch").click();
+  await expect(head.getByText("NEXT FOLLOW-UP", { exact: true })).toBeVisible();
+  await expect(main(page).getByTestId("row-expand")).toHaveCount(0);
+  expect(errors.unexpected()).toEqual([]);
+});
+
+test("columns: Projects list hides Start date and Started by default", async ({ page }) => {
+  await navTo(page, "/projects");
+  const head = main(page).locator("thead");
+  for (const h of ["ID", "CUSTOMER", "WORK TYPE", "ENGINEER", "PAYMENT", "STATUS", "ACTION"])
+    await expect(head.getByText(h, { exact: true })).toBeVisible();
+  await expect(head.getByText("START DATE", { exact: true })).toHaveCount(0);
+  await expect(head.getByText("STARTED", { exact: true })).toHaveCount(0);
+});
+
+test("columns: a Settings toggle changes the list page and is kept after reload", async ({ page }) => {
+  await navTo(page, "/settings?tab=COLUMNS");
+  const card = page.getByTestId("list-column-settings");
+  await card.getByRole("button", { name: "Enquiries", exact: true }).click();
+  await card.getByRole("switch", { name: "Show Next follow-up on Enquiries" }).click();
+  await navTo(page, "/enquiries");
+  await expect(main(page).locator("thead").getByText("NEXT FOLLOW-UP", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(main(page).locator("thead").getByText("NEXT FOLLOW-UP", { exact: true })).toBeVisible();
+  // Back to the default for the other tests
+  await navTo(page, "/settings?tab=COLUMNS");
+  await card.getByRole("button", { name: "Enquiries", exact: true }).click();
+  await card.getByRole("button", { name: "Reset to default" }).click();
+});
+
+test("columns: the export box keeps only the ticked columns, remembers them, and Settings pre-ticks them", async ({
+  page,
+}) => {
+  await navTo(page, "/enquiries");
+  test.skip((await countInTitle(main(page), /Enquiries \((\d+)\)/)) === 0, "no enquiries");
+  // Default selection: no Remarks / Start Date, but Next Follow-up is in.
+  let { rows } = await downloadExcel(page, main(page).getByTestId("export-excel"), { allColumns: false });
+  expect(Object.keys(rows[0])).toContain("Next Follow-up");
+  expect(Object.keys(rows[0])).not.toContain("Remarks");
+  expect(Object.keys(rows[0])).not.toContain("Start Date");
+
+  // Untick Location in the box: it is left out and remembered next time.
+  const dialog = page.getByTestId("choose-columns-dialog");
+  await expect(dialog).toBeHidden();
+  await main(page).getByTestId("export-excel").click();
+  await dialog.getByRole("checkbox", { name: "Location", exact: true }).click();
+  const [dl] = await Promise.all([
+    page.waitForEvent("download"),
+    dialog.getByTestId("choose-columns-confirm").click(),
+  ]);
+  expect(Object.keys((await readXlsx(dl))[0])).not.toContain("Location");
+  ({ rows } = await downloadExcel(page, main(page).getByTestId("export-excel"), { allColumns: false }));
+  expect(Object.keys(rows[0])).not.toContain("Location");
+
+  // Settings shows the same choice; Reset brings the default back.
+  await navTo(page, "/settings?tab=COLUMNS");
+  const print = page.getByTestId("print-column-settings");
+  await print.getByRole("button", { name: "Enquiries", exact: true }).click();
+  await expect(print.getByRole("checkbox", { name: "Location", exact: true })).not.toBeChecked();
+  await print.getByRole("button", { name: "Reset to default" }).click();
+  await expect(print.getByRole("checkbox", { name: "Location", exact: true })).toBeChecked();
+});
+
+test("columns: the PDF printout fits an A4 landscape page even with every column", async ({ page }) => {
+  await navTo(page, "/enquiries");
+  test.skip((await countInTitle(main(page), /Enquiries \((\d+)\)/)) === 0, "no enquiries");
+  const [popup] = await Promise.all([page.waitForEvent("popup"), clickExport(page, main(page).getByTestId("export-pdf"))]);
+  await popup.waitForLoadState("load");
+  await popup.emulateMedia({ media: "print" });
+  // A4 landscape is 297 mm wide; with 12 mm margins about 1032 CSS px are printable.
+  await popup.setViewportSize({ width: 1032, height: 700 });
+  const { tableWidth, pageWidth } = await popup.evaluate(() => ({
+    tableWidth: document.querySelector("table")!.getBoundingClientRect().width,
+    pageWidth: document.documentElement.clientWidth,
+  }));
+  expect(tableWidth).toBeLessThanOrEqual(pageWidth + 1);
+  await popup.close();
 });

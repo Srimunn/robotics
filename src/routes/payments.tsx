@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useRobotics } from "@/lib/robotics-context";
 import { canEdit } from "@/lib/permissions";
 import type { PaymentMode, PaymentStatus, Project } from "@/lib/robotics-types";
@@ -24,6 +24,7 @@ import {
   DollarSign,
 } from "lucide-react";
 import { ExportButtons } from "@/components/export-buttons";
+import { useListView, ColumnsSwitch, ExpandHead, ExpandCell, HiddenDetailsRow } from "@/components/list-columns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -184,6 +185,8 @@ function PaymentsComponent() {
       return matchesSearch && matchesCustomer;
     });
   }, [payments, searchQuery, selectedCustomerFilter, projects]);
+
+  const lv = useListView("payments");
 
   const exportPaymentRows = () => {
     if (activeTab === "RECEIVABLES") {
@@ -430,6 +433,14 @@ function PaymentsComponent() {
 
             <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full lg:w-auto justify-start sm:justify-end">
               <ExportButtons
+                before={activeTab === "RECEIVABLES" ? <ColumnsSwitch view={lv} /> : null}
+                printKey={
+                  activeTab === "RECEIVABLES"
+                    ? "list.payments.receivables"
+                    : activeTab === "HISTORY"
+                      ? "list.payments.history"
+                      : "list.payments.customer"
+                }
                 rows={exportPaymentRows}
                 filename={`Payments_${exportTabLabel}`}
                 title={`Payments - ${exportTabLabel}`}
@@ -528,22 +539,23 @@ function PaymentsComponent() {
           <Table containerClassName="max-h-[calc(100vh-280px)] min-h-[350px]">
             <TableHeader className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 shadow-2xs">
                 <TableRow className="hover:bg-transparent">
+                  <ExpandHead view={lv} />
                   <TableHead className="text-xs font-bold text-muted-foreground whitespace-nowrap min-w-[150px]">CUSTOMER</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground whitespace-nowrap min-w-[180px]">PROJECT</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground whitespace-nowrap text-center">PROJECT STATUS</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground text-right whitespace-nowrap">VALUE</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground text-right whitespace-nowrap">RECEIVED</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground text-right whitespace-nowrap">BALANCE</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground whitespace-nowrap min-w-[130px]">DUE DATE</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground text-center whitespace-nowrap">OVERDUE</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground text-center whitespace-nowrap">STATUS</TableHead>
+                  {lv.show("project") && <TableHead className="text-xs font-bold text-muted-foreground whitespace-nowrap min-w-[180px]">PROJECT</TableHead>}
+                  {lv.show("projectStatus") && <TableHead className="text-xs font-bold text-muted-foreground whitespace-nowrap text-center">PROJECT STATUS</TableHead>}
+                  {lv.show("value") && <TableHead className="text-xs font-bold text-muted-foreground text-right whitespace-nowrap">VALUE</TableHead>}
+                  {lv.show("received") && <TableHead className="text-xs font-bold text-muted-foreground text-right whitespace-nowrap">RECEIVED</TableHead>}
+                  {lv.show("balance") && <TableHead className="text-xs font-bold text-muted-foreground text-right whitespace-nowrap">BALANCE</TableHead>}
+                  {lv.show("dueDate") && <TableHead className="text-xs font-bold text-muted-foreground whitespace-nowrap min-w-[130px]">DUE DATE</TableHead>}
+                  {lv.show("overdue") && <TableHead className="text-xs font-bold text-muted-foreground text-center whitespace-nowrap">OVERDUE</TableHead>}
+                  {lv.show("status") && <TableHead className="text-xs font-bold text-muted-foreground text-center whitespace-nowrap">STATUS</TableHead>}
                   <TableHead className="text-xs font-bold text-muted-foreground text-right pr-4 whitespace-nowrap">ACTION</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedReceivables.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-12">
+                    <TableCell colSpan={lv.span(10 - lv.hidden.length)} className="text-center py-12">
                       <div className="flex flex-col items-center justify-center space-y-3">
                         <div className="grid h-12 w-12 place-items-center rounded-full bg-emerald-50 text-emerald-600">
                           <Wallet className="h-6 w-6 stroke-[1.5]" />
@@ -569,8 +581,95 @@ function PaymentsComponent() {
                     const nextDue = getProjectNextDue(proj);
                     const daysOver = getDaysOverdue(nextDue.dueDate, proj.balanceAmount);
 
+                    const projectCell = (
+                      <>
+                          <Link
+                            to="/projects"
+                            search={{ openId: proj.id }}
+                            className="font-mono font-bold text-xs text-blue-600 hover:text-blue-700 hover:underline cursor-pointer whitespace-nowrap"
+                          >
+                            {proj.id}
+                          </Link>
+                          <div className="text-[11px] text-muted-foreground truncate" title={proj.natureOfWork}>{proj.natureOfWork}</div>
+                      </>
+                    );
+                    const projectStatusCell = (
+                      <>
+                          <Badge
+                            className={`text-[10px] font-bold ${
+                              proj.status === "Ongoing"
+                                ? "bg-emerald-600 text-white"
+                                : proj.status === "Completed"
+                                ? "bg-emerald-700 text-white"
+                                : proj.status === "Closed"
+                                ? "bg-slate-600 text-white"
+                                : "bg-blue-600 text-white"
+                            }`}
+                          >
+                            {proj.status}
+                          </Badge>
+                      </>
+                    );
+                    const valueCell = (
+                      <>
+                          ₹{proj.projectValue.toLocaleString("en-IN")}
+                      </>
+                    );
+                    const receivedCell = (
+                      <>
+                          ₹{proj.receivedAmount.toLocaleString("en-IN")}
+                      </>
+                    );
+                    const balanceCell = (
+                      <>
+                          ₹{proj.balanceAmount.toLocaleString("en-IN")}
+                      </>
+                    );
+                    const dueDateCell = (
+                      <>
+                          <div className="whitespace-nowrap flex items-center gap-1">{nextDue.dueDate}</div>
+                          <div className="text-[10px] text-muted-foreground truncate max-w-[130px]">{nextDue.stageName}</div>
+                      </>
+                    );
+                    const overdueCell = (
+                      <>
+                          {daysOver > 0 ? (
+                            <Badge className="bg-rose-100 text-rose-800 border-rose-200 text-[10px] animate-pulse whitespace-nowrap">
+                              {daysOver} days overdue
+                            </Badge>
+                          ) : proj.balanceAmount <= 0 ? (
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground whitespace-nowrap">
+                              Settled
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] bg-slate-50 text-slate-700 whitespace-nowrap">
+                              On Schedule
+                            </Badge>
+                          )}
+                      </>
+                    );
+                    const statusCell = (
+                      <>
+                          <Badge
+                            className={`text-[10px] font-bold whitespace-nowrap ${
+                              proj.paymentStatus === "Paid"
+                                ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                : proj.paymentStatus === "Partial"
+                                ? "bg-blue-100 text-blue-800 border-blue-200"
+                                : proj.paymentStatus === "Overdue"
+                                ? "bg-rose-100 text-rose-800 border-rose-200"
+                                : "bg-amber-100 text-amber-800 border-amber-200"
+                            }`}
+                          >
+                            {proj.paymentStatus}
+                          </Badge>
+                      </>
+                    );
+
                     return (
-                      <TableRow key={proj.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/30 transition-colors">
+                      <Fragment key={proj.id}>
+                      <TableRow className="hover:bg-slate-50/80 dark:hover:bg-slate-900/30 transition-colors">
+                        <ExpandCell view={lv} id={proj.id} />
                         <TableCell className="whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <div className="font-bold text-xs text-foreground flex items-center gap-1">
@@ -612,81 +711,21 @@ function PaymentsComponent() {
                           </div>
                         </TableCell>
 
-                        <TableCell className="min-w-[180px] max-w-[240px]">
-                          <Link
-                            to="/projects"
-                            search={{ openId: proj.id }}
-                            className="font-mono font-bold text-xs text-blue-600 hover:text-blue-700 hover:underline cursor-pointer whitespace-nowrap"
-                          >
-                            {proj.id}
-                          </Link>
-                          <div className="text-[11px] text-muted-foreground truncate" title={proj.natureOfWork}>{proj.natureOfWork}</div>
-                        </TableCell>
+                        {lv.show("project") && <TableCell className="min-w-[180px] max-w-[240px]">{projectCell}</TableCell>}
 
-                        <TableCell className="text-center whitespace-nowrap">
-                          <Badge
-                            className={`text-[10px] font-bold ${
-                              proj.status === "Ongoing"
-                                ? "bg-emerald-600 text-white"
-                                : proj.status === "Completed"
-                                ? "bg-emerald-700 text-white"
-                                : proj.status === "Closed"
-                                ? "bg-slate-600 text-white"
-                                : "bg-blue-600 text-white"
-                            }`}
-                          >
-                            {proj.status}
-                          </Badge>
-                        </TableCell>
+                        {lv.show("projectStatus") && <TableCell className="text-center whitespace-nowrap">{projectStatusCell}</TableCell>}
 
-                        <TableCell className="text-right font-mono text-xs font-semibold text-foreground whitespace-nowrap">
-                          ₹{proj.projectValue.toLocaleString("en-IN")}
-                        </TableCell>
+                        {lv.show("value") && <TableCell className="text-right font-mono text-xs font-semibold text-foreground whitespace-nowrap">{valueCell}</TableCell>}
 
-                        <TableCell className="text-right font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
-                          ₹{proj.receivedAmount.toLocaleString("en-IN")}
-                        </TableCell>
+                        {lv.show("received") && <TableCell className="text-right font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{receivedCell}</TableCell>}
 
-                        <TableCell className="text-right font-mono text-xs font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap">
-                          ₹{proj.balanceAmount.toLocaleString("en-IN")}
-                        </TableCell>
+                        {lv.show("balance") && <TableCell className="text-right font-mono text-xs font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap">{balanceCell}</TableCell>}
 
-                        <TableCell className="text-xs font-semibold text-purple-700 dark:text-purple-400 whitespace-nowrap">
-                          <div className="whitespace-nowrap flex items-center gap-1">{nextDue.dueDate}</div>
-                          <div className="text-[10px] text-muted-foreground truncate max-w-[130px]">{nextDue.stageName}</div>
-                        </TableCell>
+                        {lv.show("dueDate") && <TableCell className="text-xs font-semibold text-purple-700 dark:text-purple-400 whitespace-nowrap">{dueDateCell}</TableCell>}
 
-                        <TableCell className="text-center whitespace-nowrap">
-                          {daysOver > 0 ? (
-                            <Badge className="bg-rose-100 text-rose-800 border-rose-200 text-[10px] animate-pulse whitespace-nowrap">
-                              {daysOver} days overdue
-                            </Badge>
-                          ) : proj.balanceAmount <= 0 ? (
-                            <Badge variant="outline" className="text-[10px] text-muted-foreground whitespace-nowrap">
-                              Settled
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-[10px] bg-slate-50 text-slate-700 whitespace-nowrap">
-                              On Schedule
-                            </Badge>
-                          )}
-                        </TableCell>
+                        {lv.show("overdue") && <TableCell className="text-center whitespace-nowrap">{overdueCell}</TableCell>}
 
-                        <TableCell className="text-center whitespace-nowrap">
-                          <Badge
-                            className={`text-[10px] font-bold whitespace-nowrap ${
-                              proj.paymentStatus === "Paid"
-                                ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                                : proj.paymentStatus === "Partial"
-                                ? "bg-blue-100 text-blue-800 border-blue-200"
-                                : proj.paymentStatus === "Overdue"
-                                ? "bg-rose-100 text-rose-800 border-rose-200"
-                                : "bg-amber-100 text-amber-800 border-amber-200"
-                            }`}
-                          >
-                            {proj.paymentStatus}
-                          </Badge>
-                        </TableCell>
+                        {lv.show("status") && <TableCell className="text-center whitespace-nowrap">{statusCell}</TableCell>}
 
                         <TableCell className="text-right pr-4 whitespace-nowrap">
                           {canFullEdit && proj.balanceAmount > 0 && (
@@ -700,6 +739,22 @@ function PaymentsComponent() {
                           )}
                         </TableCell>
                       </TableRow>
+                      <HiddenDetailsRow
+                        view={lv}
+                        id={proj.id}
+                        colSpan={lv.span(10 - lv.hidden.length)}
+                        items={[
+                          { key: "project", node: projectCell },
+                          { key: "projectStatus", node: projectStatusCell },
+                          { key: "value", node: valueCell },
+                          { key: "received", node: receivedCell },
+                          { key: "balance", node: balanceCell },
+                          { key: "dueDate", node: dueDateCell },
+                          { key: "overdue", node: overdueCell },
+                          { key: "status", node: statusCell },
+                        ]}
+                      />
+                      </Fragment>
                     );
                   })
                 )}

@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Fragment } from "react";
 import { uploadImage } from "~/server/upload";
 import { cn } from "@/lib/utils";
 import { useRobotics } from "@/lib/robotics-context";
@@ -10,6 +10,7 @@ import { DataPagination } from "@/components/ui/DataPagination";
 import { DeleteConfirm } from "@/components/delete-confirm";
 import { CreatedByBadge } from "@/components/created-by-badge";
 import { ExportButtons } from "@/components/export-buttons";
+import { useListView, ColumnsSwitch, ExpandHead, ExpandCell, HiddenDetailsRow } from "@/components/list-columns";
 import {
   CustomerTypeToggle,
   CustomerTypeBadge,
@@ -241,6 +242,8 @@ function EnquiriesComponent() {
 
     return matchesSearch && matchesDecision && matchesType && matchesGst;
   });
+
+  const lv = useListView("enquiries");
 
   const exportEnquiryRows = () =>
     filteredEnquiries.map((e) => ({
@@ -503,7 +506,14 @@ function EnquiriesComponent() {
                 <SelectItem value="NOT_SET">GST not set</SelectItem>
               </SelectContent>
             </Select>
-            <ExportButtons rows={exportEnquiryRows} filename="Enquiries" title="Enquiries" subtitle={exportSubtitle} />
+            <ExportButtons
+              before={<ColumnsSwitch view={lv} />}
+              printKey="list.enquiries"
+              rows={exportEnquiryRows}
+              filename="Enquiries"
+              title="Enquiries"
+              subtitle={exportSubtitle}
+            />
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -511,25 +521,26 @@ function EnquiriesComponent() {
             <table className="w-full text-left text-xs border-separate border-spacing-0">
               <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 text-muted-foreground text-[11px] font-bold uppercase tracking-wider [&_th]:sticky [&_th]:top-0 [&_th]:bg-slate-50 [&_th]:dark:bg-slate-900 [&_th]:z-10 [&_th]:border-b [&_th]:border-slate-200 [&_th]:dark:border-slate-800 shadow-2xs">
                 <tr>
+                  <ExpandHead view={lv} />
                   <th className="p-3 pl-4 whitespace-nowrap">ID</th>
                   <th className="p-3 whitespace-nowrap min-w-[160px]">CUSTOMER</th>
-                  <th className="p-3 whitespace-nowrap">TYPE</th>
-                  <th className="p-3 whitespace-nowrap">GST</th>
-                  <th className="p-3 whitespace-nowrap min-w-[200px]">WORK TYPE</th>
-                  <th className="p-3 whitespace-nowrap">REFERRED BY</th>
-                  <th className="p-3 whitespace-nowrap">ENGINEER</th>
-                  <th className="p-3 whitespace-nowrap">AMOUNT</th>
-                  <th className="p-3 whitespace-nowrap">START DATE</th>
-                  <th className="p-3 whitespace-nowrap">STARTED</th>
-                  <th className="p-3 whitespace-nowrap">STATUS</th>
-                  <th className="p-3 whitespace-nowrap">NEXT FOLLOW-UP</th>
+                  {lv.show("type") && <th className="p-3 whitespace-nowrap">TYPE</th>}
+                  {lv.show("gst") && <th className="p-3 whitespace-nowrap">GST</th>}
+                  {lv.show("workType") && <th className="p-3 whitespace-nowrap min-w-[200px]">WORK TYPE</th>}
+                  {lv.show("referredBy") && <th className="p-3 whitespace-nowrap">REFERRED BY</th>}
+                  {lv.show("engineer") && <th className="p-3 whitespace-nowrap">ENGINEER</th>}
+                  {lv.show("amount") && <th className="p-3 whitespace-nowrap">AMOUNT</th>}
+                  {lv.show("startDate") && <th className="p-3 whitespace-nowrap">START DATE</th>}
+                  {lv.show("started") && <th className="p-3 whitespace-nowrap">STARTED</th>}
+                  {lv.show("status") && <th className="p-3 whitespace-nowrap">STATUS</th>}
+                  {lv.show("nextFollowUp") && <th className="p-3 whitespace-nowrap">NEXT FOLLOW-UP</th>}
                   <th className="p-3 text-right pr-4 whitespace-nowrap">ACTION</th>
                 </tr>
               </thead>
               <tbody className="divide-y [&_td]:border-b [&_td]:border-slate-100 dark:[&_td]:border-slate-800">
                 {paginatedEnquiries.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="p-12 text-center">
+                    <td colSpan={lv.span(13 - lv.hidden.length)} className="p-12 text-center">
                       <div className="flex flex-col items-center justify-center space-y-3">
                         <div className="grid h-12 w-12 place-items-center rounded-full bg-blue-50 text-blue-600">
                           <PhoneCall className="h-6 w-6 stroke-[1.5]" />
@@ -580,46 +591,28 @@ function EnquiriesComponent() {
                       return unique.join(" ");
                     })();
 
-                    return (
-                      <tr
-                        key={enq.id}
-                        onClick={() => setActiveEnquiry(enq)}
-                        className="hover:bg-accent/40 transition-colors cursor-pointer"
-                      >
-                        <td className="p-3 pl-4 font-bold text-blue-600 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <span>{enq.id}</span>
-                            {enq.createdByRole && <CreatedByBadge role={enq.createdByRole} />}
-                          </div>
-                          {linkedProj && (
-                            <Badge variant="outline" className="text-[9px] bg-purple-50 text-purple-700 border-purple-200 mt-0.5">
-                              {linkedProj.id}
-                            </Badge>
-                          )}
-                        </td>
-                        <td className="p-3 whitespace-nowrap">
-                          <div className="font-bold text-xs text-foreground truncate max-w-[160px]" title={cleanCustomerName}>
-                            {cleanCustomerName}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground truncate max-w-[190px]" title={`${enq.phone} • ${enq.location}`}>
-                            {enq.phone} {enq.location ? `• ${enq.location}` : ""}
-                          </div>
-                        </td>
-                        <td className="p-3 whitespace-nowrap">
+                    const typeCell = (
+                      <>
                           <CustomerTypeBadge value={enq.customerType} />
-                        </td>
-                        <td className="p-3 whitespace-nowrap">
+                      </>
+                    );
+                    const gstCell = (
+                      <>
                           <GstBadge value={enq.isGST} />
-                        </td>
-                        <td className="p-3">
+                      </>
+                    );
+                    const workTypeCell = (
+                      <>
                           <div className="font-semibold text-xs text-foreground truncate max-w-[210px]" title={enq.leakageType}>
                             {enq.leakageType}
                           </div>
                           <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 whitespace-nowrap mt-0.5">
                             <span>Source: <strong>{enq.leadSource}</strong></span>
                           </div>
-                        </td>
-                        <td className="p-3 whitespace-nowrap">
+                      </>
+                    );
+                    const referredByCell = (
+                      <>
                           {enq.referredBy ? (
                             <span className="font-semibold text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100 whitespace-nowrap inline-block">
                               {enq.referredBy}
@@ -627,8 +620,10 @@ function EnquiriesComponent() {
                           ) : (
                             <span className="text-muted-foreground text-xs">—</span>
                           )}
-                        </td>
-                        <td className="p-3 whitespace-nowrap">
+                      </>
+                    );
+                    const engineerCell = (
+                      <>
                           {enq.assignedEngineerName ? (
                             <span className="font-semibold text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 whitespace-nowrap inline-block">
                               {enq.assignedEngineerName}
@@ -636,17 +631,25 @@ function EnquiriesComponent() {
                           ) : (
                             <span className="text-amber-600 text-[11px] font-medium">Unassigned</span>
                           )}
-                        </td>
-                        <td className="p-3 font-bold text-xs text-foreground whitespace-nowrap">
+                      </>
+                    );
+                    const amountCell = (
+                      <>
                           {enq.quotationAmount ? `₹${enq.quotationAmount.toLocaleString("en-IN")}` : "—"}
-                        </td>
-                        <td className="p-3 font-semibold text-xs text-purple-700 whitespace-nowrap font-mono">
+                      </>
+                    );
+                    const startDateCell = (
+                      <>
                           {enq.workCommittedDate ? enq.workCommittedDate : "Not Set"}
-                        </td>
-                        <td className="p-3 font-semibold text-xs text-emerald-700 whitespace-nowrap font-mono">
+                      </>
+                    );
+                    const startedCell = (
+                      <>
                           {enq.actualWorkStartedDate ? enq.actualWorkStartedDate : "Pending"}
-                        </td>
-                        <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                      </>
+                    );
+                    const statusCell = (
+                      <>
                           <Select
                             value={enq.customerDecision || "Follow Up"}
                             onValueChange={(val: CustomerDecision) => {
@@ -671,8 +674,10 @@ function EnquiriesComponent() {
                               <SelectItem value="Cancelled">Cancelled</SelectItem>
                             </SelectContent>
                           </Select>
-                        </td>
-                        <td className="p-3 whitespace-nowrap font-mono text-xs">
+                      </>
+                    );
+                    const nextFollowUpCell = (
+                      <>
                           {enq.nextFollowUpDate && isOpenForFollowUp(enq) ? (
                             <span
                               title={enq.followUpNote || undefined}
@@ -690,7 +695,45 @@ function EnquiriesComponent() {
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
+                      </>
+                    );
+
+                    return (
+                      <Fragment key={enq.id}>
+                      <tr
+                        onClick={() => setActiveEnquiry(enq)}
+                        className="hover:bg-accent/40 transition-colors cursor-pointer"
+                      >
+                        <ExpandCell view={lv} id={enq.id} />
+                        <td className="p-3 pl-4 font-bold text-blue-600 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <span>{enq.id}</span>
+                            {enq.createdByRole && <CreatedByBadge role={enq.createdByRole} />}
+                          </div>
+                          {linkedProj && (
+                            <Badge variant="outline" className="text-[9px] bg-purple-50 text-purple-700 border-purple-200 mt-0.5">
+                              {linkedProj.id}
+                            </Badge>
+                          )}
                         </td>
+                        <td className="p-3 whitespace-nowrap">
+                          <div className="font-bold text-xs text-foreground truncate max-w-[160px]" title={cleanCustomerName}>
+                            {cleanCustomerName}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground truncate max-w-[190px]" title={`${enq.phone} • ${enq.location}`}>
+                            {enq.phone} {enq.location ? `• ${enq.location}` : ""}
+                          </div>
+                        </td>
+                        {lv.show("type") && <td className="p-3 whitespace-nowrap">{typeCell}</td>}
+                        {lv.show("gst") && <td className="p-3 whitespace-nowrap">{gstCell}</td>}
+                        {lv.show("workType") && <td className="p-3">{workTypeCell}</td>}
+                        {lv.show("referredBy") && <td className="p-3 whitespace-nowrap">{referredByCell}</td>}
+                        {lv.show("engineer") && <td className="p-3 whitespace-nowrap">{engineerCell}</td>}
+                        {lv.show("amount") && <td className="p-3 font-bold text-xs text-foreground whitespace-nowrap">{amountCell}</td>}
+                        {lv.show("startDate") && <td className="p-3 font-semibold text-xs text-purple-700 whitespace-nowrap font-mono">{startDateCell}</td>}
+                        {lv.show("started") && <td className="p-3 font-semibold text-xs text-emerald-700 whitespace-nowrap font-mono">{startedCell}</td>}
+                        {lv.show("status") && <td className="p-3" onClick={(e) => e.stopPropagation()}>{statusCell}</td>}
+                        {lv.show("nextFollowUp") && <td className="p-3 whitespace-nowrap font-mono text-xs">{nextFollowUpCell}</td>}
                         <td className="p-3 text-right pr-4">
                           <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                             {targetProjectId ? (
@@ -734,6 +777,24 @@ function EnquiriesComponent() {
                           </div>
                         </td>
                       </tr>
+                      <HiddenDetailsRow
+                        view={lv}
+                        id={enq.id}
+                        colSpan={lv.span(13 - lv.hidden.length)}
+                        items={[
+                          { key: "type", node: typeCell },
+                          { key: "gst", node: gstCell },
+                          { key: "workType", node: workTypeCell },
+                          { key: "referredBy", node: referredByCell },
+                          { key: "engineer", node: engineerCell },
+                          { key: "amount", node: amountCell },
+                          { key: "startDate", node: startDateCell },
+                          { key: "started", node: startedCell },
+                          { key: "status", node: statusCell },
+                          { key: "nextFollowUp", node: nextFollowUpCell },
+                        ]}
+                      />
+                      </Fragment>
                     );
                   })
                 )}

@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { uploadImage } from "~/server/upload";
 import { useRobotics, calculateHoursFromTimes, calculateEarnedWage, payForDay } from "@/lib/robotics-context";
 import { canEdit } from "@/lib/permissions";
@@ -10,6 +10,7 @@ import { DeleteConfirm } from "@/components/delete-confirm";
 import { ProjectWorkPhotos } from "@/components/ProjectWorkPhotos";
 import { CreatedByBadge } from "@/components/created-by-badge";
 import { ExportButtons } from "@/components/export-buttons";
+import { useListView, ColumnsSwitch, ExpandHead, ExpandCell, HiddenDetailsRow } from "@/components/list-columns";
 import { CustomerTypeBadge, typeLabel } from "@/components/customer-type-toggle";
 
 import {
@@ -548,6 +549,8 @@ function ProjectsComponent() {
     return matchesSearch && matchesStatus;
   });
 
+  const lv = useListView("projects");
+
   const exportProjectRows = () =>
     filteredProjects.map((p) => ({
       "Project ID": p.id,
@@ -812,6 +815,8 @@ function ProjectsComponent() {
             <CardTitle className="text-sm font-semibold">Projects ({filteredProjects.length})</CardTitle>
           </div>
           <ExportButtons
+            before={<ColumnsSwitch view={lv} />}
+            printKey="list.projects"
             rows={exportProjectRows}
             filename="Projects"
             title="Projects"
@@ -823,21 +828,22 @@ function ProjectsComponent() {
             <table className="w-full text-left text-xs border-separate border-spacing-0">
               <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 text-muted-foreground text-[11px] font-bold uppercase tracking-wider [&_th]:sticky [&_th]:top-0 [&_th]:bg-slate-50 [&_th]:dark:bg-slate-900 [&_th]:z-10 [&_th]:border-b [&_th]:border-slate-200 [&_th]:dark:border-slate-800 shadow-2xs">
                 <tr>
+                  <ExpandHead view={lv} />
                   <th className="p-3 pl-4 whitespace-nowrap">ID</th>
                   <th className="p-3 whitespace-nowrap min-w-[160px]">CUSTOMER</th>
-                  <th className="p-3 whitespace-nowrap min-w-[200px]">WORK TYPE</th>
-                  <th className="p-3 whitespace-nowrap">ENGINEER</th>
-                  <th className="p-3 whitespace-nowrap">START DATE</th>
-                  <th className="p-3 whitespace-nowrap">STARTED</th>
-                  <th className="p-3 whitespace-nowrap">PAYMENT</th>
-                  <th className="p-3 whitespace-nowrap">STATUS</th>
+                  {lv.show("workType") && <th className="p-3 whitespace-nowrap min-w-[200px]">WORK TYPE</th>}
+                  {lv.show("engineer") && <th className="p-3 whitespace-nowrap">ENGINEER</th>}
+                  {lv.show("startDate") && <th className="p-3 whitespace-nowrap">START DATE</th>}
+                  {lv.show("started") && <th className="p-3 whitespace-nowrap">STARTED</th>}
+                  {lv.show("payment") && <th className="p-3 whitespace-nowrap">PAYMENT</th>}
+                  {lv.show("status") && <th className="p-3 whitespace-nowrap">STATUS</th>}
                   <th className="p-3 text-right pr-4 whitespace-nowrap">ACTION</th>
                 </tr>
               </thead>
               <tbody className="divide-y [&_td]:border-b [&_td]:border-slate-100 dark:[&_td]:border-slate-800">
                 {paginatedProjects.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-12 text-center">
+                    <td colSpan={lv.span(9 - lv.hidden.length)} className="p-12 text-center">
                       <div className="flex flex-col items-center justify-center space-y-3">
                         <div className="grid h-12 w-12 place-items-center rounded-full bg-blue-50 text-blue-600">
                           <FolderKanban className="h-6 w-6 stroke-[1.5]" />
@@ -870,37 +876,15 @@ function ProjectsComponent() {
                       return unique.join(" ");
                     })();
 
-                    return (
-                      <tr
-                        key={p.id}
-                        onClick={() => setActiveProject(p)}
-                        className="hover:bg-accent/40 transition-colors cursor-pointer"
-                      >
-                        <td className="p-3 pl-4 font-bold text-blue-600 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <span>{p.id}</span>
-                            {p.createdByRole && <CreatedByBadge role={p.createdByRole} />}
-                          </div>
-                          {p.enquiryId && (
-                            <Badge variant="outline" className="text-[9px] bg-blue-50 text-blue-700 border-blue-200 mt-0.5">
-                              Linked: {p.enquiryId}
-                            </Badge>
-                          )}
-                        </td>
-                        <td className="p-3 whitespace-nowrap">
-                          <div className="font-bold text-xs text-foreground truncate max-w-[160px]" title={cleanCustomerName}>
-                            {cleanCustomerName}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground truncate max-w-[190px]" title={`${p.phone} • ${p.location}`}>
-                            {p.phone} {p.location ? `• ${p.location}` : ""}
-                          </div>
-                        </td>
-                        <td className="p-3">
+                    const workTypeCell = (
+                      <>
                           <div className="font-semibold text-xs text-foreground truncate max-w-[210px]" title={p.natureOfWork}>
                             {p.natureOfWork}
                           </div>
-                        </td>
-                        <td className="p-3 whitespace-nowrap">
+                      </>
+                    );
+                    const engineerCell = (
+                      <>
                           {p.assignedEngineerName ? (
                             <span className="font-semibold text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 whitespace-nowrap inline-block">
                               {p.assignedEngineerName}
@@ -908,14 +892,20 @@ function ProjectsComponent() {
                           ) : (
                             <span className="text-amber-600 text-[11px] font-medium">Unassigned</span>
                           )}
-                        </td>
-                        <td className="p-3 font-semibold text-xs text-blue-700 whitespace-nowrap font-mono">
+                      </>
+                    );
+                    const startDateCell = (
+                      <>
                           {p.workCommittedDate ? p.workCommittedDate : "Not Set"}
-                        </td>
-                        <td className="p-3 font-semibold text-xs text-emerald-700 whitespace-nowrap font-mono">
+                      </>
+                    );
+                    const startedCell = (
+                      <>
                           {p.actualWorkStartedDate ? p.actualWorkStartedDate : "Pending"}
-                        </td>
-                        <td className="p-3 whitespace-nowrap">
+                      </>
+                    );
+                    const paymentCell = (
+                      <>
                           <Badge
                             className={`text-[10px] ${
                               p.paymentStatus === "Paid"
@@ -927,8 +917,10 @@ function ProjectsComponent() {
                           >
                             {p.paymentStatus}
                           </Badge>
-                        </td>
-                      <td className="p-3">
+                      </>
+                    );
+                    const statusCell = (
+                      <>
                         <div className="flex items-center gap-1.5">
                           {canFullEdit ? (
                             <Select
@@ -979,7 +971,41 @@ function ProjectsComponent() {
                           </Badge>
                           {p.customerType && <CustomerTypeBadge value={p.customerType} />}
                         </div>
-                      </td>
+                      </>
+                    );
+
+                    return (
+                      <Fragment key={p.id}>
+                      <tr
+                        onClick={() => setActiveProject(p)}
+                        className="hover:bg-accent/40 transition-colors cursor-pointer"
+                      >
+                        <ExpandCell view={lv} id={p.id} />
+                        <td className="p-3 pl-4 font-bold text-blue-600 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <span>{p.id}</span>
+                            {p.createdByRole && <CreatedByBadge role={p.createdByRole} />}
+                          </div>
+                          {p.enquiryId && (
+                            <Badge variant="outline" className="text-[9px] bg-blue-50 text-blue-700 border-blue-200 mt-0.5">
+                              Linked: {p.enquiryId}
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="p-3 whitespace-nowrap">
+                          <div className="font-bold text-xs text-foreground truncate max-w-[160px]" title={cleanCustomerName}>
+                            {cleanCustomerName}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground truncate max-w-[190px]" title={`${p.phone} • ${p.location}`}>
+                            {p.phone} {p.location ? `• ${p.location}` : ""}
+                          </div>
+                        </td>
+                        {lv.show("workType") && <td className="p-3">{workTypeCell}</td>}
+                        {lv.show("engineer") && <td className="p-3 whitespace-nowrap">{engineerCell}</td>}
+                        {lv.show("startDate") && <td className="p-3 font-semibold text-xs text-blue-700 whitespace-nowrap font-mono">{startDateCell}</td>}
+                        {lv.show("started") && <td className="p-3 font-semibold text-xs text-emerald-700 whitespace-nowrap font-mono">{startedCell}</td>}
+                        {lv.show("payment") && <td className="p-3 whitespace-nowrap">{paymentCell}</td>}
+                      {lv.show("status") && <td className="p-3">{statusCell}</td>}
                       <td className="p-3 text-right pr-4 whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                           <Button size="sm" variant="ghost" onClick={() => setActiveProject(p)} className="h-7 text-xs text-blue-600 gap-1 font-semibold">
@@ -999,6 +1025,20 @@ function ProjectsComponent() {
                         </div>
                       </td>
                     </tr>
+                      <HiddenDetailsRow
+                        view={lv}
+                        id={p.id}
+                        colSpan={lv.span(9 - lv.hidden.length)}
+                        items={[
+                          { key: "workType", node: workTypeCell },
+                          { key: "engineer", node: engineerCell },
+                          { key: "startDate", node: startDateCell },
+                          { key: "started", node: startedCell },
+                          { key: "payment", node: paymentCell },
+                          { key: "status", node: statusCell },
+                        ]}
+                      />
+                      </Fragment>
                   );
                 })
                 )}

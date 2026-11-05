@@ -42,6 +42,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { printTableStyle, printCellClass } from "@/lib/table-export";
+import { useColumnChooser, pickArrayColumns } from "@/components/choose-columns-dialog";
 import {
   generateProjectsReport,
   generateAttendanceReport,
@@ -695,7 +697,7 @@ function ReportsComponent() {
   };
 
   // Export Excel (.xlsx) Helper with Auto-Fit Column Widths (Fixes ##### issue in Excel!)
-  const handleExportCSV = (filename: string, headers: string[], rows: (string | number)[][], totalRow?: (string | number)[]) => {
+  const runExportCSV = (filename: string, headers: string[], rows: (string | number)[][], totalRow?: (string | number)[]) => {
     try {
       const cleanRows = (totalRow ? [...rows, totalRow] : rows).map((row) =>
         row.map((val) => {
@@ -748,7 +750,7 @@ function ReportsComponent() {
   };
 
   // Export Printable PDF Helper
-  const handleExportPDF = (reportTitle: string, headers: string[], rows: (string | number)[][], totalRow?: (string | number)[]) => {
+  const runExportPDF = (reportTitle: string, headers: string[], rows: (string | number)[][], totalRow?: (string | number)[]) => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
       toast.error("Please allow popups to download PDF report");
@@ -758,7 +760,7 @@ function ReportsComponent() {
     const tableHeaders = headers
       .map(
         (h) =>
-          `<th style="padding:8px 10px; border:1px solid #cbd5e1; background:#f1f5f9; text-align:left; font-size:10px; font-weight:bold; color:#1e293b; text-transform:uppercase;">${h}</th>`
+          `<th>${h}</th>`
       )
       .join("");
 
@@ -768,7 +770,7 @@ function ReportsComponent() {
           `<tr>${r
             .map(
               (cell) =>
-                `<td style="padding:6px 10px; border:1px solid #e2e8f0; font-size:10px; color:#334155;">${cell ?? "N/A"}</td>`
+                `<td class="${printCellClass(cell ?? "N/A")}">${cell ?? "N/A"}</td>`
             )
             .join("")}</tr>`
       )
@@ -778,7 +780,7 @@ function ReportsComponent() {
       ? `<tr>${totalRow
           .map(
             (cell) =>
-              `<td style="padding:8px 10px; border:1px solid #cbd5e1; background:#f1f5f9; font-size:10px; font-weight:bold; color:#1e293b;">${cell ?? ""}</td>`
+              `<td class="total ${printCellClass(cell)}">${cell ?? ""}</td>`
           )
           .join("")}</tr>`
       : "";
@@ -794,17 +796,12 @@ function ReportsComponent() {
       <html>
         <head>
           <title>${reportTitle}</title>
+          ${printTableStyle(headers.length)}
           <style>
-            body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; color: #0f172a; margin: 0; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-bottom: 16px; }
+            .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
             .logo { font-size: 18px; font-weight: 900; color: #1e3a8a; }
             .subtitle { font-size: 11px; color: #64748b; margin-top: 2px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-            .footer { margin-top: 20px; text-align: right; font-size: 10px; color: #94a3b8; }
-            @media print {
-              body { padding: 0; }
-              @page { size: A4 landscape; margin: 10mm; }
-            }
+            td.total { background: #f1f5f9; font-weight: bold; color: #1e293b; border-color: #cbd5e1; }
           </style>
         </head>
         <body>
@@ -836,12 +833,49 @@ function ReportsComponent() {
     toast.success(`Generated PDF View for ${reportTitle}`);
   };
 
+
+  // Every Reports-page export first asks which columns to include (saved on this computer).
+  const columnChooser = useColumnChooser();
+  const chooseThenExport = (
+    kind: "PDF" | "Excel",
+    printKey: string,
+    title: string,
+    headers: string[],
+    rows: (string | number)[][],
+    totalRow: (string | number)[] | undefined,
+    run: (title: string, headers: string[], rows: (string | number)[][], totalRow?: (string | number)[]) => void,
+  ) => {
+    columnChooser.choose({
+      reportKey: printKey,
+      title,
+      headers,
+      kind,
+      onConfirm: (selected) => {
+        const picked = pickArrayColumns(headers, rows, selected);
+        let pickedTotal: (string | number)[] | undefined;
+        if (totalRow) {
+          pickedTotal = picked.indexes.map((i) => totalRow[i]);
+          // Keep the "TOTAL" label even when its own column was left out.
+          if (!picked.indexes.includes(0) && pickedTotal.length > 0 && (pickedTotal[0] === "" || pickedTotal[0] == null)) {
+            pickedTotal[0] = totalRow[0];
+          }
+        }
+        run(title, picked.headers, picked.rows, pickedTotal);
+      },
+    });
+  };
+  const handleExportCSV = (printKey: string, filename: string, headers: string[], rows: (string | number)[][], totalRow?: (string | number)[]) =>
+    chooseThenExport("Excel", printKey, filename, headers, rows, totalRow, runExportCSV);
+  const handleExportPDF = (printKey: string, reportTitle: string, headers: string[], rows: (string | number)[][], totalRow?: (string | number)[]) =>
+    chooseThenExport("PDF", printKey, reportTitle, headers, rows, totalRow, runExportPDF);
+
   const handlePrintPDF = () => {
     window.print();
   };
 
   return (
     <div className="space-y-6">
+      {columnChooser.dialog}
       {/* Header */}
       <div className="bg-white dark:bg-card p-6 rounded-xl border border-border shadow-xs">
         <div>
@@ -941,7 +975,7 @@ function ReportsComponent() {
                   onClick={() => {
                     const statusLabel = revenuePaymentStatusFilter === "ALL" ? "All_Payments" : revenuePaymentStatusFilter;
                     const dateLabel = revenueStartDateFilter || revenueEndDateFilter ? `_${revenueStartDateFilter}_to_${revenueEndDateFilter}` : "";
-                    handleExportCSV(
+                    handleExportCSV("reports.revenue.excel", 
                       `Custom_Revenue_Report_${statusLabel}${typeFileLabel}${dateLabel}`,
                       ["Project ID", "Customer Name", "Work Description", "Scheduled Date", "Contract Value (INR)", "Discount (INR)", "Net Payable (INR)", "Amount Received (INR)", "Balance Due (INR)", "Payment Status"],
                       filteredRevenueReport.map((p) => [
@@ -968,7 +1002,7 @@ function ReportsComponent() {
                   onClick={() => {
                     const statusLabel = revenuePaymentStatusFilter === "ALL" ? "All_Payments" : revenuePaymentStatusFilter;
                     const dateLabel = revenueStartDateFilter || revenueEndDateFilter ? ` (${revenueStartDateFilter} to ${revenueEndDateFilter})` : "";
-                    handleExportPDF(
+                    handleExportPDF("reports.revenue.pdf", 
                       `Custom Revenue & Billing Summary Report - ${statusLabel}${typeTitleLabel}${dateLabel}`,
                       ["Project ID", "Customer Name", "Work Description", "Scheduled Date", "Contract Value (₹)", "Discount (₹)", "Net Payable (₹)", "Received (₹)", "Balance Due (₹)", "Status"],
                       filteredRevenueReport.map((p) => [
@@ -1192,7 +1226,7 @@ function ReportsComponent() {
                     const statusLabel = projectStatusFilter === "ALL" ? "All_Statuses" : projectStatusFilter;
                     const gstLabel = typeFileLabel;
                     const dateLabel = startDateFilter || endDateFilter ? `_${startDateFilter}_to_${endDateFilter}` : "";
-                    handleExportCSV(
+                    handleExportCSV("reports.projects.excel", 
                       `Custom_Projects_Report_${statusLabel}${gstLabel}${dateLabel}`,
                       ["Project ID", "Customer Name", "Customer Type", "GST Status", "Work Description", "Lead Engineer", "Scheduled Date", "Location", "Contract Value (INR)", "Discount (INR)", "Net Payable (INR)", "Payment Status", "Project Status"],
                       filteredProjectsReport.map((p) => [
@@ -1441,7 +1475,7 @@ function ReportsComponent() {
                   onClick={() => {
                     const statusLabel = pendingPaymentStatusFilter === "ALL" ? "All_Pending" : pendingPaymentStatusFilter;
                     const dateLabel = pendingStartDateFilter || pendingEndDateFilter ? `_${pendingStartDateFilter}_to_${pendingEndDateFilter}` : "";
-                    handleExportCSV(
+                    handleExportCSV("reports.pending.excel", 
                       `Custom_Pending_Collections_Report_${statusLabel}${typeFileLabel}${dateLabel}`,
                       ["Project ID", "Customer Name", "Contact Phone", "Work Description", "Scheduled / Due Date", "Contract Value (INR)", "Discount (INR)", "Net Payable (INR)", "Amount Received (INR)", "Outstanding Due (INR)", "Payment Status"],
                       filteredPendingReport.map((p) => [
@@ -1470,7 +1504,7 @@ function ReportsComponent() {
                   onClick={() => {
                     const statusLabel = pendingPaymentStatusFilter === "ALL" ? "All_Pending" : pendingPaymentStatusFilter;
                     const dateLabel = pendingStartDateFilter || pendingEndDateFilter ? ` (${pendingStartDateFilter} to ${pendingEndDateFilter})` : "";
-                    handleExportPDF(
+                    handleExportPDF("reports.pending.pdf", 
                       `Custom Pending Receivables & Collections Report - ${statusLabel}${typeTitleLabel}${dateLabel}`,
                       ["Project ID", "Customer Name", "Contact Phone", "Work Description", "Scheduled / Due Date", "Contract Value (₹)", "Discount (₹)", "Net Payable (₹)", "Received (₹)", "Outstanding Due (₹)", "Status"],
                       filteredPendingReport.map((p) => [
@@ -1708,7 +1742,7 @@ function ReportsComponent() {
                   onClick={() => {
                     const decLabel = enquiryDecisionFilter === "ALL" ? "All_Decisions" : enquiryDecisionFilter;
                     const dateLabel = enquiryStartDateFilter || enquiryEndDateFilter ? `_${enquiryStartDateFilter}_to_${enquiryEndDateFilter}` : "";
-                    handleExportCSV(
+                    handleExportCSV("reports.enquiries.excel", 
                       `Custom_Enquiries_Report_${decLabel}${typeFileLabel}${dateLabel}`,
                       [
                         "Enquiry ID",
@@ -1756,7 +1790,7 @@ function ReportsComponent() {
                   onClick={() => {
                     const decLabel = enquiryDecisionFilter === "ALL" ? "All_Decisions" : enquiryDecisionFilter;
                     const dateLabel = enquiryStartDateFilter || enquiryEndDateFilter ? ` (${enquiryStartDateFilter} to ${enquiryEndDateFilter})` : "";
-                    handleExportPDF(
+                    handleExportPDF("reports.enquiries.pdf", 
                       `Custom Enquiries & Quotations Funnel Report - ${decLabel}${typeTitleLabel}${dateLabel}`,
                       [
                         "Enquiry ID",
@@ -2003,7 +2037,7 @@ function ReportsComponent() {
                         return true;
                       });
 
-                      handleExportCSV(
+                      handleExportCSV("reports.timesheet.excel", 
                         `Attendance_Timesheet_${memberLabel}${dateLabel}`,
                         ["Date", "Labour ID", "Labour Name", "Project / Customer", "Location", "Work Description", "Check-in", "Check-out", "Hours Worked", "Earned Wage (INR)", "Attendance", "Verification"],
                         logsToExport.map((log) => [
@@ -2022,7 +2056,7 @@ function ReportsComponent() {
                         ])
                       );
                     } else {
-                      handleExportCSV(
+                      handleExportCSV("reports.payrollSummary.excel", 
                         `Payroll_Summary_${memberLabel}${dateLabel}`,
                         ["Labour ID", "Labour Name", "Labour Type", "Daily Wage (₹/day)", "Present Days", "Total Hours Worked", "Earned Payroll (INR)"],
                         filteredLaboursSummary.map((item) => [
@@ -2314,7 +2348,7 @@ function ReportsComponent() {
                   size="sm"
                   onClick={() => {
                     const dateLabel = `_${payrollStartDate}_to_${payrollEndDate}`;
-                    handleExportCSV(
+                    handleExportCSV("reports.weeklyPayroll.excel", 
                       `Weekly_Payroll_Report${dateLabel}`,
                       [
                         "Labour ID",
@@ -2624,7 +2658,7 @@ function ReportsComponent() {
                   size="sm"
                   onClick={() => {
                     const dateLabel = myActivityStartDate || myActivityEndDate ? ` (${myActivityStartDate} to ${myActivityEndDate})` : "";
-                    handleExportPDF(
+                    handleExportPDF("reports.activity.pdf", 
                       `My Activity Log Report - ${currentUser?.name || "User"}${dateLabel}`,
                       ["Date / Time", "Action (Event)", "Project", "Details", "Actor"],
                       filteredMyActivities.map((act) => [
@@ -2791,7 +2825,7 @@ function ReportsComponent() {
                   onClick={() => {
                     const statusLabel = custLedgerStatusFilter === "ALL" ? "All_Clients" : custLedgerStatusFilter;
                     const dateLabel = custStartDateFilter || custEndDateFilter ? `_${custStartDateFilter}_to_${custEndDateFilter}` : "";
-                    handleExportCSV(
+                    handleExportCSV("reports.ledger.excel", 
                       `Customer_Account_Ledger_${statusLabel}${typeFileLabel}${dateLabel}`,
                       ["Customer ID", "Customer Name", "Contact Phone", "Location", "Projects Count", "Total Lifetime Value (INR)", "Total Cash Received (INR)", "Outstanding Due (INR)", "Status"],
                       filteredCustomerLedgers.map((item) => [
@@ -2817,7 +2851,7 @@ function ReportsComponent() {
                   onClick={() => {
                     const statusLabel = custLedgerStatusFilter === "ALL" ? "All_Clients" : custLedgerStatusFilter;
                     const dateLabel = custStartDateFilter || custEndDateFilter ? ` (${custStartDateFilter} to ${custEndDateFilter})` : "";
-                    handleExportPDF(
+                    handleExportPDF("reports.ledger.pdf", 
                       `Customer Account Ledger & Lifetime Statements - ${statusLabel}${typeTitleLabel}${dateLabel}`,
                       ["Customer ID", "Customer Name", "Contact Phone", "Location", "Projects", "Lifetime Value (INR)", "Cash Received (INR)", "Outstanding Due (INR)", "Status"],
                       filteredCustomerLedgers.map((item) => [
@@ -3241,7 +3275,7 @@ function ReportsComponent() {
                 </Button>
                 <Button
                   onClick={() => {
-                    handleExportCSV(
+                    handleExportCSV("reports.workDone.excel", 
                       `Work_Done_${selectedWorkDoneItem.projectId}_${selectedWorkDoneItem.date}`,
                       ["Project ID", "Customer Name", "Work Category", "Activity Date", "Lead Engineer", "Staff On Duty", "Work Done Description", "Hours Logged", "Location", "Status"],
                       [[
@@ -3376,7 +3410,7 @@ function ReportsComponent() {
                 </Button>
                 <Button
                   onClick={() => {
-                    handleExportCSV(
+                    handleExportCSV("reports.clientStatement.excel", 
                       `Client_Statement_${selectedCustomerLedger.customer.name.replace(/\s+/g, "_")}`,
                       ["Project ID", "Customer Name", "Work Description", "Scheduled Date", "Contract Value (INR)", "Amount Received (INR)", "Balance Due (INR)", "Payment Status"],
                       selectedCustomerLedger.projects.map((p: any) => [
@@ -3566,7 +3600,7 @@ function ReportsComponent() {
                 <div className="flex items-center gap-2">
                   <Button
                     onClick={() => {
-                      handleExportCSV(
+                      handleExportCSV("reports.workHistory.excel", 
                         `Project_Work_History_${selectedWorkProject.projectId}_Till_Date`,
                         ["Project ID", "Customer Name", "Work Category", "Shift Date", "Staff On Duty", "Work Done Description", "In Time", "Out Time", "Hours Worked", "Verification"],
                         selectedWorkProject.logs.length > 0
@@ -3603,7 +3637,7 @@ function ReportsComponent() {
 
                   <Button
                     onClick={() => {
-                      handleExportPDF(
+                      handleExportPDF("reports.workHistory.pdf", 
                         `Project Work History & Shift Logs - ${selectedWorkProject.projectId} (${selectedWorkProject.customerName})`,
                         ["Shift Date", "Staff On Duty", "Work Done Description", "In - Out Time", "Hours Logged", "Verification Status"],
                         selectedWorkProject.logs.length > 0

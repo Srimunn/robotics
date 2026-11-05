@@ -64,6 +64,43 @@ export function exportRowsToExcel(filename: string, rows: ExportRow[], sheetName
 }
 
 /**
+ * Print CSS shared by every table printout. The table is always squeezed to the page width
+ * (long text wraps inside its cell instead of running off the paper), the font shrinks a
+ * little when there are many columns, and the 12 mm margin stays inside what office
+ * printers can print, so nothing is cut off at the edges of an A4 sheet.
+ */
+/** Short values with no spaces (IDs, phone numbers, dates, amounts) are never split across lines. */
+export function printCellClass(value: unknown) {
+  const v = String(value ?? "");
+  return v.length > 0 && v.length <= 16 && !/\s/.test(v) ? "nw" : "";
+}
+
+export function printTableStyle(columnCount: number) {
+  const font = columnCount > 16 ? 7 : columnCount > 12 ? 7.5 : columnCount > 8 ? 8.5 : 9.5;
+  const pad = columnCount > 12 ? "3px 4px" : "5px 6px";
+  return `<style>
+  * { box-sizing: border-box; }
+  html, body { width: 100%; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; padding: 16px; color: #0f172a; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .header { border-bottom: 2px solid #2563eb; padding-bottom: 8px; margin-bottom: 12px; }
+  .company { font-size: 16px; font-weight: 800; color: #1e3a8a; }
+  .title { font-size: 13px; font-weight: 700; margin-top: 2px; }
+  .meta { font-size: 10px; color: #64748b; margin-top: 2px; }
+  table { width: 100%; max-width: 100%; border-collapse: collapse; table-layout: auto; }
+  th, td { overflow-wrap: ${columnCount > 14 ? "anywhere" : "break-word"}; word-break: normal; }
+  th { overflow-wrap: anywhere; }
+  td.nw { white-space: nowrap; }
+  th { padding: ${pad}; border: 1px solid #cbd5e1; background: #f1f5f9; text-align: left; font-size: ${font}px; text-transform: uppercase; vertical-align: bottom; }
+  td { padding: ${pad}; border: 1px solid #e2e8f0; font-size: ${font + 0.5}px; color: #334155; vertical-align: top; }
+  tr { page-break-inside: avoid; break-inside: avoid; }
+  thead { display: table-header-group; }
+  .footer { margin-top: 12px; font-size: 9px; color: #94a3b8; text-align: right; }
+  @page { size: A4 landscape; margin: 12mm; }
+  @media print { body { padding: 0; } }
+</style>`;
+}
+
+/**
  * Opens a printable A4-landscape table and the browser print dialog ("Save as PDF").
  * Returns false when the popup was blocked.
  */
@@ -79,27 +116,14 @@ export function exportRowsToPdf(
   const docTitle = `${safeFileName(title)}_${today()}`;
   w.document
     .write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(docTitle)}</title>
-<style>
-  body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; color: #0f172a; margin: 0; }
-  .header { border-bottom: 2px solid #2563eb; padding-bottom: 8px; margin-bottom: 12px; }
-  .company { font-size: 16px; font-weight: 800; color: #1e3a8a; }
-  .title { font-size: 13px; font-weight: 700; margin-top: 2px; }
-  .meta { font-size: 10px; color: #64748b; margin-top: 2px; }
-  table { width: 100%; border-collapse: collapse; }
-  th { padding: 6px 8px; border: 1px solid #cbd5e1; background: #f1f5f9; text-align: left; font-size: 9px; text-transform: uppercase; }
-  td { padding: 5px 8px; border: 1px solid #e2e8f0; font-size: 9.5px; color: #334155; vertical-align: top; }
-  tr { page-break-inside: avoid; }
-  thead { display: table-header-group; }
-  .footer { margin-top: 12px; font-size: 9px; color: #94a3b8; text-align: right; }
-  @media print { body { padding: 0; } @page { size: A4 landscape; margin: 10mm; } }
-</style></head><body>
+${printTableStyle(headers.length)}</head><body>
 <div class="header">
   <div class="company">${escapeHtml(opts.companyName || "Service_OS")}</div>
   <div class="title">${escapeHtml(title)}</div>
   <div class="meta">${opts.subtitle ? `${escapeHtml(opts.subtitle)} • ` : ""}${rows.length} record(s) • Generated ${escapeHtml(generated)}</div>
 </div>
 <table><thead><tr>${headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead>
-<tbody>${rows.map((r) => `<tr>${headers.map((h) => `<td>${escapeHtml(pdfCell(r[h]))}</td>`).join("")}</tr>`).join("")}</tbody></table>
+<tbody>${rows.map((r) => `<tr>${headers.map((h) => `<td class="${printCellClass(pdfCell(r[h]))}">${escapeHtml(pdfCell(r[h]))}</td>`).join("")}</tr>`).join("")}</tbody></table>
 <div class="footer">Generated via Service_OS</div>
 <script>window.onload = function () { window.print(); };</script>
 </body></html>`);

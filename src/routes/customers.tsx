@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, Fragment } from "react";
 import { useRobotics } from "@/lib/robotics-context";
 import type { Customer, Enquiry, Project } from "@/lib/robotics-types";
 import { ExportButtons } from "@/components/export-buttons";
+import { useListView, ColumnsSwitch, ExpandHead, ExpandCell, HiddenDetailsRow } from "@/components/list-columns";
 import { CustomerTypeBadge, GstBadge, typeLabel, gstLabel } from "@/components/customer-type-toggle";
 import { DataPagination } from "@/components/ui/DataPagination";
 import {
@@ -173,6 +174,8 @@ function CustomersComponent() {
     </th>
   );
 
+  const lv = useListView("customers");
+
   const exportRows = () =>
     filteredRows.map((r, i) => ({
       "S.No": i + 1,
@@ -247,6 +250,8 @@ function CustomersComponent() {
         <CardHeader className="p-4 border-b flex flex-row flex-wrap items-center justify-between gap-2">
           <CardTitle className="text-sm font-semibold">Customers ({filteredRows.length})</CardTitle>
           <ExportButtons
+            before={<ColumnsSwitch view={lv} />}
+            printKey="list.customers"
             rows={exportRows}
             filename="Customers"
             title="Customers"
@@ -258,24 +263,25 @@ function CustomersComponent() {
             <table className="w-full text-left text-xs border-separate border-spacing-0" data-testid="customers-table">
               <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 text-muted-foreground text-[11px] font-bold uppercase tracking-wider [&_th]:sticky [&_th]:top-0 [&_th]:bg-slate-50 [&_th]:dark:bg-slate-900 [&_th]:z-10 [&_th]:border-b [&_th]:border-slate-200 [&_th]:dark:border-slate-800 shadow-2xs">
                 <tr>
-                  <th className="p-3 pl-4 whitespace-nowrap hidden sm:table-cell">S.NO</th>
+                  <ExpandHead view={lv} />
+                  {lv.show("sno") && <th className="p-3 pl-4 whitespace-nowrap hidden sm:table-cell">S.NO</th>}
                   <SortHeader k="name" label="Customer" className="min-w-[160px] left-0 !z-20" />
-                  <th className="p-3 whitespace-nowrap">PHONE</th>
-                  <th className="p-3 whitespace-nowrap">LOCATION</th>
-                  <th className="p-3 whitespace-nowrap">TYPE</th>
-                  <th className="p-3 whitespace-nowrap">GST</th>
-                  <SortHeader k="enquiries" label="Enquiries" />
-                  <SortHeader k="projects" label="Projects" />
-                  <SortHeader k="value" label="Contract Value" className="text-right" />
-                  <SortHeader k="collected" label="Collected" className="text-right" />
-                  <SortHeader k="pending" label="Pending" className="text-right" />
-                  <SortHeader k="lastActivity" label="Last Activity" className="pr-4" />
+                  {lv.show("phone") && <th className="p-3 whitespace-nowrap">PHONE</th>}
+                  {lv.show("location") && <th className="p-3 whitespace-nowrap">LOCATION</th>}
+                  {lv.show("type") && <th className="p-3 whitespace-nowrap">TYPE</th>}
+                  {lv.show("gst") && <th className="p-3 whitespace-nowrap">GST</th>}
+                  {lv.show("enquiries") && <SortHeader k="enquiries" label="Enquiries" />}
+                  {lv.show("projects") && <SortHeader k="projects" label="Projects" />}
+                  {lv.show("value") && <SortHeader k="value" label="Contract Value" className="text-right" />}
+                  {lv.show("collected") && <SortHeader k="collected" label="Collected" className="text-right" />}
+                  {lv.show("pending") && <SortHeader k="pending" label="Pending" className="text-right" />}
+                  {lv.show("lastActivity") && <SortHeader k="lastActivity" label="Last Activity" className="pr-4" />}
                 </tr>
               </thead>
               <tbody className="[&_td]:border-b [&_td]:border-slate-100 dark:[&_td]:border-slate-800">
                 {pageRows.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="p-12 text-center">
+                    <td colSpan={lv.span(12 - lv.hidden.length)} className="p-12 text-center">
                       <div className="flex flex-col items-center justify-center space-y-3">
                         <div className="grid h-12 w-12 place-items-center rounded-full bg-blue-50 text-blue-600">
                           <Users className="h-6 w-6 stroke-[1.5]" />
@@ -288,37 +294,75 @@ function CustomersComponent() {
                     </td>
                   </tr>
                 ) : (
-                  pageRows.map((r, i) => (
-                    <tr
-                      key={r.customer.id}
-                      onClick={() => setSelectedCustomer(r.customer)}
-                      className="group hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors cursor-pointer"
-                    >
-                      <td className="p-3 pl-4 text-muted-foreground hidden sm:table-cell">{(currentPage - 1) * pageSize + i + 1}</td>
-                      <td className="p-3 font-bold text-foreground sticky left-0 z-[1] bg-white dark:bg-card group-hover:bg-slate-50 dark:group-hover:bg-slate-900">
-                        <span className="truncate block max-w-[220px]" title={r.customer.name}>{r.customer.name}</span>
-                      </td>
-                      <td className="p-3 whitespace-nowrap font-mono">{r.customer.phone}</td>
-                      <td className="p-3 whitespace-nowrap truncate max-w-[160px]" title={r.customer.location}>{r.customer.location}</td>
-                      <td className="p-3 whitespace-nowrap"><CustomerTypeBadge value={r.type} /></td>
-                      <td className="p-3 whitespace-nowrap"><GstBadge value={r.gst} /></td>
-                      <td className="p-3 whitespace-nowrap text-center">{r.enquiryCount}</td>
-                      <td className="p-3 whitespace-nowrap">
+                  pageRows.map((r, i) => {
+                    const snoCell = <>{(currentPage - 1) * pageSize + i + 1}</>;
+                    const phoneCell = <>{r.customer.phone}</>;
+                    const locationCell = <>{r.customer.location}</>;
+                    const typeCell = <><CustomerTypeBadge value={r.type} /></>;
+                    const gstCell = <><GstBadge value={r.gst} /></>;
+                    const enquiriesCell = <>{r.enquiryCount}</>;
+                    const projectsCell = (
+                      <>
                         <span className="font-semibold">{r.projectCount}</span>
                         {r.projectCount > 0 && (
                           <span className="text-[10px] text-muted-foreground ml-1">
                             ({r.ongoingCount} ongoing, {r.completedCount} done)
                           </span>
                         )}
-                      </td>
-                      <td className="p-3 whitespace-nowrap text-right font-semibold">₹{r.value.toLocaleString("en-IN")}</td>
-                      <td className="p-3 whitespace-nowrap text-right font-semibold text-emerald-600">₹{r.collected.toLocaleString("en-IN")}</td>
-                      <td className={`p-3 whitespace-nowrap text-right font-bold ${r.pending > 0 ? "text-rose-600" : "text-muted-foreground"}`}>
+                      </>
+                    );
+                    const valueCell = <>₹{r.value.toLocaleString("en-IN")}</>;
+                    const collectedCell = <>₹{r.collected.toLocaleString("en-IN")}</>;
+                    const pendingCell = (
+                      <>
                         ₹{r.pending.toLocaleString("en-IN")}
+                      </>
+                    );
+                    const lastActivityCell = <>{r.lastActivity || "—"}</>;
+
+                    return (
+                    <Fragment key={r.customer.id}>
+                    <tr
+                      onClick={() => setSelectedCustomer(r.customer)}
+                      className="group hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors cursor-pointer"
+                    >
+                      <ExpandCell view={lv} id={r.customer.id} />
+                      {lv.show("sno") && <td className="p-3 pl-4 text-muted-foreground hidden sm:table-cell">{snoCell}</td>}
+                      <td className="p-3 font-bold text-foreground sticky left-0 z-[1] bg-white dark:bg-card group-hover:bg-slate-50 dark:group-hover:bg-slate-900">
+                        <span className="truncate block max-w-[220px]" title={r.customer.name}>{r.customer.name}</span>
                       </td>
-                      <td className="p-3 pr-4 whitespace-nowrap font-mono">{r.lastActivity || "—"}</td>
+                      {lv.show("phone") && <td className="p-3 whitespace-nowrap font-mono">{phoneCell}</td>}
+                      {lv.show("location") && <td className="p-3 whitespace-nowrap truncate max-w-[160px]" title={r.customer.location}>{locationCell}</td>}
+                      {lv.show("type") && <td className="p-3 whitespace-nowrap">{typeCell}</td>}
+                      {lv.show("gst") && <td className="p-3 whitespace-nowrap">{gstCell}</td>}
+                      {lv.show("enquiries") && <td className="p-3 whitespace-nowrap text-center">{enquiriesCell}</td>}
+                      {lv.show("projects") && <td className="p-3 whitespace-nowrap">{projectsCell}</td>}
+                      {lv.show("value") && <td className="p-3 whitespace-nowrap text-right font-semibold">{valueCell}</td>}
+                      {lv.show("collected") && <td className="p-3 whitespace-nowrap text-right font-semibold text-emerald-600">{collectedCell}</td>}
+                      {lv.show("pending") && <td className={`p-3 whitespace-nowrap text-right font-bold ${r.pending > 0 ? "text-rose-600" : "text-muted-foreground"}`}>{pendingCell}</td>}
+                      {lv.show("lastActivity") && <td className="p-3 pr-4 whitespace-nowrap font-mono">{lastActivityCell}</td>}
                     </tr>
-                  ))
+                    <HiddenDetailsRow
+                      view={lv}
+                      id={r.customer.id}
+                      colSpan={lv.span(12 - lv.hidden.length)}
+                      items={[
+                        { key: "sno", node: snoCell },
+                        { key: "phone", node: phoneCell },
+                        { key: "location", node: locationCell },
+                        { key: "type", node: typeCell },
+                        { key: "gst", node: gstCell },
+                        { key: "enquiries", node: enquiriesCell },
+                        { key: "projects", node: projectsCell },
+                        { key: "value", node: valueCell },
+                        { key: "collected", node: collectedCell },
+                        { key: "pending", node: pendingCell },
+                        { key: "lastActivity", node: lastActivityCell },
+                      ]}
+                    />
+                    </Fragment>
+                    );
+                  })
                 )}
               </tbody>
             </table>

@@ -354,6 +354,7 @@ function AttendancePageComponent() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ExportButtons
+            printKey="list.attendance"
             rows={exportAttendanceRows}
             filename="Attendance"
             title="Attendance & Wages"

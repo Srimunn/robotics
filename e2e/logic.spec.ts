@@ -66,7 +66,8 @@ async function createEnquiry(
   await search(page, customer);
   const row = rowWith(page, customer);
   await expect(row).toHaveCount(1);
-  const id = (await row.locator("td").first().innerText()).match(/ENQ-[\w-]+/)?.[0];
+  // The first cell may be the row's expand arrow, so read the id from the whole row.
+  const id = (await row.innerText()).match(/ENQ-\d{4}-\d+/)?.[0];
   expect(id, "enquiry id shown in first column").toBeTruthy();
   return id!;
 }
@@ -234,7 +235,7 @@ test("enquiry -> approve -> convert: project value equals quotation; cannot conv
 
   // The enquiry cockpit still renders "Convert To Project" in its Approved banner;
   // pressing it must not create a second project.
-  await row.locator("td").first().click();
+  await row.getByText(P.enquiryId, { exact: true }).click();
   const enq = page.getByRole("dialog").filter({ hasText: P.enquiryId });
   await expect(enq).toBeVisible();
   const again = enq.getByRole("button", { name: /Convert To Project/i });
@@ -383,7 +384,7 @@ test("[bug] editing only the enquiry remarks does not change the discounted proj
 
   await navTo(page, "/enquiries");
   await search(page, P.customer);
-  await rowWith(page, P.customer).locator("td").first().click();
+  await rowWith(page, P.customer).getByText(P.enquiryId, { exact: true }).click();
   const dialog = page.getByRole("dialog").filter({ hasText: P.enquiryId });
   await expect(dialog).toBeVisible();
   await fieldInput(dialog, "Remarks & Special Notes").fill(`remarks edited by ${RUN}`);
